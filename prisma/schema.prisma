@@ -1,0 +1,45 @@
+// =============================================================================
+// Qooma Backend Service — Prisma Schema
+// =============================================================================
+// 1 service = 1 database = 1 schema. Lihat ADR-0004.
+// Schema ini berisi 1 model contoh (`ExampleResource`) sebagai pola.
+// Ganti / hapus sesuai kebutuhan service.
+// =============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Contoh model (REFERENCE — ganti dengan model service Anda)
+// =============================================================================
+//
+// Konvensi:
+// - Tabel: snake_case di DB (pakai @map), camelCase di model Prisma
+// - Field: snake_case di DB (@map), camelCase di model
+// - PK: UUID v4 default
+// - Timestamp: TIMESTAMPTZ UTC
+// - Soft delete: kolom `deletedAt` (opsional)
+//
+// Lihat docs/MODULE_TEMPLATE.md untuk contoh penggunaan.
+// =============================================================================
+
+model ExampleResource {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  status    String    @default("active") @db.VarChar(50)
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@map("example_resources")
+  @@index([status, createdAt])
+}
