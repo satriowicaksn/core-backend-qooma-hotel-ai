@@ -19,7 +19,7 @@
 
 ## 🧱 Tech stack
 
-Node.js 20 LTS · TypeScript 5 (strict) · Fastify 4 · Prisma 5 · PostgreSQL 15 · Redis 7 · Bull 4 · zod 3 · winston 3 · Jest 29 · **pnpm 9** · Docker multi-stage · AWS ECS Fargate (default deploy target)
+Node.js ≥20 LTS (diuji di Node 20 + 22) · TypeScript 5 (strict) · Fastify 4 · Prisma 5 · PostgreSQL 15 · Redis 7 · Bull 4 · zod 3 · winston 3 · Jest 29 · **pnpm 9** · Docker multi-stage · AWS ECS Fargate (default deploy target)
 
 ## 🏗️ Pattern arsitektur
 
@@ -31,8 +31,10 @@ Detail rationale: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) + ADR di [docs/
 
 ## 🚀 Quick start
 
+> **Prasyarat**: Node.js ≥20, pnpm (auto-install via `corepack enable` — sudah di-handle `make install`).
+
 ```bash
-# 1. Install pnpm & deps
+# 1. Install pnpm & deps (termasuk corepack enable otomatis)
 make install
 
 # 2. Setup env
