@@ -1,11 +1,3 @@
-// =============================================================================
-// Qooma Backend Service — Prisma Schema
-// =============================================================================
-// 1 service = 1 database = 1 schema. Lihat ADR-0004.
-// Schema ini berisi 1 model contoh (`ExampleResource`) sebagai pola.
-// Ganti / hapus sesuai kebutuhan service.
-// =============================================================================
-
 generator client {
   provider      = "prisma-client-js"
   output        = "../node_modules/.prisma/client"
