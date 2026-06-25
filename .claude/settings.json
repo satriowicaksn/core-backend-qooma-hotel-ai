@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings",
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(pnpm:*)",
@@ -45,7 +45,7 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
       "env": {
-        "DATABASE_URL": "postgresql://app:app_dev_pw@localhost:5432/app"
+        "DATABASE_URL": "postgresql://app:app_dev_pw@localhost:5433/app"
       }
     },
     "serena": {

@@ -44,6 +44,13 @@ Saya akan scaffold backend service baru untuk platform Qooma. Tolong ikuti conve
 ├── .claude/settings.json           MCP servers + permissions
 ├── .github/workflows/ci.yml        Lint + typecheck + test + docker build
 ├── .github/PULL_REQUEST_TEMPLATE.md
+├── KICKOFF.md                      Master multi-dev kickoff (Planning/Parent PM/PM A-C/Executor A-C prompts, Nathan/Nanak/Satrio naming)
+├── PM-AGENT.md                     Orchestrator prompt (Parent PM + sub-PM A/B/C role spec, drift scans, validation procedure)
+├── EXECUTOR-PROTOCOL.md            Executor workflow rulebook (session bootstrap, PLAN/SUBMIT format, self-validate)
+├── PM-STATUS-PARENT.md             Parent PM tracker (cross-dev roll-up, global task tracker, gates, open Qs)
+├── PM-STATUS-A.md                  Per-dev tracker slot A (Nathan) — PM A + Executor A append-only
+├── PM-STATUS-B.md                  Per-dev tracker slot B (Nanak) — PM B + Executor B append-only
+├── PM-STATUS-C.md                  Per-dev tracker slot C (Satrio) — PM C + Executor C append-only
 ├── docs/
 │   ├── ARCHITECTURE.md             High-level + rationale
 │   ├── PROJECT_STRUCTURE.md        Folder-by-folder explanation (1 file aja)
@@ -257,6 +264,28 @@ Jobs: lint-and-typecheck, test-unit, test-integration (dengan postgres+redis ser
 Buat folder kosong dengan `.gitkeep`.
 Bikin `src/modules/_template/` dengan skeleton lengkap (routes, service, repository, schema, types, events, jobs, port, adapter, tests). JANGAN edit `_template/` setelah ini.
 
+### 19. Multi-agent workflow files (WAJIB — boilerplate ini default pakai 3-dev paralel model)
+
+Copy/derive dari boilerplate referensi (qooma-hotel core-backend) — file-file ini define workflow Planning / Parent PM / sub-PM A-C / Executor A-C dengan identitas Nathan / Nanak / Satrio:
+
+- **`KICKOFF.md`** — Master kickoff dengan PROMPT A (Planning), PROMPT B-PARENT (Parent PM), PROMPT B (sub-PM per slot), PROMPT C (Executor per slot). Berisi: tim & naming convention, file ownership matrix, workflow loop diagram, identity-check rule (WAJIB sebut Role + Slot di response pertama session; bila user belum sebut — STOP, tanya dulu), git hygiene, eskalasi rules.
+- **`PM-AGENT.md`** — Role spec untuk Parent PM + sub-PM A/B/C. Section penting: §0.0 identity check, §0.2 read order (sub-PM vs Parent), §0.4 file ownership matrix, §0.8 roll-up protocol (sub-PM → Parent), §3 validation procedure (drift scans tabel), §5 gates G1-G5, §7 standup format (sub-PM §7.1 + Parent §7a), §9 interact with executor.
+- **`EXECUTOR-PROTOCOL.md`** — Workflow rulebook executor A/B/C. Section penting: §0.0 identity check, §0.2 read order (executor scope = PM-STATUS-<SLOT> only, JANGAN read PARENT atau slot lain), §4 work loop (PLAN/ACK/IMPLEMENT/SUBMIT), §4.4 self-validate (drift scans), §4.5 SUBMIT format, §10 forbidden actions.
+- **`PM-STATUS-PARENT.md`** — Parent PM tracker. Section: §0 current focus global, §1 global task tracker (kolom Slot WAJIB), §2 per-dev short roll-up (latest di atas), §3 open Qs consolidated, §4 deviation log, §5 gates G1-G5, §6 parent standup, §7 cross-dev incidents, §8 next-up queue, §10 cross-dev coord, §11 file ownership matrix.
+- **`PM-STATUS-A.md`** — Per-dev tracker untuk slot A (Nathan). Section: §0 current focus slot, §1 slot task tracker, §2 active assignments append-only (ASSIGNMENT/PLAN/CHECKPOINT/SUBMIT/VERDICT), §3 slot open Qs, §4 drift baseline slot, §5 standup slot, §6 incidents slot, §7 PM operating notes, §8 slot queue, §9 roll-up reminder.
+- **`PM-STATUS-B.md`** — Per-dev tracker untuk slot B (Nanak). Sama struktur dengan PM-STATUS-A.md, sesuaikan reference dari A/Nathan → B/Nanak.
+- **`PM-STATUS-C.md`** — Per-dev tracker untuk slot C (Satrio). Sama struktur, sesuaikan reference ke C/Satrio.
+
+**Aturan inti** yang HARUS tertulis di file-file di atas:
+
+1. **Identity check WAJIB di response pertama tiap fresh session** — sebut `Role` + `Slot` + `Reading: <file>`. Bila user belum sebut slot → STOP, tanya: "Sebelum mulai: ini Dev slot mana — A (Nathan), B (Nanak), atau C (Satrio)?"
+2. **Strict per-file ownership** — PM A hanya nulis di PM-STATUS-A.md + (append) ke PM-STATUS-PARENT.md §2/§6. PM B / PM C sama. Executor A/B/C hanya nulis di PM-STATUS-<SLOT>.md + src/. Parent PM full PARENT, read-only di sub.
+3. **Append-only di assignment blocks** — ASSIGNMENT/PLAN/CHECKPOINT/SUBMIT/VERDICT semua jadi sub-block di bawah ASSIGNMENT existing; JANGAN edit block lama.
+4. **Roll-up protocol** — sub-PM post short 1-2 line summary ke PARENT §2 setelah tiap APPROVE / ESCALATE; full SUBMIT/VERDICT tetap di slot file.
+5. **Standup harian** — sub-PM post di slot §5, lalu 3-baris ringkas ke PARENT §6 di bawah Parent PM's block. Parent PM consolidate jadi parent standup.
+6. **Eskalasi**: sub-PM TIDAK DM PO langsung — route via Parent PM (PARENT §3 atau §10). Parent PM yang decide DM PO.
+7. **README.md punya section "Progress board"** dengan snapshot table (slot, dev, active task, status, branch) + gates table + counters. Parent PM update setiap end-of-day, mirroring dari PARENT §1/§5.
+
 ## Yang TIDAK perlu dibuat sekarang
 
 - Install pnpm dependencies (kosongkan di package.json)
@@ -281,8 +310,11 @@ Bikin `src/modules/_template/` dengan skeleton lengkap (routes, service, reposit
 - [ ] Lint config + Prettier config sudah set sesuai standard
 - [ ] Dockerfile multi-stage siap
 - [ ] CI workflow siap
+- [ ] **Multi-agent workflow files siap**: KICKOFF.md, PM-AGENT.md, EXECUTOR-PROTOCOL.md, PM-STATUS-PARENT.md, PM-STATUS-A.md, PM-STATUS-B.md, PM-STATUS-C.md
+- [ ] **Identity-check rule** tertulis di KICKOFF.md §4 + PM-AGENT.md §0.0 + EXECUTOR-PROTOCOL.md §0.0 (semua fresh session WAJIB sebut Role + Slot; bila user belum sebut → STOP, tanya)
+- [ ] **README.md punya "Progress board" section** dengan snapshot table per slot + gates table + counters
 
-Mulai dari batch struktur folder, lalu config files, lalu README + CLAUDE.md, lalu architecture docs, lalu ADRs, lalu module template, terakhir verifikasi.
+Mulai dari batch struktur folder, lalu config files, lalu README + CLAUDE.md, lalu architecture docs, lalu ADRs, lalu module template, lalu multi-agent workflow files (KICKOFF/PM-AGENT/EXECUTOR-PROTOCOL/PM-STATUS-{PARENT,A,B,C}), terakhir verifikasi.
 ````
 
 ## Cara pakai prompt ini
