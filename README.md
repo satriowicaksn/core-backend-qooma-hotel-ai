@@ -1,6 +1,8 @@
-# Qooma Backend Service — Boilerplate
+# Qooma Hotel Core (CRM) — Backend Service
 
-> Template/boilerplate untuk backend service di ekosistem **Qooma** (microservices). Dipakai sebagai **pondasi konsisten** saat membuat service baru. Service nyata akan inherit struktur dari sini.
+> Service **Hotel Core (CRM)** di ekosistem **Qooma** (microservices) — bounded context terbesar (~80% API surface). Repo ini berasal dari boilerplate Qooma; pattern reusable (`_template/`, `MODULE_TEMPLATE.md`, ADR-0001..0007) tetap, tapi scope work-in-flight = Hotel Core only. Sibling service (Auth, AI Orchestration, Integration) hidup di repo terpisah.
+>
+> Charter lengkap: **[docs/SERVICE-CHARTER.md](./docs/SERVICE-CHARTER.md)** · Ratifikasi: **[ADR-0008](./docs/decisions/0008-repo-scope-hotel-core.md)**.
 >
 > Goal: AI-driven development (~80% AI) tetap clean dan maintainable lewat pola **multi-agent workflow** (Planning / PM / Executor) dengan 3 dev paralel.
 
