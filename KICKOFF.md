@@ -6,13 +6,15 @@
 
 ## 1. Tim & naming
 
-3 dev paralel, identitas tetap A/B/C — nama personal cuma untuk readability:
+3 dev paralel, identitas tetap A/B/C — nama personal cuma untuk readability.
 
-| Slot | Nama   | Owns (default domain — PO bisa override)                       |
-| ---- | ------ | -------------------------------------------------------------- |
-| A    | Nathan | Foundation / shared infra (core, plugins, entrypoints, migrations boilerplate, ADR-touching tasks) |
-| B    | Nanak  | Business modules batch 1 (e.g. auth/identity, hotel-core CRUD) |
-| C    | Satrio | Business modules batch 2 + integration channels (AI conversation, webhook channels) |
+> **Scope reminder**: repo ini = service **Hotel Core (CRM)** (lihat [docs/SERVICE-CHARTER.md](./docs/SERVICE-CHARTER.md) + [ADR-0008](./docs/decisions/0008-repo-scope-hotel-core.md)). Auth, AI Orchestration, dan Integration hidup di repo terpisah; slot di sini hanya menggarap domain Hotel Core.
+
+| Slot | Nama   | Owns (default domain — PO bisa override)                                                                          |
+| ---- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| A    | Nathan | Foundation / shared infra (core, plugins, entrypoints, migrations boilerplate, ADR-touching tasks)                |
+| B    | Nanak  | Hotel Core **core** — tickets, guests, visits, settings, billing                                                  |
+| C    | Satrio | Hotel Core **comms** — notifications, WA templates, integrations config CRUD, escalation tree, quota & comms workers |
 
 > Domain split di atas adalah **default starter** — Parent PM boleh re-balance per gate, tapi tetap pertahankan rule "shared-infra ke Dev A supaya B & C tidak saling tunggu" (lihat pola di frontend `WAVE-B-KICKOFF.md`).
 
