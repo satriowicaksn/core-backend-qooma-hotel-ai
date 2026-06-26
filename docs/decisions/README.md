@@ -28,6 +28,7 @@ Pakai template di [0000-template.md](./0000-template.md). Filename: `<nomor-4-di
 | [0005](./0005-deployment-target.md) | AWS ECS Fargate default | accepted |
 | [0006](./0006-fastify-vs-express.md) | Fastify HTTP framework | accepted |
 | [0007](./0007-prisma-vs-alternatives.md) | Prisma ORM | accepted |
+| [0008](./0008-repo-scope-hotel-core.md) | Repo scope narrows from generic boilerplate to Hotel Core service | accepted |
 
 ## Prinsip
 
