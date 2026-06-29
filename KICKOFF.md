@@ -12,9 +12,13 @@
 
 | Slot | Nama   | Owns (default domain — PO bisa override)                                                                          |
 | ---- | ------ | ----------------------------------------------------------------------------------------------------------------- |
-| A    | Nathan | Foundation / shared infra (core, plugins, entrypoints, migrations boilerplate, ADR-touching tasks)                |
-| B    | Nanak  | Hotel Core **core** — tickets, guests, visits, settings, billing                                                  |
-| C    | Satrio | Hotel Core **comms** — notifications, WA templates, integrations config CRUD, escalation tree, quota & comms workers |
+| A    | Nathan | **Foundation** — Prisma schema + migrations, tenant-guard + RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload, CSV import utility, workers harness |
+| B    | Nanak  | **Core CRM** — tickets (state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual), notifications, socket emitters |
+| C    | Satrio | **Settings + Analytics** — departments, menu (+ CSV + bulk), knowledge (+ import), WA templates lifecycle (incl. Meta-callback ingest), feature flags (tier-gated), billing (quota meter + invoices + upgrade + daily brief), settings/agents, settings/voice groundwork, all 8 analytics endpoints |
+
+> **H12 2026-06-29 change**: Satrio's bucket no longer includes "integrations config CRUD" — that moved to Integration repo (`integration-backend-qooma-hotel-ai`). Satrio retains Meta-callback ingest for WA templates because `wa_templates` table stays HC-owned. See `docs/SERVICE-CHARTER.md` §3.
+
+> **Authoritative spec for this repo**: [`docs/spec/02-hotel-core.md`](./docs/spec/02-hotel-core.md) (endpoints + DDL + indexes + state machines) + [`docs/spec/MVP-HOTEL-CORE-FIRST.md`](./docs/spec/MVP-HOTEL-CORE-FIRST.md) (slice + AC). Read those before claiming a task.
 
 > Domain split di atas adalah **default starter** — Parent PM boleh re-balance per gate, tapi tetap pertahankan rule "shared-infra ke Dev A supaya B & C tidak saling tunggu" (lihat pola di frontend `WAVE-B-KICKOFF.md`).
 

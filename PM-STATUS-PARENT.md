@@ -12,13 +12,14 @@
 
 ## 0. Current focus (global)
 
-- **Day**: H0 / TBD (PO set timeline)
-- **Phase**: Bootstrap / pre-T01
-- **Active gate**: G1 — Boilerplate ready (kriteria default `PM-AGENT.md §5`; PO konfirmasi)
+- **Day**: H12+ (post-Auth bootstrap; Hotel Core handover landed 2026-06-29)
+- **Phase**: Bootstrap / pre-T01 — authoritative spec live di [`docs/spec/MVP-HOTEL-CORE-FIRST.md`](./docs/spec/MVP-HOTEL-CORE-FIRST.md) (Slice 2 of 3 backend MVP slices)
+- **Active gate**: G1 — Boilerplate + Prisma schema ready (kriteria default `PM-AGENT.md §5`; PO konfirmasi)
 - **Active devs**: A (Nathan) · B (Nanak) · C (Satrio) — semua belum claim task
-- **Progress (global)**: 0 / TBD task approved
+- **Progress (global)**: 0 / 30 task assigned (T01–T03 + T11 + T21 active per below; T04–T10, T12–T20, T22–T30 backlog — Parent PM release per gate)
+- **Reading order untuk fresh dev**: `KICKOFF.md` → `docs/SERVICE-CHARTER.md` → `docs/spec/MVP-HOTEL-CORE-FIRST.md` → `docs/spec/02-hotel-core.md` (full DDL + RBAC) → `docs/spec/data-model.md` → `docs/spec/open-questions.md` → claim task di §8 / §1a
 
-> **Catatan**: Backend belum punya `docs/DEVELOPMENT-PLAN.md` formal. Task ID `T##` di-issue oleh PO via §8 next-up queue. Sampai PO menetapkan, gunakan §8 sebagai sumber task aktif.
+> **H12 PO rulings baked in (2026-06-29)**: integrations CRUD MOVED → Integration repo (Q-OPS-03 resolved); Satrio's bucket retains WA-template Meta-callback only. Q-CONTRACT-25 + Q-OPS-06 NEW (Telegram per-dept write-through — see `docs/spec/open-questions.md`).
 
 ---
 
@@ -26,11 +27,75 @@
 
 > Otoritas Parent PM untuk edit row in-place. Status: `backlog` | `assigned` | `wip` | `submit-pending` | `approved` | `rejected` | `escalated`.
 >
-> Setiap task **wajib** punya kolom **Slot** untuk routing ke PM A/B/C.
+> Setiap task **wajib** punya kolom **Slot** untuk routing ke PM A/B/C. ID `T##` di-issue oleh PO atau Parent PM dari §1a pre-G1 queue.
 
-| T## | Title                              | Slot | Owner    | Status   | Verified by | Notes                                 |
-| --- | ---------------------------------- | ---- | -------- | -------- | ----------- | ------------------------------------- |
-| —   | (belum ada task aktif)             | —    | —        | —        | —           | Tunggu PO post task atau roadmap awal |
+| T## | Title                                                                            | Slot | Owner   | Status   | Verified by | Notes                                              |
+| --- | -------------------------------------------------------------------------------- | ---- | ------- | -------- | ----------- | -------------------------------------------------- |
+| T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nathan  | assigned | —           | Foundation critical path — start here              |
+| T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nathan  | assigned | —           | ⚠ Blocks B (T11+) and C (T21+) implementation     |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nathan  | assigned | —           | After T02                                          |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nathan  | backlog  | —           | After T03                                          |
+| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)            | A    | Nathan  | backlog  | —           | After T04                                          |
+| T06 | Ticket state-machine helper + unit-test the transition table                     | A    | Nathan  | backlog  | —           | Parallel-friendly after T01                        |
+| T07 | Common error handlers (HC-specific codes per spec §7)                            | A    | Nathan  | backlog  | —           | After T01                                          |
+| T08 | Multipart upload utility (S3 / R2 abstraction)                                   | A    | Nathan  | backlog  | —           | After T01                                          |
+| T09 | CSV import utility (used by menu + knowledge)                                    | A    | Nathan  | backlog  | —           | After T01                                          |
+| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks              | A    | Nathan  | backlog  | —           | After T02                                          |
+| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nanak   | assigned | —           | Spec reading + module skeleton OK; impl blocked on T02 |
+| T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nanak   | backlog  | —           | After T11 + T06                                    |
+| T13 | Ticket stats + overdue                                                           | B    | Nanak   | backlog  | —           | After T11                                          |
+| T14 | Guests CRUD + preferences                                                        | B    | Nanak   | backlog  | —           | After T02                                          |
+| T15 | Guest messages history                                                           | B    | Nanak   | backlog  | —           | After T14                                          |
+| T16 | Visits list + pending verification flow                                          | B    | Nanak   | backlog  | —           | After T02                                          |
+| T17 | Visit reject + failed_3x override                                                | B    | Nanak   | backlog  | —           | After T16                                          |
+| T18 | Manual visit create                                                              | B    | Nanak   | backlog  | —           | After T16                                          |
+| T19 | Notifications CRUD + optimistic ops                                              | B    | Nanak   | backlog  | —           | After T02                                          |
+| T20 | Socket emitters (`ticket:*` + `verification:*` + `notification:new`)             | B    | Nanak   | backlog  | —           | After T11 + T16 + T19                              |
+| T21 | Departments CRUD (escalation tree + operating hours)                             | C    | Satrio  | assigned | —           | Spec reading + module skeleton OK; impl blocked on T02 |
+| T22 | Menu CRUD + categories + multipart image                                         | C    | Satrio  | backlog  | —           | After T02 + T08                                    |
+| T23 | Menu bulk ops (CSV + bulk availability)                                          | C    | Satrio  | backlog  | —           | After T22 + T09                                    |
+| T24 | Knowledge CRUD + CSV import                                                      | C    | Satrio  | backlog  | —           | After T02 + T09                                    |
+| T25 | WA templates lifecycle + Meta-callback ingest                                    | C    | Satrio  | backlog  | —           | After T02                                          |
+| T26 | Feature flags (tier-gated, dependency check)                                     | C    | Satrio  | backlog  | —           | After T02; needs Auth `hotels.tier_id` join        |
+| T27 | Billing (overview + upgrade + invoice + daily brief)                             | C    | Satrio  | backlog  | —           | After T02                                          |
+| T28 | Settings/agents config (min-3 enforcement)                                       | C    | Satrio  | backlog  | —           | After T02                                          |
+| T29 | Settings/voice groundwork stub                                                   | C    | Satrio  | backlog  | —           | After T02                                          |
+| T30 | Analytics 8 endpoints (Luxury-gated + export)                                    | C    | Satrio  | backlog  | —           | After T02; tier-join required                      |
+
+### 1a. Pre-G1 bootstrap queue (MIRRORED into §1 on 2026-06-29 — kept here as spec-driven reference; §1 is the live tracker)
+
+| Suggested T## | Title                                                                    | Slot | Spec ref                                          |
+| ------------- | ------------------------------------------------------------------------ | ---- | ------------------------------------------------- |
+| T01           | `make check` green dari boilerplate (lint + typecheck + format)          | A    | F1 prep                                           |
+| T02           | Prisma schema initial migration (13 HC tables + indexes)                 | A    | F1 — `docs/spec/02-hotel-core.md` §2 DDL          |
+| T03           | Tenant-guard middleware (`hotel_id` from session everywhere)             | A    | F2                                                |
+| T04           | RBAC middleware (gm_admin / dept_head / super_admin all-access)          | A    | F3                                                |
+| T05           | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)    | A    | F4                                                |
+| T06           | Ticket state-machine helper + unit-test the transition table             | A    | F5                                                |
+| T07           | Common error handlers (HC-specific codes per spec §7)                    | A    | F6                                                |
+| T08           | Multipart upload utility (S3 / R2 abstraction)                           | A    | F7                                                |
+| T09           | CSV import utility (used by menu + knowledge)                            | A    | F8                                                |
+| T10           | Workers harness (cron + queue) — actual workers wired per B/C tasks      | A    | F8 follow-up                                      |
+| T11           | Tickets list + detail (GET endpoints + filters + cursor pagination)      | B    | B1                                                |
+| T12           | Ticket status transition + reroute (state-machine-validated)             | B    | B2                                                |
+| T13           | Ticket stats + overdue                                                   | B    | B3                                                |
+| T14           | Guests CRUD + preferences                                                | B    | B4                                                |
+| T15           | Guest messages history                                                   | B    | B5                                                |
+| T16           | Visits list + pending verification flow                                  | B    | B6                                                |
+| T17           | Visit reject + failed_3x override                                        | B    | B7                                                |
+| T18           | Manual visit create                                                      | B    | B8                                                |
+| T19           | Notifications CRUD + optimistic ops                                      | B    | B9                                                |
+| T20           | Socket emitters (`ticket:*` + `verification:*` + `notification:new`)     | B    | B10                                               |
+| T21           | Departments CRUD (escalation tree + operating hours)                     | C    | C1                                                |
+| T22           | Menu CRUD + categories + multipart image                                 | C    | C2                                                |
+| T23           | Menu bulk ops (CSV + bulk availability)                                  | C    | C3                                                |
+| T24           | Knowledge CRUD + CSV import                                              | C    | C4                                                |
+| T25           | WA templates lifecycle + Meta-callback ingest                            | C    | C5                                                |
+| T26           | Feature flags (tier-gated, dependency check)                             | C    | C6                                                |
+| T27           | Billing (overview + upgrade + invoice + daily brief)                     | C    | C7                                                |
+| T28           | Settings/agents config (min-3 enforcement)                               | C    | C8                                                |
+| T29           | Settings/voice groundwork stub                                           | C    | C9                                                |
+| T30           | Analytics 8 endpoints (Luxury-gated + export)                            | C    | C10                                               |
 
 ---
 

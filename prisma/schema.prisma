@@ -10,28 +10,518 @@ datasource db {
 }
 
 // =============================================================================
-// Contoh model (REFERENCE — ganti dengan model service Anda)
+// Hotel Core (CRM) — Prisma schema
 // =============================================================================
 //
-// Konvensi:
-// - Tabel: snake_case di DB (pakai @map), camelCase di model Prisma
-// - Field: snake_case di DB (@map), camelCase di model
-// - PK: UUID v4 default
+// Authoritative spec: docs/spec/02-hotel-core.md §2 (DDL + indexes)
+//                     docs/spec/MVP-HOTEL-CORE-FIRST.md §3 (migration order)
+//
+// Topology (Q-OPS-06 H12 ratification): Auth + HC + Integration co-locate
+// in one Postgres. FKs to Auth's `hotels` + `users` work directly.
+// AI runs in own DB; ticket_messages.conversationId is a NULLABLE opaque
+// UUID (no FK).
+//
+// Conventions:
+// - Tabel: snake_case di DB (@map), camelCase di model Prisma
+// - PK: UUID v4 default (gen_random_uuid())
 // - Timestamp: TIMESTAMPTZ UTC
-// - Soft delete: kolom `deletedAt` (opsional)
-//
-// Lihat docs/MODULE_TEMPLATE.md untuk contoh penggunaan.
+// - Every multi-tenant table has hotelId column + @@index([hotelId])
+// - List-heavy tables also @@index([hotelId, createdAt(sort: Desc)])
+// - CHECK constraints are added via raw SQL migration (Prisma doesn't model
+//   them natively; see DDL block at end of file for the post-migrate SQL).
 // =============================================================================
 
-model ExampleResource {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @db.VarChar(255)
-  status    String    @default("active") @db.VarChar(50)
-  metadata  Json      @default("{}")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+// -----------------------------------------------------------------------------
+// External tables (defined by sibling Auth service — declared here as
+// reference-only so Prisma can generate the relations). DO NOT migrate these
+// from this repo; Auth service owns them.
+// -----------------------------------------------------------------------------
 
-  @@map("example_resources")
-  @@index([status, createdAt])
+model Hotel {
+  id String @id @default(uuid()) @db.Uuid
+
+  departments      Department[]
+  guests           Guest[]
+  guestPreferences GuestPreference[]
+  visits           Visit[]
+  tickets          Ticket[]
+  ticketUpdates    TicketUpdate[]
+  ticketMessages   TicketMessage[]
+  notifications    Notification[]
+  menuCategories   MenuCategory[]
+  menuItems        MenuItem[]
+  knowledgeEntries KnowledgeEntry[]
+  waTemplates      WaTemplate[]
+  featureFlags     FeatureFlag[]
+  billingQuotas    BillingQuota[]
+  billingInvoices  BillingInvoice[]
+  billingExtras    BillingExtra[]
+  aiAgentConfigs   AiAgentConfig[]
+  voiceConfig      VoiceConfig?
+
+  @@map("hotels")
 }
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  assignedTickets  Ticket[]        @relation("ticket_assigned")
+  createdTickets   Ticket[]        @relation("ticket_created")
+  ticketUpdates    TicketUpdate[]
+  ticketMessages   TicketMessage[]
+  notifications    Notification[]
+  featureFlagsUpdated FeatureFlag[]
+
+  @@map("users")
+}
+
+// -----------------------------------------------------------------------------
+// Hotel Core owned tables (this repo migrates these)
+// -----------------------------------------------------------------------------
+
+model Department {
+  id                     String   @id @default(uuid()) @db.Uuid
+  hotelId                String   @map("hotel_id") @db.Uuid
+  name                   String   @db.VarChar(80)
+  code                   String   @db.VarChar(8)
+  operatingHours         Json     @default("{}") @map("operating_hours")
+  escalationChain        Json     @default("{}") @map("escalation_chain")
+  telegramChatId         String?  @map("telegram_chat_id") @db.VarChar(64)
+  supervisorTelegramId   String?  @map("supervisor_telegram_id") @db.VarChar(64)
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel    Hotel    @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  tickets  Ticket[]
+
+  @@unique([hotelId, code], map: "departments_hotel_code_unique")
+  @@index([hotelId])
+  @@index([hotelId, isActive])
+  @@map("departments")
+}
+
+model Guest {
+  id           String   @id @default(uuid()) @db.Uuid
+  hotelId      String   @map("hotel_id") @db.Uuid
+  name         String   @db.VarChar(120)
+  waPhone      String   @map("wa_phone") @db.VarChar(20)
+  email        String?  @db.VarChar(255)
+  privacyMode  String   @default("standard") @map("privacy_mode") @db.VarChar(20)
+  isVip        Boolean  @default(false) @map("is_vip")
+  vipLevel     String?  @map("vip_level") @db.VarChar(20)
+  totalStays   Int      @default(0) @map("total_stays")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel       Hotel             @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  preferences GuestPreference[]
+  visits      Visit[]
+  tickets     Ticket[]
+
+  @@unique([hotelId, waPhone], map: "guests_hotel_wa_unique")
+  @@index([hotelId])
+  @@index([hotelId, waPhone])
+  @@index([hotelId, isVip])
+  @@index([hotelId, createdAt(sort: Desc)])
+  @@map("guests")
+}
+
+model GuestPreference {
+  id              String   @id @default(uuid()) @db.Uuid
+  hotelId         String   @map("hotel_id") @db.Uuid
+  guestId         String   @map("guest_id") @db.Uuid
+  preferenceType  String   @map("preference_type") @db.VarChar(40)
+  preferenceValue String   @map("preference_value") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@unique([guestId, preferenceType], map: "guest_preferences_unique")
+  @@index([hotelId])
+  @@index([guestId])
+  @@map("guest_preferences")
+}
+
+model Visit {
+  id                    String    @id @default(uuid()) @db.Uuid
+  hotelId               String    @map("hotel_id") @db.Uuid
+  guestId               String    @map("guest_id") @db.Uuid
+  checkIn               DateTime  @map("check_in") @db.Timestamptz
+  checkOut              DateTime? @map("check_out") @db.Timestamptz
+  nights                Int?
+  roomNumber            String?   @map("room_number") @db.VarChar(16)
+  status                String    @default("pending_verification") @db.VarChar(30)
+  bookingSource         String?   @map("booking_source") @db.VarChar(20)
+  verificationAttempts  Int       @default(0) @map("verification_attempts")
+  specialRequest        String?   @map("special_request") @db.Text
+  satisfactionScore     Int?      @map("satisfaction_score")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  guest Guest @relation(fields: [guestId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId])
+  @@index([hotelId, status])
+  @@index([guestId, checkIn(sort: Desc)])
+  @@index([hotelId, checkIn(sort: Desc)])
+  @@map("visits")
+}
+
+model Ticket {
+  id                    String    @id @default(uuid()) @db.Uuid
+  hotelId               String    @map("hotel_id") @db.Uuid
+  ticketNumber          String    @map("ticket_number") @db.VarChar(32)
+  guestId               String    @map("guest_id") @db.Uuid
+  departmentId          String    @map("department_id") @db.Uuid
+  assignedUserId        String?   @map("assigned_user_id") @db.Uuid
+  createdBy             String?   @map("created_by") @db.Uuid
+  status                String    @default("open") @db.VarChar(30)
+  priority              String    @default("normal") @db.VarChar(10)
+  complaintType         String?   @map("complaint_type") @db.VarChar(30)
+  complaintDetail       String?   @map("complaint_detail") @db.Text
+  subject               String    @db.VarChar(255)
+  body                  String?   @db.Text
+  isHighAlert           Boolean   @default(false) @map("is_high_alert")
+  isOverdue             Boolean   @default(false) @map("is_overdue")
+  resolvedSatisfaction  Int?      @map("resolved_satisfaction")
+  slaDueAt              DateTime? @map("sla_due_at") @db.Timestamptz
+  closedAt              DateTime? @map("closed_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel        Hotel           @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  guest        Guest           @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  department   Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignedUser User?           @relation("ticket_assigned", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  creator      User?           @relation("ticket_created", fields: [createdBy], references: [id], onDelete: SetNull)
+  updates      TicketUpdate[]
+  messages     TicketMessage[]
+
+  @@unique([hotelId, ticketNumber], map: "tickets_hotel_ticket_number_unique")
+  @@index([hotelId])
+  @@index([hotelId, createdAt(sort: Desc)])
+  @@index([hotelId, status, departmentId])
+  @@index([departmentId, status])
+  @@index([guestId, createdAt(sort: Desc)])
+  @@index([assignedUserId])
+  @@map("tickets")
+}
+
+model TicketUpdate {
+  id                 String   @id @default(uuid()) @db.Uuid
+  hotelId            String   @map("hotel_id") @db.Uuid
+  ticketId           String   @map("ticket_id") @db.Uuid
+  actorUserId        String?  @map("actor_user_id") @db.Uuid
+  type               String   @db.VarChar(40)
+  fromStatus         String?  @map("from_status") @db.VarChar(30)
+  toStatus           String?  @map("to_status") @db.VarChar(30)
+  fromDepartmentId   String?  @map("from_department_id") @db.Uuid
+  toDepartmentId     String?  @map("to_department_id") @db.Uuid
+  note               String?  @db.Text
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  hotel  Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([hotelId])
+  @@index([ticketId, createdAt])
+  @@map("ticket_updates")
+}
+
+model TicketMessage {
+  id              String    @id @default(uuid()) @db.Uuid
+  hotelId         String    @map("hotel_id") @db.Uuid
+  ticketId        String    @map("ticket_id") @db.Uuid
+  // conversationId is an OPAQUE pointer to AI service's conversations.id.
+  // No FK — AI runs in a separate DB. NULL until AI spawns a conversation.
+  conversationId  String?   @map("conversation_id") @db.Uuid
+  sender          String    @db.VarChar(20)
+  senderUserId    String?   @map("sender_user_id") @db.Uuid
+  body            String?   @db.Text
+  media           Json?
+  externalId      String?   @map("external_id") @db.VarChar(80)
+  sentAt          DateTime  @default(now()) @map("sent_at") @db.Timestamptz
+  deliveredAt     DateTime? @map("delivered_at") @db.Timestamptz
+  readAt          DateTime? @map("read_at") @db.Timestamptz
+
+  hotel  Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender_user User? @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([hotelId])
+  @@index([ticketId, sentAt])
+  @@index([conversationId])
+  @@map("ticket_messages")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  hotelId   String    @map("hotel_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(40)
+  title     String    @db.VarChar(255)
+  body      String?   @db.Text
+  link      String?   @db.VarChar(500)
+  metadata  Json      @default("{}")
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model MenuCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  hotelId   String   @map("hotel_id") @db.Uuid
+  name      String   @db.VarChar(80)
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel      @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  items MenuItem[]
+
+  @@unique([hotelId, name], map: "menu_categories_hotel_name_unique")
+  @@index([hotelId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id                  String    @id @default(uuid()) @db.Uuid
+  hotelId             String    @map("hotel_id") @db.Uuid
+  categoryId          String    @map("category_id") @db.Uuid
+  name                String    @db.VarChar(120)
+  description         String?   @db.Text
+  priceIdr            Decimal   @map("price_idr") @db.Decimal(12, 2)
+  imageUrl            String?   @map("image_url") @db.VarChar(500)
+  prepMinutes         Int?      @map("prep_minutes")
+  isAvailable         Boolean   @default(true) @map("is_available")
+  availableWindowFrom DateTime? @map("available_window_from") @db.Time
+  availableWindowTo   DateTime? @map("available_window_to") @db.Time
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel    Hotel        @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  category MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId])
+  @@index([categoryId])
+  @@index([hotelId, isAvailable])
+  @@map("menu_items")
+}
+
+model KnowledgeEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  hotelId   String   @map("hotel_id") @db.Uuid
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  category  String?  @db.VarChar(80)
+  tags      String[] @default([])
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId])
+  @@index([hotelId, isActive])
+  @@map("knowledge_entries")
+}
+
+model WaTemplate {
+  id              String    @id @default(uuid()) @db.Uuid
+  hotelId         String?   @map("hotel_id") @db.Uuid
+  name            String    @db.VarChar(80)
+  body            String    @db.Text
+  variables       Json      @default("[]")
+  language        String    @default("id") @db.VarChar(8)
+  status          String    @default("pending") @db.VarChar(20)
+  templateIdMeta  String?   @map("template_id_meta") @db.VarChar(80)
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  isGlobal        Boolean   @default(false) @map("is_global")
+  approvedAt      DateTime? @map("approved_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel? @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId])
+  @@index([hotelId, status])
+  @@map("wa_templates")
+}
+
+model FeatureFlag {
+  id         String   @id @default(uuid()) @db.Uuid
+  hotelId    String   @map("hotel_id") @db.Uuid
+  flag       String   @db.VarChar(80)
+  isEnabled  Boolean  @default(false) @map("is_enabled")
+  config     Json     @default("{}")
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy  String?  @map("updated_by") @db.Uuid
+
+  hotel  Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  editor User? @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@unique([hotelId, flag], map: "feature_flags_hotel_flag_unique")
+  @@index([hotelId])
+  @@map("feature_flags")
+}
+
+model BillingQuota {
+  id                      String    @id @default(uuid()) @db.Uuid
+  hotelId                 String    @map("hotel_id") @db.Uuid
+  periodStart             DateTime  @map("period_start") @db.Date
+  outboundQuotaTotal      Int       @map("outbound_quota_total")
+  outboundUsed            Int       @default(0) @map("outbound_used")
+  threshold80EmittedAt    DateTime? @map("threshold_80_emitted_at") @db.Timestamptz
+  threshold100EmittedAt   DateTime? @map("threshold_100_emitted_at") @db.Timestamptz
+  resetAt                 DateTime? @map("reset_at") @db.Timestamptz
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@unique([hotelId, periodStart], map: "billing_quotas_hotel_period_unique")
+  @@index([hotelId])
+  @@index([hotelId, periodStart(sort: Desc)])
+  @@map("billing_quotas")
+}
+
+model BillingInvoice {
+  id            String    @id @default(uuid()) @db.Uuid
+  hotelId       String    @map("hotel_id") @db.Uuid
+  invoiceNumber String    @map("invoice_number") @db.VarChar(40)
+  periodStart   DateTime  @map("period_start") @db.Date
+  periodEnd     DateTime  @map("period_end") @db.Date
+  amountIdr     Decimal   @map("amount_idr") @db.Decimal(14, 2)
+  status        String    @default("issued") @db.VarChar(20)
+  pdfUrl        String?   @map("pdf_url") @db.VarChar(500)
+  issuedAt      DateTime  @default(now()) @map("issued_at") @db.Timestamptz
+  paidAt        DateTime? @map("paid_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@unique([invoiceNumber], map: "billing_invoices_number_unique")
+  @@index([hotelId, issuedAt(sort: Desc)])
+  @@map("billing_invoices")
+}
+
+model BillingExtra {
+  id           String    @id @default(uuid()) @db.Uuid
+  hotelId      String    @map("hotel_id") @db.Uuid
+  type         String    @db.VarChar(40)
+  qty          Int
+  amountIdr    Decimal   @map("amount_idr") @db.Decimal(14, 2)
+  purchasedAt  DateTime  @default(now()) @map("purchased_at") @db.Timestamptz
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId, purchasedAt(sort: Desc)])
+  @@map("billing_extras")
+}
+
+model AiAgentConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  hotelId   String   @map("hotel_id") @db.Uuid
+  agentType String   @map("agent_type") @db.VarChar(40)
+  name      String   @db.VarChar(80)
+  isActive  Boolean  @default(true) @map("is_active")
+  capacity  Int      @default(1)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@unique([hotelId, agentType], map: "ai_agent_configs_hotel_type_unique")
+  @@index([hotelId])
+  @@index([hotelId, isActive])
+  @@map("ai_agent_configs")
+}
+
+model VoiceConfig {
+  hotelId   String   @id @map("hotel_id") @db.Uuid
+  pbxType   String?  @map("pbx_type") @db.VarChar(40)
+  config    Json     @default("{}")
+  isActive  Boolean  @default(false) @map("is_active")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@map("voice_configs")
+}
+
+// =============================================================================
+// Post-migration SQL — CHECK constraints (Prisma doesn't model these natively)
+// Add these as a separate migration after the initial schema-push.
+// =============================================================================
+//
+// ALTER TABLE departments ADD CONSTRAINT departments_code_check
+//   CHECK (code ~ '^[A-Z]{2,8}$');
+// ALTER TABLE guests ADD CONSTRAINT guests_privacy_mode_check
+//   CHECK (privacy_mode IN ('standard','vvip'));
+// ALTER TABLE guests ADD CONSTRAINT guests_vip_level_check
+//   CHECK (vip_level IS NULL OR vip_level IN ('silver','gold','platinum'));
+// ALTER TABLE visits ADD CONSTRAINT visits_status_check
+//   CHECK (status IN ('pending_verification','checked_in','checked_out','rejected','failed_verification','cancelled'));
+// ALTER TABLE visits ADD CONSTRAINT visits_nights_check
+//   CHECK (nights IS NULL OR (nights >= 1 AND nights <= 30));
+// ALTER TABLE visits ADD CONSTRAINT visits_satisfaction_check
+//   CHECK (satisfaction_score IS NULL OR (satisfaction_score BETWEEN 1 AND 5));
+// ALTER TABLE visits ADD CONSTRAINT visits_booking_source_check
+//   CHECK (booking_source IS NULL OR booking_source IN ('ota_email','direct','walk-in','pms'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_status_check
+//   CHECK (status IN ('open','in_progress','awaiting_late_reason','done_pending','closed','high_alert','escalated','cancelled'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_priority_check
+//   CHECK (priority IN ('low','normal','high','urgent'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_complaint_type_check
+//   CHECK (complaint_type IS NULL OR complaint_type IN ('staff_attitude','facility','fnb','general','vvip'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_satisfaction_check
+//   CHECK (resolved_satisfaction IS NULL OR (resolved_satisfaction BETWEEN 1 AND 5));
+// ALTER TABLE ticket_updates ADD CONSTRAINT ticket_updates_type_check
+//   CHECK (type IN ('status_change','reroute','assignment','escalation','note','handover','system'));
+// ALTER TABLE ticket_messages ADD CONSTRAINT ticket_messages_sender_check
+//   CHECK (sender IN ('guest','staff','ai','system'));
+// ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+//   CHECK (type IN ('ticket_created','ticket_escalated','ticket_assigned','message_new','high_alert','verification_pending','verification_failed_3x','billing_threshold','system'));
+// ALTER TABLE menu_items ADD CONSTRAINT menu_items_price_check CHECK (price_idr >= 0);
+// ALTER TABLE menu_items ADD CONSTRAINT menu_items_prep_check
+//   CHECK (prep_minutes IS NULL OR prep_minutes >= 0);
+// ALTER TABLE wa_templates ADD CONSTRAINT wa_templates_status_check
+//   CHECK (status IN ('pending','approved','rejected','archived'));
+// ALTER TABLE wa_templates ADD CONSTRAINT wa_templates_scope_check
+//   CHECK ((is_global = true AND hotel_id IS NULL) OR (is_global = false AND hotel_id IS NOT NULL));
+// ALTER TABLE billing_invoices ADD CONSTRAINT billing_invoices_status_check
+//   CHECK (status IN ('issued','paid','overdue','void'));
+//
+// Plus partial indexes (Prisma's `where:` on @@index is limited; use raw SQL):
+//
+// CREATE INDEX idx_guests_hotel_vip ON guests(hotel_id, is_vip) WHERE is_vip = true;
+// CREATE INDEX idx_visits_pending ON visits(hotel_id, created_at DESC) WHERE status = 'pending_verification';
+// CREATE INDEX idx_visits_failed ON visits(hotel_id, created_at DESC) WHERE status = 'failed_verification';
+// CREATE INDEX idx_tickets_overdue ON tickets(hotel_id, sla_due_at)
+//   WHERE is_overdue = true OR sla_due_at IS NOT NULL;
+// CREATE INDEX idx_tickets_high_alert ON tickets(hotel_id, created_at DESC) WHERE is_high_alert = true;
+// CREATE INDEX idx_tickets_open ON tickets(hotel_id, status) WHERE status NOT IN ('closed','cancelled');
+// CREATE INDEX idx_notifications_user_unread ON notifications(user_id, created_at DESC) WHERE is_read = false;
+// CREATE INDEX idx_ticket_messages_conversation ON ticket_messages(conversation_id) WHERE conversation_id IS NOT NULL;
+// CREATE INDEX idx_knowledge_tags ON knowledge_entries USING GIN(tags);
+// CREATE INDEX idx_knowledge_search ON knowledge_entries
+//   USING GIN(to_tsvector('english', title || ' ' || content));
+// CREATE INDEX idx_wa_templates_global ON wa_templates(is_global) WHERE is_global = true;
+//
+// =============================================================================

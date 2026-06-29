@@ -1,8 +1,8 @@
 {
-  "name": "@qooma/backend-service-template",
+  "name": "@qooma/core-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Boilerplate untuk backend service di ekosistem Qooma (microservices). 1 service = 1 database = 1 Prisma schema.",
+  "description": "Hotel Core (CRM) backend service for Qooma — tickets, guests, visits, settings, billing, notifications, analytics. Spec: docs/spec/02-hotel-core.md.",
   "license": "UNLICENSED",
   "packageManager": "pnpm@9.0.0",
   "engines": {

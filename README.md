@@ -1,6 +1,8 @@
 # Qooma Hotel Core (CRM) — Backend Service
 
-> Service **Hotel Core (CRM)** di ekosistem **Qooma** (microservices) — bounded context terbesar (~80% API surface). Repo ini berasal dari boilerplate Qooma; pattern reusable (`_template/`, `MODULE_TEMPLATE.md`, ADR-0001..0007) tetap, tapi scope work-in-flight = Hotel Core only. Sibling service (Auth, AI Orchestration, Integration) hidup di repo terpisah.
+> Service **Hotel Core (CRM)** di ekosistem **Qooma** (microservices) — operational CRM surface (tickets, guests, visits, departments, menu, KB, WA templates, feature flags, billing, notifications, analytics, agents config). Per H11 PO ruling: hotels/tiers/admin users MOVED to Auth. Per H12 PO ruling 2026-06-29: integration config CRUD MOVED to Integration (`integration-backend-qooma-hotel-ai`). Repo ini berasal dari boilerplate Qooma; pattern reusable (`_template/`, `MODULE_TEMPLATE.md`, ADR-0001..0007) tetap. Sibling service: `auth-backend-qooma-hotel-ai`, `integration-backend-qooma-hotel-ai`, AI repo TBD.
+>
+> **Authoritative spec**: [`docs/spec/02-hotel-core.md`](./docs/spec/02-hotel-core.md) (endpoints + DDL + indexes + state machines) + [`docs/spec/MVP-HOTEL-CORE-FIRST.md`](./docs/spec/MVP-HOTEL-CORE-FIRST.md) (slice + AC).
 >
 > Charter lengkap: **[docs/SERVICE-CHARTER.md](./docs/SERVICE-CHARTER.md)** · Ratifikasi: **[ADR-0008](./docs/decisions/0008-repo-scope-hotel-core.md)**.
 >
