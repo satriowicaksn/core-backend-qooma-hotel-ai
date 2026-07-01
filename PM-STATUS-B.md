@@ -128,6 +128,18 @@ Repo has a canonical envelope after all: `docs/spec/README.md` **§2.7** (pagina
 
 Awaiting PM B ACK (PLAN + Q-B-01 envelope proposal + GAP T11-#1). Not writing code before ACK.
 
+#### PLAN ADDENDUM T11 — exec-B (Nathan) at H1 (2026-07-01) — T03 landed mid-PLAN, revising the seam
+Slot A shipped **T03 tenant-guard** on `main` (commit `9b55b86`) while I was drafting. It provides exactly my DEP-1 seam as **shared, Slot-A-owned** code in `src/plugins/tenant-guard.ts` + `.types.ts`. Revising the PLAN to **consume it** instead of defining a local `SessionContext` (reuse-before-create, CLAUDE §4):
+- **Seam type:** consume `TenantContext { hotelId; isSuperAdmin; role: 'gm_admin'|'dept_head'|'super_admin'|'staff'; deptId? }` from `@plugins/tenant-guard.js`. **Drop** my planned local `SessionContext` in `tickets.types.ts` and the local `declare module 'fastify'` augmentation — T03 already declares `req.tenant?: TenantContext` in `tenant-guard.types.ts`. My service methods take `ctx: TenantContext` as first arg.
+- **Detail `:id` (D3/D4):** after repo fetches by id, call `assertHotelOwnership(ctx, row.hotelId, 'Ticket')` then `assertDeptOwnership(ctx, row.departmentId, 'Ticket')` — both already mask cross-tenant/cross-dept as `NotFoundError` (404) per spec §7, exactly matching D4. Direct reuse, no reimplementation.
+- **List (D3/D4):** build `where` from ctx — `hotelId: ctx.hotelId` unless `ctx.isSuperAdmin` (explicit branch, drop filter); `departmentId: ctx.deptId` when `ctx.role==='dept_head'`. (The assert helpers are single-resource guards; list still builds the WHERE, consistent with them.)
+- **Masking (D5):** predicate becomes `guest.privacy_mode==='vvip' && !(ctx.role==='gm_admin' || ctx.isSuperAdmin)` — super_admin counts as gm_admin via `isSuperAdmin`.
+- **Q-B-02 → resolvable:** "is SessionContext Slot-A-owned or per-module?" answered by T03 — it is **Slot-A-owned** (`TenantContext` in `src/plugins/tenant-guard.ts`). Requesting PM B mark Q-B-02 resolved in §3 (PM authority; not editing the table myself).
+- **DEP-1 narrows (still merge-blocking, smaller):** the seam TYPE + guards now EXIST and are consumable; what remains unbuilt is the **runtime population** of `req.tenant` — T03 shipped pure functions "not yet wired as a Fastify preHandler; wait for JWT plugin (T04+)". So the live route is still not AC-complete until T04 wires the preHandler, but service+repo consume `TenantContext` and are fully unit/integration testable by constructing it directly. No change to DEP-2/DEP-3 or GAP T11-#1.
+- **New file count:** unchanged except `tickets.types.ts` no longer holds the seam (keeps domain + wire DTOs only).
+
+Awaiting PM B ACK. Not writing code before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
