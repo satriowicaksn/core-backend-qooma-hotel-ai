@@ -435,6 +435,45 @@ export async function tenantGuardPlugin(app: FastifyInstance): Promise<void> {
 
 Awaiting PM A ACK.
 
+##### PM A REJECT-PLAN — T04 PLAN needs 2 fixes before implementation (H0 2026-07-01) by PM A (Nanak)
+
+Direction sound (Option A bundle chosen wisely; dept-filter defer justified; RBAC guard order defensible). But 2 implementation choices would ship non-working code — catching at PLAN is cheaper than REJECT-at-SUBMIT.
+
+**Fix #1 — Fastify plugin encapsulation** (correctness blocker)
+
+- **Violation**: `src/plugins/tenant-guard.plugin.ts` as plain async fn = isolated context per Fastify 4 encapsulation model. `addHook('onRequest', ...)` inside plain-fn plugin only fires for routes registered as **children** of that plugin's scope. Nathan will register `ticketsRoutes` as a **sibling** at root (standard pattern per T11 PLAN). Result: `req.tenant` stays `undefined` for all ticket routes → Option A bundle doesn't satisfy Nathan's merge gate.
+- **Fix — pick ONE**:
+  - **(A, preferred)**: change export from plugin to a plain setup fn — `export function configureTenantGuardHooks(app: FastifyInstance): void` that calls `app.addHook('onRequest', ...)` on the passed instance directly (no `app.register()` wrapper). Nathan calls `configureTenantGuardHooks(app)` in `api.ts` root scope. Zero dep, zero encapsulation, hook is global. Rename file to `tenant-guard.hooks.ts` for accuracy. 5 LOC delta from your current sketch.
+  - **(B, fallback)**: add `fastify-plugin@4.x` as devDep (well-known, ~2KB) + wrap with `fp(fn)` to escape encapsulation. Requires PO approval per CLAUDE.md §11 (dep add) — I can fast-track via Parent PM if you prefer this, but adds ½-day gating.
+  - **(C, ugly)**: keep plain plugin, but instruct Nathan to register `ticketsRoutes` **inside** `tenantGuardPlugin`. Awkward coupling; NOT preferred — reject unless (A) and (B) both infeasible.
+- **Recommendation**: (A). Update test to match — `describe('configureTenantGuardHooks', ...)` builds a Fastify instance, calls the fn, adds test route at same scope, verifies hook fires.
+
+**Fix #2 — `FastifyRequest.user` type augmentation collision with `@fastify/jwt` v8** (typecheck blocker at SUBMIT)
+
+- **Violation**: `src/plugins/tenant-guard.types.ts` adding `user?: SessionUser` to `FastifyRequest` will collide with `@fastify/jwt`'s own `declare module 'fastify'` block that types `req.user` via its `FastifyJWT` interface. TS error: `Subsequent property declarations must have the same type. Property 'user' must be of type '...'`.
+- **Fix**: augment `@fastify/jwt`'s `FastifyJWT` interface instead — that's the canonical pattern the plugin exposes for consumers to type the JWT payload:
+  ```ts
+  declare module '@fastify/jwt' {
+    interface FastifyJWT {
+      payload: SessionUser;
+      user: SessionUser;
+    }
+  }
+  ```
+  Effect: `req.user` auto-typed as `SessionUser` everywhere; no conflict; works whether or not JWT plugin is registered yet at runtime (typecheck-only augmentation).
+- Keep existing `FastifyRequest.tenant?: TenantContext` augmentation in same file (T03) untouched — that one's fine (Fastify doesn't declare `.tenant`).
+
+**Accepted as-planned (no change needed)**
+
+- Q-B-02 handling (Delta 1 acknowledgment) ✓
+- `applyDeptFilter` defer with premature-abstraction rationale ✓ — endpoint-specific Prisma `WhereInput` typing is the right call; T11 inline pattern is clearer. If ≥3 modules repeat the same shape post-T11, refactor then.
+- `requireRole` check order (auth → staff-reject → super-bypass → allowed) ✓ — defense-in-depth staff-reject is defensible; super_admin can't also be staff (union exclusive), so ordering is semantically equivalent to super-first anyway.
+- Test plan (10-12 unit + 3 integration-style via `fastify.inject()`) ✓
+- Files list (4 create + 1 modify) ✓ — with Fix #1 file rename: `tenant-guard.plugin.ts` → `tenant-guard.hooks.ts` (test file rename same)
+- Delta 3 (prisma-generate) acknowledged as out-of-scope ✓
+
+**Resubmit as PLAN T04 addendum** (append sub-block under this REJECT-PLAN, not a new PLAN block) — address Fix #1 + Fix #2 with chosen approach + updated LOC estimate. Same DoD/scope otherwise. PM A will ACK addendum if fixes clean.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
