@@ -9,14 +9,27 @@ import { NotFoundError } from '@core/errors/app-errors.js';
 import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.js';
 
 import type { GuestsRepository } from './guests.repository.js';
-import { parseGuestListQuery, parseGuestUpdate, parsePreferenceInput } from './guests.schema.js';
-import { serializeGuest, serializeGuestDetail, serializePreference } from './guests.serializer.js';
+import {
+  encodeMessageCursor,
+  parseGuestListQuery,
+  parseGuestUpdate,
+  parseMessagesQuery,
+  parsePreferenceInput,
+} from './guests.schema.js';
+import {
+  serializeGuest,
+  serializeGuestDetail,
+  serializeMessage,
+  serializePreference,
+} from './guests.serializer.js';
 import type {
   GuestDetailResponse,
   GuestListQuery,
   GuestListResponse,
+  GuestMessagesResponse,
   GuestResponse,
   GuestUpdate,
+  MessageCursor,
   PreferencesResponse,
 } from './guests.types.js';
 
@@ -38,6 +51,27 @@ export function buildGuestListWhere(
     });
   }
   return and.length > 0 ? { AND: and } : {};
+}
+
+// Guest messages = ticket_messages across the guest's tickets. Tenant-scoped on the
+// message's own hotelId (denormalized, indexed); keyset OR kept in its own AND arm
+// so it never collapses with the guest-relation filter (N1).
+export function buildGuestMessagesWhere(
+  ctx: TenantContext,
+  guestId: string,
+  cursor?: MessageCursor,
+): Prisma.TicketMessageWhereInput {
+  const and: Prisma.TicketMessageWhereInput[] = [{ ticket: { guestId } }];
+  if (!ctx.isSuperAdmin) {
+    and.push({ hotelId: ctx.hotelId });
+  }
+  if (cursor) {
+    const sentAt = new Date(cursor.sentAt);
+    and.push({
+      OR: [{ sentAt: { lt: sentAt } }, { sentAt, id: { lt: cursor.id } }],
+    });
+  }
+  return { AND: and };
 }
 
 function toGuestUpdateData(update: GuestUpdate): Prisma.GuestUpdateInput {
@@ -108,5 +142,31 @@ export class GuestsService {
       input.preferenceValue,
     );
     return { data: prefs.map((p) => serializePreference(p)) };
+  }
+
+  async messages(
+    ctx: TenantContext,
+    id: string,
+    rawQuery: unknown,
+  ): Promise<GuestMessagesResponse> {
+    const query = parseMessagesQuery(rawQuery);
+    const guest = await this.repo.findById(id);
+    if (!guest) {
+      throw new NotFoundError('Guest', id);
+    }
+    assertHotelOwnership(ctx, guest.hotelId, 'Guest');
+
+    const where = buildGuestMessagesWhere(ctx, id, query.cursor);
+    const rows = await this.repo.findGuestMessages(where, query.limit + 1);
+
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    const last = page[page.length - 1];
+    const nextCursor =
+      hasMore && last
+        ? encodeMessageCursor({ sentAt: last.sentAt.toISOString(), id: last.id })
+        : null;
+
+    return { data: page.map((m) => serializeMessage(m)), pageInfo: { nextCursor, hasMore } };
   }
 }

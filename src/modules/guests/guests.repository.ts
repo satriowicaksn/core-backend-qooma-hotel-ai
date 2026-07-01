@@ -2,7 +2,12 @@
 
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import type { GuestDetailRow, GuestPreferenceRow, GuestRow } from './guests.types.js';
+import type {
+  GuestDetailRow,
+  GuestPreferenceRow,
+  GuestRow,
+  TicketMessageRow,
+} from './guests.types.js';
 
 const DETAIL_INCLUDE = {
   preferences: { orderBy: { createdAt: 'asc' } },
@@ -59,5 +64,16 @@ export class GuestsRepository {
       }),
     ]);
     return list;
+  }
+
+  async findGuestMessages(
+    where: Prisma.TicketMessageWhereInput,
+    take: number,
+  ): Promise<TicketMessageRow[]> {
+    return this.db.ticketMessage.findMany({
+      where,
+      orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+      take,
+    });
   }
 }

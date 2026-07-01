@@ -10,6 +10,8 @@ import {
   VIP_LEVELS,
   type GuestListQuery,
   type GuestUpdate,
+  type MessageCursor,
+  type MessageListQuery,
   type PreferenceInput,
   type PrivacyMode,
   type VipLevel,
@@ -17,6 +19,8 @@ import {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
 
 const pageField = z.coerce.number().int().min(1).catch(1).default(1);
 const pageSizeField = z.coerce
@@ -111,5 +115,56 @@ export function parsePreferenceInput(rawBody: unknown): PreferenceInput {
   return {
     preferenceType: result.data.preference_type,
     preferenceValue: result.data.preference_value,
+  };
+}
+
+// --- Guest messages history (cursor pagination) ---
+
+const limitField = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .catch(DEFAULT_LIMIT)
+  .transform((v) => Math.min(v, MAX_LIMIT))
+  .default(DEFAULT_LIMIT);
+
+export const MessagesQuerySchema = z.object({
+  limit: limitField,
+  cursor: z.string().min(1).optional(),
+});
+
+const MessageCursorSchema = z.object({
+  sentAt: z.string().datetime({ offset: true }),
+  id: z.string().uuid(),
+});
+
+export function encodeMessageCursor(cursor: MessageCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+export function decodeMessageCursor(raw: string): MessageCursor {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+  } catch {
+    throw new ValidationError('Invalid cursor', { field: 'cursor' });
+  }
+  const result = MessageCursorSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new ValidationError('Invalid cursor', { field: 'cursor' });
+  }
+  return result.data;
+}
+
+export function parseMessagesQuery(rawQuery: unknown): MessageListQuery {
+  const result = MessagesQuerySchema.safeParse(rawQuery ?? {});
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  return {
+    limit: result.data.limit,
+    ...(result.data.cursor !== undefined
+      ? { cursor: decodeMessageCursor(result.data.cursor) }
+      : {}),
   };
 }

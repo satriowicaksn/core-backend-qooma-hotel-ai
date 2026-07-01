@@ -10,6 +10,7 @@ import type { GuestsService } from '../guests.service.js';
 import type {
   GuestDetailResponse,
   GuestListResponse,
+  GuestMessagesResponse,
   GuestResponse,
   PreferencesResponse,
 } from '../guests.types.js';
@@ -35,6 +36,10 @@ const DETAIL_RESULT: GuestDetailResponse = {
 };
 const GUEST_RESULT: GuestResponse = { data: GUEST_WIRE };
 const PREFS_RESULT: PreferencesResponse = { data: [] };
+const MESSAGES_RESULT: GuestMessagesResponse = {
+  data: [],
+  pageInfo: { nextCursor: null, hasMore: false },
+};
 
 interface Recorder {
   listCtx?: TenantContext;
@@ -42,6 +47,7 @@ interface Recorder {
   updateId?: string;
   updateBody?: unknown;
   prefId?: string;
+  messagesId?: string;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -62,6 +68,10 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     addPreference: (_ctx: TenantContext, id: string): Promise<PreferencesResponse> => {
       recorder.prefId = id;
       return Promise.resolve(PREFS_RESULT);
+    },
+    messages: (_ctx: TenantContext, id: string): Promise<GuestMessagesResponse> => {
+      recorder.messagesId = id;
+      return Promise.resolve(MESSAGES_RESULT);
     },
   } as unknown as GuestsService;
 
@@ -143,5 +153,13 @@ describe('guestsRoutes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(recorder.prefId).toBe(ID);
+  });
+
+  it('should route /guests/:id/messages to the messages handler', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({ method: 'GET', url: `/guests/${ID}/messages?limit=10` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(MESSAGES_RESULT);
+    expect(recorder.messagesId).toBe(ID);
   });
 });

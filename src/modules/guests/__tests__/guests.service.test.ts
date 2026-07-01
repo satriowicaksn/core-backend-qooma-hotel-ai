@@ -5,10 +5,17 @@ import { NotFoundError, ValidationError } from '@core/errors/app-errors.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import type { GuestsRepository } from '../guests.repository.js';
-import { parseGuestListQuery, parseGuestUpdate, parsePreferenceInput } from '../guests.schema.js';
+import {
+  decodeMessageCursor,
+  encodeMessageCursor,
+  parseGuestListQuery,
+  parseGuestUpdate,
+  parseMessagesQuery,
+  parsePreferenceInput,
+} from '../guests.schema.js';
 import { serializeGuest, serializeVisit } from '../guests.serializer.js';
-import { buildGuestListWhere, GuestsService } from '../guests.service.js';
-import type { GuestDetailRow, GuestRow, VisitRow } from '../guests.types.js';
+import { buildGuestListWhere, buildGuestMessagesWhere, GuestsService } from '../guests.service.js';
+import type { GuestDetailRow, GuestRow, TicketMessageRow, VisitRow } from '../guests.types.js';
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
   return { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin', ...overrides };
@@ -38,8 +45,27 @@ function fakeRepo(overrides: Partial<GuestsRepository>): GuestsRepository {
     findById: () => Promise.resolve(null),
     updateGuest: () => Promise.reject(new Error('not stubbed')),
     upsertPreferenceAndList: () => Promise.resolve([]),
+    findGuestMessages: () => Promise.resolve([]),
     ...overrides,
   } as unknown as GuestsRepository;
+}
+
+function makeMessage(overrides: Partial<TicketMessageRow> = {}): TicketMessageRow {
+  return {
+    id: 'msg-1',
+    hotelId: 'hotel-1',
+    ticketId: 'ticket-1',
+    conversationId: null,
+    sender: 'guest',
+    senderUserId: null,
+    body: 'halo',
+    media: null,
+    externalId: null,
+    sentAt: new Date('2026-06-11T07:00:00.000Z'),
+    deliveredAt: null,
+    readAt: null,
+    ...overrides,
+  };
 }
 
 describe('buildGuestListWhere', () => {
@@ -250,5 +276,73 @@ describe('GuestsService', () => {
     });
     expect(res.data).toHaveLength(1);
     expect(res.data[0]?.preference_type).toBe('pillow');
+  });
+});
+
+describe('message cursor codec', () => {
+  it('should round-trip a message cursor', () => {
+    const cursor = {
+      sentAt: '2026-06-11T07:00:00.000Z',
+      id: '11111111-1111-4111-8111-111111111111',
+    };
+    expect(decodeMessageCursor(encodeMessageCursor(cursor))).toEqual(cursor);
+  });
+
+  it('should throw ValidationError on a malformed cursor', () => {
+    expect(() => decodeMessageCursor('nope')).toThrow(ValidationError);
+  });
+
+  it('should default limit to 20 and clamp to 100', () => {
+    expect(parseMessagesQuery({}).limit).toBe(20);
+    expect(parseMessagesQuery({ limit: '500' }).limit).toBe(100);
+  });
+});
+
+describe('buildGuestMessagesWhere', () => {
+  it('should scope by ticket.guestId and the message hotelId for gm_admin', () => {
+    const where = buildGuestMessagesWhere(ctx(), 'guest-9');
+    expect(where.AND).toContainEqual({ ticket: { guestId: 'guest-9' } });
+    expect(where.AND).toContainEqual({ hotelId: 'hotel-1' });
+  });
+
+  it('should drop the hotel filter for super_admin', () => {
+    const where = buildGuestMessagesWhere(ctx({ isSuperAdmin: true, role: 'super_admin' }), 'g1');
+    expect(where.AND).toEqual([{ ticket: { guestId: 'g1' } }]);
+  });
+
+  it('should add a keyset OR arm when a cursor is supplied', () => {
+    const now = new Date('2026-06-11T07:00:00.000Z');
+    const where = buildGuestMessagesWhere(ctx(), 'g1', {
+      sentAt: '2026-06-11T07:00:00.000Z',
+      id: 'msg-1',
+    });
+    expect(where.AND).toContainEqual({
+      OR: [{ sentAt: { lt: now } }, { sentAt: now, id: { lt: 'msg-1' } }],
+    });
+  });
+});
+
+describe('GuestsService.messages', () => {
+  it('should 404 when the guest is missing', async () => {
+    const service = new GuestsService(fakeRepo({ findById: () => Promise.resolve(null) }));
+    await expect(service.messages(ctx(), 'guest-x', {})).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should paginate newest-first and emit a nextCursor when more remain', async () => {
+    const rows = [
+      makeMessage({ id: 'm1', sentAt: new Date('2026-06-11T09:00:00.000Z') }),
+      makeMessage({ id: 'm2', sentAt: new Date('2026-06-11T08:00:00.000Z') }),
+    ];
+    const service = new GuestsService(
+      fakeRepo({
+        findById: () => Promise.resolve(makeGuest()),
+        findGuestMessages: (_where, take: number) => Promise.resolve(rows.slice(0, take)),
+      }),
+    );
+    const res = await service.messages(ctx(), 'guest-1', { limit: '1' });
+    expect(res.data).toHaveLength(1);
+    expect(res.data[0]?.id).toBe('m1');
+    expect(res.pageInfo.hasMore).toBe(true);
+    expect(res.pageInfo.nextCursor).not.toBeNull();
   });
 });

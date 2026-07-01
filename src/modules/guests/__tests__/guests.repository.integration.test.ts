@@ -18,6 +18,12 @@ const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const GUEST_A1 = 'c1111111-cccc-4ccc-8ccc-cccccccccccc';
 const GUEST_B1 = 'c2222222-cccc-4ccc-8ccc-cccccccccccc';
+const DEPT_A = 'd1111111-dddd-4ddd-8ddd-dddddddddddd';
+const DEPT_B = 'd2222222-dddd-4ddd-8ddd-dddddddddddd';
+const TICKET_A1 = 'e1111111-eeee-4eee-8eee-eeeeeeeeeeee';
+const TICKET_A2 = 'e2222222-eeee-4eee-8eee-eeeeeeeeeeee';
+const TICKET_OTHER = 'e3333333-eeee-4eee-8eee-eeeeeeeeeeee';
+const TICKET_B = 'e4444444-eeee-4eee-8eee-eeeeeeeeeeee';
 
 const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };
 const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };
@@ -95,6 +101,92 @@ async function seed(): Promise<void> {
       },
     ],
   });
+
+  // Tickets + messages for the guest-messages history aggregation.
+  await db.department.createMany({
+    data: [
+      { id: DEPT_A, hotelId: HOTEL_A, name: 'Housekeeping', code: 'HSK' },
+      { id: DEPT_B, hotelId: HOTEL_B, name: 'Front Office', code: 'FO' },
+    ],
+  });
+  await db.ticket.createMany({
+    data: [
+      {
+        id: TICKET_A1,
+        hotelId: HOTEL_A,
+        ticketNumber: 'HSK-2606-001',
+        guestId: GUEST_A1,
+        departmentId: DEPT_A,
+        subject: 't1',
+      },
+      {
+        id: TICKET_A2,
+        hotelId: HOTEL_A,
+        ticketNumber: 'HSK-2606-002',
+        guestId: GUEST_A1,
+        departmentId: DEPT_A,
+        subject: 't2',
+      },
+      {
+        id: TICKET_OTHER,
+        hotelId: HOTEL_A,
+        ticketNumber: 'HSK-2606-003',
+        guestId: guestId(0),
+        departmentId: DEPT_A,
+        subject: 't3',
+      },
+      {
+        id: TICKET_B,
+        hotelId: HOTEL_B,
+        ticketNumber: 'FO-2606-001',
+        guestId: GUEST_B1,
+        departmentId: DEPT_B,
+        subject: 't4',
+      },
+    ],
+  });
+  await db.ticketMessage.createMany({
+    data: [
+      // GUEST_A1 messages across two tickets, out of order to prove sorting.
+      {
+        hotelId: HOTEL_A,
+        ticketId: TICKET_A1,
+        sender: 'guest',
+        body: 'a1-old',
+        sentAt: new Date('2026-06-11T07:00:00.000Z'),
+      },
+      {
+        hotelId: HOTEL_A,
+        ticketId: TICKET_A2,
+        sender: 'staff',
+        body: 'a2-new',
+        sentAt: new Date('2026-06-11T09:00:00.000Z'),
+      },
+      {
+        hotelId: HOTEL_A,
+        ticketId: TICKET_A1,
+        sender: 'ai',
+        body: 'a1-mid',
+        sentAt: new Date('2026-06-11T08:00:00.000Z'),
+      },
+      // A message on a DIFFERENT guest's ticket (same hotel) — must be excluded.
+      {
+        hotelId: HOTEL_A,
+        ticketId: TICKET_OTHER,
+        sender: 'guest',
+        body: 'other-guest',
+        sentAt: new Date('2026-06-11T10:00:00.000Z'),
+      },
+      // A message in hotel B — must be excluded for hotel-A callers.
+      {
+        hotelId: HOTEL_B,
+        ticketId: TICKET_B,
+        sender: 'guest',
+        body: 'other-hotel',
+        sentAt: new Date('2026-06-11T10:00:00.000Z'),
+      },
+    ],
+  });
 }
 
 beforeAll(async () => {
@@ -114,9 +206,12 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await db.ticketMessage.deleteMany();
+  await db.ticket.deleteMany();
   await db.guestPreference.deleteMany();
   await db.visit.deleteMany();
   await db.guest.deleteMany();
+  await db.department.deleteMany();
   await db.hotel.deleteMany();
   await seed();
 });
@@ -204,5 +299,36 @@ describe('GuestsService.addPreference (integration)', () => {
     await expect(
       service.addPreference(gmB, GUEST_A1, { preference_type: 'x', preference_value: 'y' }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('GuestsService.messages (integration)', () => {
+  it('should aggregate the guest ticket_messages newest-first, excluding other guests/hotels', async () => {
+    const res = await service.messages(gmA, GUEST_A1, { limit: '10' });
+    expect(res.data.map((m) => m.body)).toEqual(['a2-new', 'a1-mid', 'a1-old']);
+    expect(res.pageInfo.hasMore).toBe(false);
+  });
+
+  it('should cursor-paginate the history', async () => {
+    const page1 = await service.messages(gmA, GUEST_A1, { limit: '2' });
+    expect(page1.data.map((m) => m.body)).toEqual(['a2-new', 'a1-mid']);
+    expect(page1.pageInfo.hasMore).toBe(true);
+
+    const page2 = await service.messages(gmA, GUEST_A1, {
+      limit: '2',
+      cursor: page1.pageInfo.nextCursor,
+    });
+    expect(page2.data.map((m) => m.body)).toEqual(['a1-old']);
+    expect(page2.pageInfo.hasMore).toBe(false);
+  });
+
+  it('should 404 for a cross-tenant guest', async () => {
+    await expect(service.messages(gmB, GUEST_A1, {})).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should return an empty history for a guest with no tickets', async () => {
+    const res = await service.messages(gmA, guestId(1), {});
+    expect(res.data).toEqual([]);
+    expect(res.pageInfo.hasMore).toBe(false);
   });
 });
