@@ -41,7 +41,7 @@
 | T08 | Multipart upload utility (S3 / R2 abstraction)                                   | A    | Nanak   | backlog  | —           | After T01                                          |
 | T09 | CSV import utility (used by menu + knowledge)                                    | A    | Nanak   | backlog  | —           | After T01                                          |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks              | A    | Nanak   | backlog  | —           | After T02                                          |
-| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nathan  | assigned | —           | Spec reading + module skeleton OK; impl unblocked (T02 done). Nathan pick up on onboard. |
+| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nathan  | wip      | —           | PLAN ACK'd by PM B 2026-07-01. Coding `feat/tickets-list-detail`; consumes T03 `TenantContext`. Merge-blocked only on T04 preHandler runtime wiring. Q-B-01/Q-B-02 resolved. |
 | T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nathan  | backlog  | —           | After T11 + T06                                    |
 | T13 | Ticket stats + overdue                                                           | B    | Nathan  | backlog  | —           | After T11                                          |
 | T14 | Guests CRUD + preferences                                                        | B    | Nathan  | backlog  | —           | After T02                                          |
@@ -108,6 +108,7 @@
 > [YYYY-MM-DD H{N}] [PM <SLOT> <NAME>] <T## status — 1 liner>
 > ```
 
+[2026-07-01 H12] [PM B Nathan] T11 PLAN ACK'd → wip (`feat/tickets-list-detail`). Q-B-01 resolved from in-repo spec (`README §2.7`, no PO needed); Q-B-02 resolved (T03 `TenantContext` Slot-A-owned). New: **GAP-T11-1** (prisma-generate⇄`make check` CI gap, foundation) → §3b/§10 for Slot A. T11 merge now gated only on **T04** preHandler wiring.
 [2026-07-01 H12] [PM B Nathan] Online. Last approved: none (slot B first activity). Active: T11 ASSIGNMENT issued (tickets list+detail), awaiting exec-B PLAN. Next-up: T12–T20. Open Qs: 2 (Q-B-01 contract envelope escalated §3a; Q-B-02 session-context shape §3c). ⚠ T11 merge-blocked on Slot A T03/T04 seam — see PARENT §10.
 [2026-07-01 H0] [PM A Nanak] T03 tenant-guard APPROVED (attempt 1) — 3 files (tenant-guard.ts + .types.ts + test 14 pass) + bonus jest config alias+.js fix. Pure fn approach; wire as Fastify preHandler when JWT plugin lands. ⚠ Nathan flag T11 merge-blocked on this + T04 (see §10) — plan T04 next.
 [2026-07-01 H0] [PM A Nanak covering] T02 Prisma init migration APPROVED (attempt 1) — 18 HC tables + 19 CHECK + 11 partial/GIN indexes applied. DEV Opsi C deviation (fresh `hotel_core_dev` DB) logged in §4. UNBLOCKS T03–T30 impl chain (except T26/T30 tier-gated features pending Opsi A restore).
@@ -129,19 +130,19 @@
 
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
-| Q-B-01        | Canonical response envelope for tickets list/detail (pagination wrapper, cursor field name, JSON casing). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from repo; truth = FE MSW handlers. | PM B (Nathan) | T11 · MVP §1.2/§6 | open | Needs PO/FE-shape ratify. Interim: exec-B proposes envelope in T11 PLAN for PM B ACK. |
+| Q-B-01        | Canonical response envelope for tickets list/detail (pagination wrapper, cursor field name, JSON casing). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from repo. | PM B (Nathan) | T11 · MVP §1.2/§6 | **resolved (in-repo spec) 2026-07-01** | Canonical shape lives at `docs/spec/README.md §2.7` (list `{data,pageInfo:{nextCursor,hasMore}}`) + §2.3 (error). PM B ratified camelCase envelope + snake_case resource fields (§2.6 imposes no global casing). Provisional on FE MSW tiebreaker; serializer-isolated. **No PO action needed** unless FE MSW diverges. |
 
 ### 3b. Package / tooling questions
 
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
-| —             | —        | —         | —              | —      | —          |
+| GAP-T11-1     | `make check` (`Makefile:148`) has no `prisma-generate` prereq; `core/prisma/prisma-client.ts:29` is a `{}` stub. Once any B/C module imports the generated `PrismaClient`, CI `make check` fails typecheck on fresh checkout unless generate runs first. **Affects every task that touches Prisma (B + C).** | PM B (Nathan) | T11 | **open — foundation/Slot A** | Proposed fix: Slot A adds `prisma-generate` as prereq of `check` (or CI runs `make install` before `make check`). Not a T11-scope edit. See §10. Interim: exec-B runs `pnpm prisma:generate` locally; PM B does same before verifying. |
 
 ### 3c. Architecture / planning questions
 
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
-| Q-B-02        | `SessionContext {hotelId,userId,role,deptId}` — Slot-A-owned shared type from T03/T04 middleware, or per-module? Slot B T11 consumes it as a seam now; needs a single owner to avoid divergence across B/C. | PM B (Nathan) | T11 · MVP §4.1 | open | Coordinate w/ Slot A (Nanak) on T03/T04 — see §10. |
+| Q-B-02        | `SessionContext` — Slot-A-owned shared type, or per-module? Slot B T11 consumes it as a seam now; needs a single owner to avoid divergence across B/C. | PM B (Nathan) | T11 · MVP §4.1 | **resolved 2026-07-01** | T03 (`9b55b86`) shipped `TenantContext` as Slot-A-owned (`src/plugins/tenant-guard.ts`). B/C consume it. No per-module seam. |
 
 ---
 
@@ -294,7 +295,8 @@ ke §2 / §6 di sini, **bukan** ke PO langsung.
 
 | Tanggal | Topic                                         | Affects        | Action / decision                         |
 | ------- | --------------------------------------------- | -------------- | ----------------------------------------- |
-| 2026-07-01 | Session-context seam blocks Core CRM merges. T11 (and all B tickets/guests/visits endpoints) need `SessionContext {hotelId,userId,role,deptId}` from Slot A's **T03 tenant-guard + T04 RBAC**. Both currently `assigned`/`backlog`. B can BUILD + unit/integration-test against an injected seam now, but nothing merges to main until Slot A lands the middleware + owns the shared type (Q-B-02). | B (blocked-to-merge), A (provider), C (same seam later) | *Proposed by PM B for Parent PM ratify*: prioritize T03/T04 in Slot A queue to unblock B/C merges; Nanak to declare the `SessionContext` type location so B/C consume one source. |
+| 2026-07-01 | Session-context seam blocks Core CRM merges. T11 (and all B tickets/guests/visits endpoints) need session context from Slot A's **T03 tenant-guard + T04 RBAC**. | B (blocked-to-merge), A (provider), C (same seam later) | **PARTIALLY RESOLVED**: T03 landed (`9b55b86`) → `TenantContext` + `assert*` guards exist and are Slot-A-owned (Q-B-02 resolved). B now consumes them. **Remaining**: T04 must wire the `req.tenant` preHandler (runtime population) — until then B routes build + test but do not merge live. Ask stands: prioritize **T04** to unblock B/C route merges. |
+| 2026-07-01 | **CI/build gap (GAP-T11-1)**: `make check` has no `prisma-generate` prereq + `prisma-client.ts` is a `{}` stub. First B/C module importing the generated client breaks CI typecheck on fresh checkout. | A (owns Makefile/CI foundation), B + C (all Prisma-touching tasks) | *Proposed by PM B for Parent PM*: route to Slot A — add `prisma-generate` as prereq of `check` target (or CI runs `make install` first). Small foundation fix; unblocks every downstream data task. Interim: executors generate locally. |
 
 <!-- Contoh:
 2026-06-30 | core/queue/ Bull factory pattern decision | B, C | A ship dulu (T05), B & C unblocked H+1

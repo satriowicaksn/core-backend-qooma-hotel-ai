@@ -16,7 +16,7 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T11 — Tickets list + detail** (issued in §2; impl unblocked by T02, merge-blocked by T03/T04 seam — see below)
+- **Active task**: **T11 — Tickets list + detail** (PLAN ACK'd 2026-07-01, coding on `feat/tickets-list-detail`; consumes T03 `TenantContext`; merge-blocked only on T04 preHandler runtime wiring)
 - **Branch**: `feat/tickets-list-detail` (to be created by exec-B; code stays on branch, PO merges manually)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
@@ -33,7 +33,7 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T11 | Tickets list + detail (GET + filters + cursor pagination) | assigned | — | ASSIGNMENT issued §2 (2026-07-01). Impl unblocked (T02). Merge-blocked on T03/T04 seam (Slot A). Contract GAP Q-B-01. Awaiting exec-B PLAN. |
+| T11 | Tickets list + detail (GET + filters + cursor pagination) | wip | — | PLAN ACK'd 2026-07-01 (§2). Q-B-01+Q-B-02 resolved. Coding on `feat/tickets-list-detail`. Consumes T03 `TenantContext`. Merge-blocked on T04 preHandler wiring (DEP-1 runtime). GAP T11-#1 (prisma-generate⇄CI) escalated to Parent §3b. |
 | T12–T20 | Core CRM backlog (see PARENT §1)  | backlog  | —              | Released per dependency chain / gate  |
 
 ---
@@ -139,6 +139,31 @@ Slot A shipped **T03 tenant-guard** on `main` (commit `9b55b86`) while I was dra
 - **New file count:** unchanged except `tickets.types.ts` no longer holds the seam (keeps domain + wire DTOs only).
 
 Awaiting PM B ACK. Not writing code before ACK.
+
+##### PM B ACK — T11 PLAN APPROVED, proceed to coding (2026-07-01, H12)
+PLAN + addendum verified against the actual repo (trust-but-verify, not citation-trust). **ACK — create `feat/tickets-list-detail`, run `pnpm prisma:generate`, implement.** Resolutions on the three open items:
+
+**① Q-B-01 envelope — RESOLVED from in-repo canonical spec (not a PO escalation).** You were right: `docs/spec/README.md` carries the canonical contract. I confirmed each line:
+- **List** `{ data, pageInfo: { nextCursor, hasMore } }` — matches §2.7 **verbatim** (line 125; its example is literally `GET /api/tickets?limit=20&cursor=…`). ACK.
+- **Detail** `{ data: TicketDetail }` — ACK. §2.7: "no `pageInfo` ⇒ single page"; single-object `data` wrapper is the consistent read.
+- **Error** `{ error: { code, message, details } }` — matches §2.3 (canonical, every endpoint). Use the §2.3 codes (`VALIDATION_ERROR`, `NOT_FOUND`, `BUSINESS_RULE` 422) — these are what your `AppError.toJson()` must emit; wiring waits on the error-handler plugin (DEP-2), fine.
+- **Casing tension — your reading is APPROVED as the working contract.** §2.6 mandates UUID/ISO-8601/lowercase-enums but imposes **no** global field-casing rule, so there is no contradiction: **camelCase envelope wrapper (§2.7) + snake_case resource fields (§1.2)**. Ratified. Because you isolated all wire-shaping in `tickets.serializer.ts`, if the FE MSW handlers (the ultimate tiebreaker, separate repo) ever diverge, it's a **single-file** change — good design, that's precisely why I'm comfortable ratifying now rather than blocking on the absent FE repo.
+- **`wa_phone_masked` sub-clarification — APPROVED.** List always emits `wa_phone_masked = maskWaPhone(...)` (the field name is definitional; §1.2 list shape exposes no raw-phone field). The §4.5 compound predicate governs `name`/`email` (+ any fuller phone in detail). Provisional on FE MSW; serializer-isolated.
+
+**② Q-B-02 — RESOLVED. `TenantContext` is Slot-A-owned** (`src/plugins/tenant-guard.ts:22`, confirmed: `{ hotelId: string; isSuperAdmin; role: SessionRole; deptId? }` + `assertHotelOwnership`/`assertDeptOwnership` both mask cross-tenant/cross-dept as `NotFoundError` 404 per §7). **Consume it — do NOT define a local `SessionContext`.** Your addendum's reuse-before-create call is correct (CLAUDE §4). Marked resolved in §3. One confirmation: T03 already declares the `req.tenant` Fastify augmentation in `tenant-guard.types.ts` — so **do not** add a second `declare module 'fastify'` (duplicate augmentation = TS merge you don't want). You already noted dropping it; confirmed correct.
+
+**③ GAP T11-#1 (prisma-generate ⇄ `make check`) — VERIFIED REAL; split into two.**
+- **Local, for you (ACK, not blocking):** `prisma-client.ts:29` is a `{} as unknown` placeholder and `Makefile:148 check:` has no `prisma-generate` prereq — confirmed. Running `pnpm prisma:generate` before coding is safe (writes gitignored `node_modules/.prisma`, no tracked-file overwrite). Import the generated `PrismaClient` in the repo constructor. Proceed.
+- **CI coupling (foundation / cross-dev — I'm escalating, NOT you):** once T11 (and every B/C task) imports the generated client, CI `make check` fails unless generate runs first. That's a foundation gap affecting >1 dev → I've raised it to Parent PM (PARENT §3b + §10) for Slot A to add `prisma-generate` as a prereq of `check` (or CI to run `make install` first). **Do not edit `Makefile`/CI yourself** — out of T11 scope. In SUBMIT, just state the CI ordering requirement; I'll run `pnpm prisma:generate` before my own `make check` rerun so your gate isn't falsely red on my side.
+
+**Advisory nudges (catch-early, NOT blocking — no re-ACK needed):**
+- **N1 — keyset cursor:** Prisma has no row-value tuple `<`. Implement `(createdAt, id) < (c.createdAt, c.id)` as the OR-decomposition: `OR: [{ createdAt: { lt: c.createdAt } }, { createdAt: c.createdAt, id: { lt: c.id } }]` with `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`, fetch `limit+1` for `hasMore`. Keep the `q`-search `OR` and the cursor `OR` in **separate** `AND` arms so they don't collapse into one `OR` (correctness trap).
+- **N2 — dept_head guard:** if `role === 'dept_head'` but `deptId` is undefined, do not let `departmentId: undefined` silently drop the filter (tenant leak). Treat missing `deptId` for a dept_head as empty-result or `AuthError` — assert it explicitly.
+- **N3 — endpoint-level RBAC (gm_admin/dept_head only) is T04's job**, not yours. `TenantContext.role` can be `'staff'`; your service correctly scopes data, but do not hand-roll the "who may hit this route" gate — leave the route consuming `req.tenant` and let T04's RBAC preHandler reject `staff`. Note this seam in SUBMIT.
+
+**At SUBMIT I will verify:** all 10 DoD, drift scans (§3 Step 2) on changed files, `pnpm prisma:generate && make check` green on my rerun, integration test against `hotel_core_dev`, ≥80% line coverage on changed files, envelope+casing conformance to the ratified contract above. T11 remains **not-mergeable-to-main** until T04 wires the `req.tenant` preHandler (DEP-1 runtime) — that's a merge gate for PO, not an approval blocker for your service+repo layer.
+
+Proceed. 🟢
 
 <!--
 TEMPLATE — copy untuk task baru:
@@ -247,8 +272,8 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 
 | ID            | Question | Source         | Status | Resolution |
 | ------------- | -------- | -------------- | ------ | ---------- |
-| Q-B-01        | Canonical **response envelope** for `GET /api/tickets` (+ `/:id`): pagination wrapper (`data`/`meta`), cursor field name, JSON field casing (camel vs snake). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from this repo; truth = FE MSW handlers (separate repo). | T11 · MVP §1.2 / §6 | open — escalated to Parent PM (PARENT §3a) | Pending PO/Parent. Interim: exec-B proposes envelope in T11 PLAN for PM B ACK against §1.2 field names. |
-| Q-B-02        | Session context shape/ownership: is `SessionContext {hotelId,userId,role,deptId}` a Slot-A-owned shared type (from T03/T04 middleware) or per-module? Affects T11 seam + all B tasks. | T11 · MVP §4.1 | open — coordinate w/ Slot A via Parent §10 | Pending T03/T04 design (Nanak). |
+| Q-B-01        | Canonical **response envelope** for `GET /api/tickets` (+ `/:id`): pagination wrapper, cursor field name, JSON field casing (camel vs snake). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from this repo. | T11 · MVP §1.2 / §6 | **RESOLVED (in-repo spec) 2026-07-01** | Canonical shape found by exec-B at `docs/spec/README.md §2.7` (list `{data,pageInfo:{nextCursor,hasMore}}`) + §2.3 (error `{error:{code,message,details}}`). Ratified by PM B: **camelCase envelope + snake_case resource fields (§1.2)** — §2.6 imposes no global casing rule, so no contradiction. Provisional on FE MSW (tiebreaker, absent repo); serializer-isolated → single-file change if it diverges. PARENT §3a downgraded from escalated → resolved. |
+| Q-B-02        | Session context shape/ownership: Slot-A-owned shared type vs per-module? Affects T11 seam + all B tasks. | T11 · MVP §4.1 | **RESOLVED 2026-07-01** | T03 (`9b55b86`) shipped `TenantContext` as **Slot-A-owned** in `src/plugins/tenant-guard.ts`. T11 consumes it (reuse-before-create). No per-module seam. PARENT §3c marked resolved. |
 
 ---
 
