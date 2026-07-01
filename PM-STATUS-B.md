@@ -382,6 +382,54 @@ Verified against spec + merged T11 code. **ACK — create `feat/tickets-stats-ov
 
 Proceed. 🟢
 
+### SUBMIT T13 — exec-B (Nathan) at H1 (2026-07-01) (attempt 1)
+
+Task: Ticket stats + overdue — `GET /api/tickets/stats` + `GET /api/tickets/overdue`
+Branch: **`feat/tickets-stats-overdue`** (pushed; commit `3a6af90`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 12 (1 new source + 1 new test + 10 modified, **all** in `src/modules/tickets/`; 0 outside — no `api.ts`/`prisma`/`core` edits)
+  - **new** `tickets.overdue.ts` — SSOT for overdue (row predicate + WHERE forms)
+  - **new** `__tests__/tickets.stats.test.ts` — unit (isOverdue, WHERE builders, scope, serializeStats, service stats/overdue)
+  - mod `tickets.service.ts` (buildScopeArms extraction + buildOverdueWhere + stats/overdue + is_overdue filter re-route + now threading), `tickets.repository.ts` (groupCountByStatus/countWhere/findOverdue), `tickets.serializer.ts` (serializeStats + is_overdue computed via SSOT), `tickets.schema.ts` (parseOverdueQuery + shared limit), `tickets.types.ts` (stats/overdue types), `tickets.routes.ts` (2 static routes), `index.ts` (exports)
+  - mod 3 test files (route-collision, T11 is_overdue-filter regression fix, integration stats/overdue + SSOT-coherence)
+
+DoD self-check
+- [x] **E1** — `/stats` returns `{ data: { by_status{8 zero-filled}, total, overdue, high_alert_count } }` (ratified Q-B-03). One `groupBy` for status counts + 2 `count()` aggregates (overdue, high-alert) — **never N-per-status**.
+- [x] **E2** — `/overdue` returns overdue tickets via the **T11 list-item serializer**, `ORDER BY sla_due_at ASC`; **top-N** pagination (`limit` ≤100, `pageInfo.hasMore`, `nextCursor: null`) — decision stated in PLAN + implemented.
+- [x] **E3** — both scoped via the **extracted `buildScopeArms(ctx)`** (one scope impl, explicit super_admin bypass, N2 dept_head-missing-deptId → `AuthError`); dept_head stats+overdue auto-filtered to `ctx.deptId`. `hotel_id` never from URL/body. Integration-verified (dept_head stats total 5 / overdue 2).
+- [x] **E4** — `/tickets/stats` + `/tickets/overdue` registered as static routes; **route-collision test** asserts each hits its handler (not `/:id`→400-uuid). `tickets.routes.test.ts`.
+- [x] **E5** — overdue list reuses T11 serializer (PII masking intact); errors `AppError` only; `req.log` + correlationId (D7 pattern) on both routes.
+- [x] **E6** — no cross-module import; barrel adds only new response types; layout consistent (extended `tickets` module, no fork).
+- [x] **E7** — unit (stats shaping/zero-fill, overdue scope+order, `/stats`-vs-`/:id` collision) + integration vs `hotel_core_dev`-shaped PG (statuses spread + past/future SLA + terminal-status exclusion). **Changed-file line coverage 96.58%** (overdue 100 / repo 100 / service 98.8 / serializer 100 / routes 96.96 / schema 90.16 / types 100). `make check` + `make test-integration` green.
+
+**② REQUIRED coherence fix — done.** New `tickets.overdue.ts` `isOverdue(row, now)` is the single source of truth, used in **4 spots**: (1) serializer `is_overdue` field (`serializer.ts` → computed, no longer reads the dormant column), (2) `/overdue` list filter (`buildOverdueWhere`), (3) stats `overdue` count (`countWhere(buildOverdueWhere)`), (4) T11 `is_overdue` filter in `buildTicketWhere` (now `overdueWhere`/`notOverdueWhere`, not `{ isOverdue: value }`). The row predicate + Prisma WHERE forms are co-located and **asserted equal against a real DB** by the integration test "should agree with the isOverdue row predicate (SSOT coherence)". Net: FE no longer sees `is_overdue:false` on a ticket that's in `/overdue`, and `?is_overdue=true` on the T11 list now returns the same set.
+
+**T11 regression** — all T11 tests green after the serializer/filter change (1 T11 unit assertion updated: the `is_overdue` filter now asserts the computed predicate instead of the column). T11 integration counts/orderings/masking/404s unchanged (seed enriched with SLA/status without altering counts).
+
+Quality gate
+- `make check`: **PASS** (lint + format + typecheck + test-unit = **93 passed, 2 skipped** template placeholders)
+- `make test-integration`: **PASS** (**17 tests**, testcontainers, incl. SSOT-coherence)
+- ⚠ CI ordering unchanged: `make prisma-generate` before `make check`/tests on fresh checkout (GAP T11-#1, foundation-tracked as T-INFRA-01).
+
+Drift scans (src/modules/tickets): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Tenant/dept scope on stats + overdue via shared `buildScopeArms`; PII masking reused from T11 serializer on the overdue list. No secrets; no PII in logs. Read-only; no webhook/crypto.
+
+Test evidence
+- Unit/component: **48** (service 28 + stats 14 + routes 6). Integration: **17**. Files: `tickets.service.test.ts`, `tickets.stats.test.ts`, `tickets.routes.test.ts`, `tickets.repository.integration.test.ts`. Total **65** across the module.
+- Sample stats envelope (ratified shape):
+  ```json
+  { "data": { "by_status": { "open": 5, "in_progress": 0, "awaiting_late_reason": 0,
+      "done_pending": 0, "closed": 1, "high_alert": 0, "escalated": 0, "cancelled": 0 },
+    "total": 6, "overdue": 3, "high_alert_count": 1 } }
+  ```
+
+Notes / open items
+- Same merge posture as T11: buildable + fully testable now; live traffic after T04 merges + `api.ts` bootstrap wires `configureTenantGuardHooks` + `register(ticketsRoutes)` (DEP-2/DEP-4, foundation — not touched).
+- Q-B-03 shipped exactly as ratified (`high_alert_count`); FE MSW remains the final tiebreaker (serializer-isolated → one-file change if it diverges).
+
+Requesting PM B VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
