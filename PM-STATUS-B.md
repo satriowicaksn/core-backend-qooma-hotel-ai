@@ -863,6 +863,48 @@ Verified your analysis against `core/errors/app-errors.ts` (confirmed: 409→429
 
 Awaiting exec-B PLAN for T15.
 
+### ASSIGNMENT T15 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/guest-messages` (off latest main; created on ACK) · Routed from PARENT §1 T15 = MVP §1.2 B5
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T15 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+One `gm_admin`-only endpoint `GET /api/guests/:id/messages` — the guest's conversation history, **cursor-paginated**. No standalone table: aggregate `ticket_messages` across the guest's tickets. **Extends the existing `src/modules/guests/` module** (I own it post-T14) — read `ticket_messages` via Prisma directly, do NOT import the tickets module.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.3` (`GET /guests/:id/messages`) + §2.4 DDL (`ticket_messages` — `hotel_id`, `ticket_id`, `sender`, `sender_user_id`, `body`, `media`, `conversation_id`, `sent_at`, `delivered_at`, `read_at`) + tickets §1.2 `messages[]` wire shape; envelope `README §2.7`
+- Dependency: T14 ✅ merged (guests module on main); no other executor in this module.
+- `pnpm typecheck` clean ✓ ; `pnpm lint` clean ✓ (on `main`).
+- Scaffolder risk: **none** (no new deps; extends existing module).
+
+**Files to modify** (all in `src/modules/guests/` — extend, no new module)
+- `guests.types.ts` — add `MessageWire` (tickets §1.2 shape), `MessageCursor`, `MessageListQuery`, `GuestMessagesResponse`, `TicketMessageRow` (`Prisma.TicketMessageGetPayload`).
+- `guests.schema.ts` — add `parseMessagesQuery` (limit default 20 / max 100 + opaque `cursor`) + `encodeMessageCursor`/`decodeMessageCursor` (module-local base64 keyset codec).
+- `guests.serializer.ts` — add `serializeMessage` (snake_case, conforms to tickets §1.2 `messages[]`).
+- `guests.repository.ts` — add `findGuestMessages(where, take)` (Prisma `ticketMessage.findMany`).
+- `guests.service.ts` — add `messages(ctx, id, rawQuery)`: load guest (`findById`) → `assertHotelOwnership` (404) → build keyset where → serialize.
+- `guests.routes.ts` — add `GET /guests/:id/messages`.
+- `index.ts` — export `GuestMessagesResponse` + `MessageWire`.
+- `__tests__/guests.service.test.ts` — cursor codec + where-build + service (fake repo) unit.
+- `__tests__/guests.repository.integration.test.ts` — seed guest + ≥2 tickets + messages across them; assert aggregation, ordering, pagination, tenant/guest isolation, 404.
+
+**Approach**
+- **Source (Q-B-10)**: `ticket_messages` filtered by `hotelId: ctx.hotelId` (denormalized, indexed — explicit super_admin bypass drops it) **AND** `ticket: { guestId: id }` (relation filter). Guard first: load the guest row + `assertHotelOwnership(ctx, guest.hotelId, 'Guest')` → cross-tenant/missing guest = `NotFoundError` 404 (M3). gm_admin-only gate = T04 preHandler (N3).
+- **Ordering (Q-B-10, propose)**: **newest-first** — `ORDER BY sent_at DESC, id DESC`. Rationale: this is a *paginated scrollback* (page 1 = latest, cursor loads older), unlike tickets `:id` detail which returns the full thread `sent_at ASC`. **My intent: DESC.** Pin against FE MSW; one-file flip if it wants ASC.
+- **Cursor (M1)**: module-local base64 codec of `{ sentAt: ISO, id }`; keyset via N1 OR-decomposition `[{ sentAt: { lt } }, { sentAt: c.sentAt, id: { lt } }]`; fetch `limit+1` → `hasMore`; invalid cursor → `ValidationError` 400. (Duplicates T11's codec by design — **T-CLEAN-02** promote-to-`@shared` noted, not this PR.)
+- **Envelope**: `{ data: MessageWire[], pageInfo: { nextCursor, hasMore } }` (cursor, per Q-B-01/§2.7).
+- **No body masking (M4) — confirmed**: §4.5 masks guest *identity* fields, not conversation content; endpoint is gm_admin-only. Messages serialized verbatim (no `maskWaPhone`/`maskName` on `body`). Flagging explicitly, not silently masking.
+
+**Open Q / notes**
+- **Q-B-10** — (a) source = aggregate `ticket_messages` by `ticket.guestId` ✓ (per your verified note); (b) ordering = **newest-first DESC** (proposed); (c) envelope = cursor `{data, pageInfo:{nextCursor,hasMore}}`. Confirm (b) against FE MSW.
+- **T-CLEAN-02** acknowledged (generic cursor codec → `@shared`), post-CRM; keeping module-local now.
+
+**Merge posture**: same as T11/T13/T14 — buildable + fully testable now (inject `TenantContext`); live once `api.ts` bootstrap wires `register(guestsRoutes)` (DEP-4, foundation — not touched). `make prisma-generate` before CI (T-INFRA-01).
+
+Awaiting PM B ACK (PLAN + Q-B-10 ordering/source/envelope + M4 no-body-masking confirm). Not coding before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
