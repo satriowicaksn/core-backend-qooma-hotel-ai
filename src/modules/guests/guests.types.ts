@@ -16,6 +16,7 @@ export type GuestDetailRow = Prisma.GuestGetPayload<{
   include: { preferences: true; visits: true };
 }>;
 export type VisitRow = GuestDetailRow['visits'][number];
+export type TicketMessageRow = Prisma.TicketMessageGetPayload<Record<string, never>>;
 
 // Validated PATCH payload — only mutable profile fields.
 export interface GuestUpdate {
@@ -105,4 +106,37 @@ export interface GuestResponse {
 
 export interface PreferencesResponse {
   readonly data: readonly PreferenceWire[];
+}
+
+// Guest messages history — aggregated ticket_messages, cursor-paginated (Q-B-10).
+export interface MessageCursor {
+  readonly sentAt: string;
+  readonly id: string;
+}
+
+export interface MessageListQuery {
+  readonly limit: number;
+  readonly cursor?: MessageCursor;
+}
+
+// Conforms to tickets §1.2 messages[] wire shape (snake_case).
+export interface MessageWire {
+  readonly id: string;
+  readonly ticket_id: string;
+  readonly sender: string;
+  readonly sender_user_id: string | null;
+  readonly body: string | null;
+  readonly media: unknown;
+  readonly conversation_id: string | null;
+  readonly sent_at: string;
+  readonly delivered_at: string | null;
+  readonly read_at: string | null;
+}
+
+export interface GuestMessagesResponse {
+  readonly data: readonly MessageWire[];
+  readonly pageInfo: {
+    readonly nextCursor: string | null;
+    readonly hasMore: boolean;
+  };
 }

@@ -82,5 +82,16 @@ export const guestsRoutes: FastifyPluginCallback<GuestsRoutesOptions> = (fastify
     return reply.send(result);
   });
 
+  fastify.get('/guests/:id/messages', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    const id = parseGuestId(req.params);
+    req.log.info(
+      { module: 'guests', action: 'messages', guestId: id, correlationId: correlationIdOf(req) },
+      'guest messages history',
+    );
+    const result = await service.messages(ctx, id, req.query);
+    return reply.send(result);
+  });
+
   done();
 };

@@ -11,7 +11,9 @@ import type {
   GuestPreferenceRow,
   GuestRow,
   GuestWire,
+  MessageWire,
   PreferenceWire,
+  TicketMessageRow,
   VisitRow,
   VisitWire,
 } from './guests.types.js';
@@ -72,6 +74,23 @@ export function serializeVisit(visit: VisitRow): VisitWire {
     satisfaction_score: visit.satisfactionScore,
     created_at: visit.createdAt.toISOString(),
     updated_at: visit.updatedAt.toISOString(),
+  };
+}
+
+// Conversation content is not PII-masked (§4.5 governs identity fields, not
+// message bodies; endpoint is gm_admin-only anyway — M4).
+export function serializeMessage(message: TicketMessageRow): MessageWire {
+  return {
+    id: message.id,
+    ticket_id: message.ticketId,
+    sender: message.sender,
+    sender_user_id: message.senderUserId,
+    body: message.body,
+    media: message.media ?? null,
+    conversation_id: message.conversationId,
+    sent_at: message.sentAt.toISOString(),
+    delivered_at: iso(message.deliveredAt),
+    read_at: iso(message.readAt),
   };
 }
 
