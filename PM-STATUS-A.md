@@ -14,8 +14,8 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T04 (RBAC middleware) — next to start
-- **Branch**: main (solo drive; feature branch discipline resumes when Nathan onboards to slot B and Satrio joins)
+- **Active task**: T04 (RBAC middleware) — ASSIGNMENT posted §2, awaiting exec-A PLAN. Includes Q-B-02 seam callout (option a canonicalize vs option b declare-authoritative — exec picks in PLAN).
+- **Branch**: `feat/foundation-rbac` (per PO branch-per-task policy — applies to all foundation tasks T04+ going forward; code lewat feature branch, PO manual merge to main; consistent dengan Slot B workflow). Historical T01–T03 landed pre-policy on `main` via solo-drive deviation.
 - **Completed today**: T01, T02, T03
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 (next) · T05–T10 backlog
@@ -246,6 +246,80 @@ Notes
 - → Row mirrored to PARENT §1
 - → T04 (RBAC middleware) moves from `backlog` → `assigned`
 - → Short roll-up posted to PARENT §2
+
+### ASSIGNMENT T04 — claimed by exec-A (Nanak) at H0 2026-07-01
+- Branch: `feat/foundation-rbac` (per PO branch-per-task policy — code lewat feature branch, PO manual merge to main; consistency dengan Slot B workflow)
+- Routed from: PM-STATUS-PARENT.md §1 T04 (Nanak permanent slot A owner per §4 2026-07-01 swap)
+- Depends on: T03 tenant-guard ✓ (consumes `SessionUser` / `SessionRole` / `TenantContext`)
+- Downstream unblocks: **T11** (Nathan / slot B — currently merge-blocked on T03/T04 seam per PARENT §10) + all future B/C endpoints that gate on role
+- Spec refs (WAJIB dibaca sebelum PLAN):
+  - `docs/spec/02-hotel-core.md §6` — RBAC & tenant-guard summary + per-endpoint RBAC matrix (super_admin all-access / gm_admin full CRM / dept_head own-dept auto-filter on tickets+knowledge+menu / **staff NEVER** — Telegram-only)
+  - `docs/spec/02-hotel-core.md §7` — Error catalog (403 vs cross-tenant 404-mask rule — do NOT downgrade T03's 404-mask to 403)
+  - `CLAUDE.md §5.4` — AppError hierarchy (use `ForbiddenError` for role mismatch, NOT `throw new Error(...)`)
+  - `CLAUDE.md §8` — Testing rules (unit + mock port; NO Prisma mock)
+
+#### PM A notes untuk exec-A
+
+**Scope**
+- RBAC middleware — **pure functions** (bukan Fastify plugin yet — same rationale as T03: `api.ts` masih stub, wire as preHandler ketika JWT auth plugin lands, kemungkinan late-T04 atau task terpisah).
+- Support 4 roles dari T03's `SessionRole` union: `super_admin` (all-access implicit), `gm_admin` (all HC endpoints), `dept_head` (subset + own-dept auto-filter), `staff` (**hard-reject di setiap HC endpoint**).
+- Compose bersih dengan T03's tenant-guard: call chain idiom = `deriveTenantContext(user)` → `requireRole(tenant, [...])` → `assertHotelOwnership(tenant, resourceHotelId)` → `assertDeptOwnership(tenant, resourceDeptId)`.
+
+**Q-B-02 seam callout — WAJIB address di PLAN (pilih ONE + justify)**
+
+T03 exports `SessionUser` dari `src/plugins/tenant-guard.ts`. Nathan (slot B, T11) merge-blocked karena butuh canonical `SessionContext {hotelId,userId,role,deptId}` import path yang stable (PARENT §3c Q-B-02 + §10 coord note). Exec-A pilih di PLAN:
+
+- **Option (a) — canonicalize (PREFERRED jika delta kecil)**: rename `SessionUser` → `SessionContext`, pindah ke `src/shared/types/session-context.ts` (per `CLAUDE.md §3` folder rule for lintas-modul types), re-export dari `tenant-guard.ts` untuk compat. Gunakan jika:
+  - Perubahan ≤ ~30 LOC total (move + re-export shim + import update di T03 test file)
+  - 0 test regression (14 T03 tests tetap hijau)
+  - Tidak butuh nambah dep atau struktur baru selain 1 file di `shared/types/`
+  - **Efek**: Q-B-02 selesai permanent — B/C import path `@shared/types/session-context.js`, single source of truth.
+- **Option (b) — declare authoritative in place**: `SessionUser` tetap di `src/plugins/tenant-guard.ts`, exec-A tulis note di PLAN yang formally declare path itu authoritative. PM A pakai note itu untuk resolve Q-B-02 di PARENT §3c. Gunakan jika kanonikalisasi out-of-scope (mis. butuh rename di banyak file, atau conflict dengan struktur folder yang akan datang).
+
+Rebuttal welcome jika exec-A yakin ada Option (c) lebih tepat — sertakan di PLAN GAP section.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- RBAC = **pure functions**. Test = unit dengan mock `SessionContext`. **JANGAN**:
+  - mock Prisma (per CLAUDE.md §8)
+  - butuh DB integration test (role-check adalah decision on injected context, tidak ada side-effect)
+  - couple ke T05 seed data (T04 harus reviewable + testable tanpa row apapun di `hotel_core_dev`)
+  - kalau exec-A menemukan RBAC butuh live user record untuk validate → design smell → raise sebagai GAP di PLAN, jangan lanjut coding
+- Error hierarchy WAJIB pakai `AppError` subclass dari `@core/errors/app-errors`:
+  - Role mismatch (allowed roles tidak match) → `ForbiddenError` (HTTP 403)
+  - No session on request → `AuthError` (HTTP 401)
+  - Cross-tenant / cross-dept → tetap `NotFoundError` (T03's 404-mask rule, spec §7) — **JANGAN** downgrade jadi 403
+- No new deps (`package.json` untouched — kalau butuh sesuatu, escalate ke PM A dulu)
+- No `any` / `console.log` / `throw new Error(...)` / default export di luar entrypoints (per CLAUDE.md §5 + §7 + drift table)
+- File naming: `kebab-case.ts`; class PascalCase; fn camelCase; explicit return type untuk public fn
+
+**Files hint (exec-A finalize di PLAN)**
+- `src/plugins/rbac.ts` — new; `requireRole(...)` guard fn + optional dept-scope helper untuk list endpoint filter
+- `src/plugins/__tests__/rbac.test.ts` — new; unit ≥ 80% line coverage, semua branch (each role × each guard) tercover
+- **IF Option (a) chosen**:
+  - `src/shared/types/session-context.ts` — new; canonical `SessionContext` type
+  - `src/plugins/tenant-guard.ts` — modify: replace inline `SessionUser` interface dengan `import type { SessionContext } from '@shared/types/session-context.js'` + re-export shim (`export type SessionUser = SessionContext` untuk backward-compat) — atau langsung rename call-site
+  - `src/plugins/__tests__/tenant-guard.test.ts` — verify 14 tests tetap green after rename
+- **IF Option (b) chosen**: no `shared/types/` change; hanya note di PLAN yang PM A mirror ke PARENT §3c
+
+**T04 DoD**
+- [ ] `requireRole(tenant, allowed: SessionRole[])` guard fn — throws `AuthError` on no tenant; `ForbiddenError` on role tidak di `allowed`; super_admin implicit all-access (no perlu di-list)
+- [ ] `staff` role **hard-rejected** di setiap call (spec §6: "staff role NEVER hits any of these")
+- [ ] Optional: dept-scope filter helper untuk list endpoint (mis. `applyDeptFilter(tenant, whereClause)`) — signature TBD di PLAN, harus satisfy spec §6 rule 2. Kalau exec-A anggap ini overhead di T04 dan lebih baik di modul konsumer (T11+), justify di PLAN — PM A OK dengan defer selama T04 punya minimum surface untuk B/C consume
+- [ ] Compose bersih dengan T03 tenant-guard (chain idiom di atas terpanggil di 1 test integration-style unit — mock context, verify order/exit)
+- [ ] Unit test ≥ 80% line coverage on new file(s); test naming `it('should <expected> when <condition>')`
+- [ ] All branches covered: 4 roles × guard outcomes (allow / auth-error / forbidden)
+- [ ] `make check` PASS (lint + format:check + typecheck + test:unit)
+- [ ] Drift scans clean (`any` / `console.log` / `throw new Error(` / forbidden imports / default export / `.skip`)
+- [ ] Q-B-02 addressed via chosen option — PLAN sub-block harus include: (i) option a/b, (ii) rationale, (iii) resolution note yang PM A tinggal mirror ke PARENT §3c
+
+**Coordination downstream (untuk PM A tracking, exec-A tidak perlu action)**
+- Post VERDICT APPROVED, PM A akan:
+  - Update PARENT §1 row T04 → approved
+  - Post roll-up ke PARENT §2
+  - Resolve Q-B-02 di PARENT §3c (option + import path yang exec-A pilih)
+  - Update PARENT §10 coord note (Nathan/slot B unblocked-to-merge untuk T11 chain)
+
+Awaiting **PLAN T04** dari exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
