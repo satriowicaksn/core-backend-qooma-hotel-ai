@@ -16,16 +16,45 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T14 — Guests CRUD + preferences** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ merged · T13 ✅ APPROVED (awaiting PO merge).
-- **Branch**: T11 merged ✓ · T13 `feat/tickets-stats-overdue` @ `3a6af90` (approved, awaiting PO merge) · T14 `feat/guests-crud` (pending)
-- **Runtime unblock**: T04 (RBAC) **MERGED to main** ✓ — `req.tenant` seam live. Only remaining go-live gate = **DEP-4** (`api.ts` bootstrap wiring, foundation).
-- **Progress slot B**: **2/10 approved (T11, T13)**. Next: T14. Fan-out window open (T14 ∥ T19; T16 coordinates Visit shape). T12 waits on T06 (Slot A).
+- **Active tasks (PARALLEL)**: **T14 (guests) ∥ T16 (visits)** — both issued, awaiting PLANs; parallel-safe via ratified Q-B-05. **T19 (notifications)** issued but ⛔ blocked on DEP-5. T11 + T13 ✅ merged.
+- **Branches**: T11 merged ✓ · T13 merged ✓ · T14 `feat/guests-crud` · T16 `feat/visits-list-verify` · T19 `feat/notifications-crud` (pending)
+- **Mode**: multi-executor. Each T = own thread in §2 (ASSIGNMENT→PLAN→ACK→SUBMIT→VERDICT) + own branch → I verify each independently on its branch. See §0a board for live state.
+- **Runtime**: T04 MERGED ✓ (`req.tenant` live). Go-live gate = **DEP-4** (`api.ts` bootstrap). **DEP-5** (`ctx.userId`) unblocks T19. Both escalated.
+- **Progress**: **2/10 merged (T11, T13)** · 2 active (T14, T16) · 2 blocked (T19, T12) · 4 backlog. See §0a.
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
 - **⚠ Verified blockers (src/ inspection 2026-07-01)**:
   1. `src/common/` empty → **T03 tenant-guard + T04 RBAC (Slot A) NOT built**. T11 codes against a `SessionContext` seam, injected in tests; NOT mergeable to main until Slot A lands the middleware (MVP §4.1).
   2. `src/entrypoints/api.ts` still a stub (no Fastify bootstrap / `fastify.services`). T11 ships as `ticketsRoutes` plugin + service/repo behind barrel; live-server wiring = foundation scope.
   3. `docs/API-CONTRACT.md §2.2` (canonical response envelope) absent from repo → open-Q Q-B-01 (§3).
+
+---
+
+## 0a. Progress board + Loop ledger (Slot B — at-a-glance)
+
+> **Purpose (PO ask 2026-07-01)**: crisp "done vs not-done" every loop, whether we close 1 T or several. Board = current state of all 10 Slot-B tasks. Ledger = one append per loop close (newest on top). Detail lives in §1 (tracker) + §2 (threads).
+
+### Progress board — Slot B (T11–T20)
+| T## | Task | Status | Branch | On main? |
+| --- | ---- | ------ | ------ | -------- |
+| T11 | Tickets list + detail | ✅ approved | `feat/tickets-list-detail` | ✅ merged (PR #1) |
+| T13 | Ticket stats + overdue | ✅ approved | `feat/tickets-stats-overdue` | ✅ merged |
+| T14 | Guests CRUD + preferences | 🟡 assigned (awaiting PLAN) | `feat/guests-crud` | — |
+| T16 | Visits list + verify-manual | 🟡 assigned (awaiting PLAN) | `feat/visits-list-verify` | — |
+| T19 | Notifications CRUD | ⛔ blocked (DEP-5 `ctx.userId`) | `feat/notifications-crud` | — |
+| T12 | Ticket transition + reroute | ⛔ blocked (T06, Slot A) | — | — |
+| T15 | Guest messages history | ⚪ backlog (←T14) | — | — |
+| T17 | Visit reject + failed_3x | ⚪ backlog (←T16) | — | — |
+| T18 | Manual visit create | ⚪ backlog (←T16) | — | — |
+| T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
+
+**Counts**: ✅ 2/10 done+merged · 🟡 2 active (T14, T16) · ⛔ 2 blocked (T19 on DEP-5, T12 on T06) · ⚪ 4 backlog.
+**Foundation watch (not Slot B, but gate our go-live/unblocks)**: DEP-4 `api.ts` bootstrap (go-live for ALL routes) · DEP-5 `TenantContext.userId` (unblocks T19) · T06 state-machine (unblocks T12) — all escalated to Parent/Slot A.
+
+### Loop ledger (newest on top)
+- **Loop 3 — 2026-07-01 H12 — OPEN parallel batch.** Issued T14 ∥ T16 (both fully buildable; Q-B-05 Visit shape ratified so they don't collide) + T19 (blocked on DEP-5). Escalated DEP-5 (`ctx.userId`) to Slot A. **Done so far: T11, T13 (both merged).** In-flight: T14, T16 awaiting PLANs. Next close: whichever of T14/T16 SUBMITs first → independent VERDICT.
+- **Loop 2 — 2026-07-01 H12 — T13 APPROVED + merged.** stats+overdue; `is_overdue` SSOT coherence fix verified 4 sites; T11 regression green. T04 observed merged (seam live).
+- **Loop 1 — 2026-07-01 H12 — T11 APPROVED + merged (PR #1).** tickets read surface; PM-reverified (make check + integration + 96% cov + drift clean).
 
 ---
 
@@ -36,10 +65,11 @@
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
-| T13 | Ticket stats + overdue                                    | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-01) — PM rerun: make check (93) + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② coherence SSOT verified across 4 sites. Code `feat/tickets-stats-overdue` @ `3a6af90` → **awaiting PO merge**. |
-| T14 | Guests CRUD + preferences                                 | assigned     | —              | ASSIGNMENT issued §2 (2026-07-01). Greenfield `guests/`. Awaiting exec-B PLAN. Q-B-04 (offset envelope) + Q-B-05 (embedded visit shape ↔ T16). |
-| T12 | Ticket status transition + reroute                        | backlog      | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
-| T16/T19 | Visits / Notifications CRUD                           | backlog      | —              | Unblocked (T02 ✓). Fan-out window open: T14 ∥ T19 safe; T16 shares Visit shape w/ T14 (Q-B-05) — sequence or lock shape. |
+| T13 | Ticket stats + overdue                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main** 2026-07-01. PM rerun: make check 93 + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② SSOT coherence verified 4 sites. |
+| T14 | Guests CRUD + preferences                                 | assigned     | —              | Issued §2 (2026-07-01). Greenfield `guests/`. Parallel-safe w/ T16 (Q-B-05 ratified). Awaiting PLAN. Q-B-04 (offset envelope). |
+| T16 | Visits list + verify-manual                               | assigned     | —              | Issued §2 (2026-07-01). Greenfield `visits/`. Owns canonical Visit serializer (Q-B-05). Parallel w/ T14. Awaiting PLAN. |
+| T19 | Notifications CRUD + optimistic ops                       | assigned ⛔  | —              | Issued §2 (2026-07-01) but **BLOCKED on DEP-5** (`TenantContext.userId`, Slot A). May PLAN now; impl waits. Escalated PARENT §3b/§10. |
+| T12 | Ticket status transition + reroute                        | backlog ⛔   | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
 | T15/T17/T18/T20 | Downstream CRM + socket                       | backlog      | —              | T15←T14; T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
@@ -498,6 +528,66 @@ Another clean first pass — coherence trap closed properly with an SSOT + real-
 
 Awaiting exec-B PLAN for T14.
 
+---
+
+### 📐 Q-B-05 RESOLVED (PM B ratify, 2026-07-01) — canonical `Visit` wire shape (unblocks T14 ∥ T16 parallel)
+To let T14 (embeds `visits[]` in guest detail) and T16 (owns `GET /visits` + Visit serializer) run in parallel **without shape divergence**, I pin the canonical Visit wire object from DDL §2.3. Both modules serialize to THIS (each module-local — no cross-module import); FE MSW is final tiebreaker (serializer-isolated → one-file change if it differs):
+```json
+{ "id": "uuid", "guest_id": "uuid", "check_in": "ISO", "check_out": "ISO|null",
+  "nights": "int|null", "room_number": "string|null",
+  "status": "pending_verification|checked_in|checked_out|rejected|failed_verification|cancelled",
+  "booking_source": "ota_email|direct|walk-in|pms|null", "verification_attempts": "int",
+  "special_request": "string|null", "satisfaction_score": "1..5|null",
+  "created_at": "ISO", "updated_at": "ISO" }
+```
+- **T16 owns** the canonical `visits.serializer.ts` producing this. **T14 embeds** the same shape in guest detail (module-local serialization of the subset it needs — MAY omit `special_request`/`satisfaction_score` for the profile summary; MUST NOT rename or retype shared fields). If either finds FE MSW wants a different shape, raise it — one serializer-file change each. Optional: a shared `VisitWire` **type** in `@shared/types/` both import (type-only, no logic) — allowed, not required.
+
+---
+
+### ASSIGNMENT T16 — Visits list + pending verification flow — issued by PM B (Nathan) 2026-07-01 (H12)
+- Branch: `feat/visits-list-verify` · Routed from PARENT §1 T16 = MVP §1.2 **B6** · Spec: `02-hotel-core.md §1.3` (visits endpoints + pending/failed flows) + §2.3 DDL (`visits`) + §4.9 (atomic verify)
+- **New greenfield module `src/modules/visits/`.** Dependency: T02 ✓. **Parallel-safe with T14** via Q-B-05. **Owns the canonical Visit serializer** (Q-B-05).
+- **Inherited floor** (same as T11/T13 — I verify all at SUBMIT): tenant guard via T03 `TenantContext` (`WHERE hotelId=ctx.hotelId`, super_admin explicit bypass, never trust URL/body); `AppError` only; structured log + correlationId; module layout per `MODULE_TEMPLATE.md`; no cross-module internal import; PII masking §4.5 at serializer; zod validation; `AppError` errors; ≥80% line coverage; `make check` + `make test-integration` green; drift 0.
+
+**Scope (role `gm_admin` only)**
+- `GET /api/visits` — list, filter `?status=` (incl. `pending_verification`, `failed_verification`); **offset (page/pageSize) pagination** (dashboard cards; same envelope decision as guests Q-B-04 — align with T14). Serialize via canonical Visit shape.
+- `PATCH /api/visits/:id/verify-manual` — dual-mode per §1.3: **approve** `{ guest_name, room_number, nights (1–7) }` → status `checked_in`, derive `check_out = check_in@13:00 + nights → @11:00`; **reject** `{ action: 'reject' }` → status `rejected`.
+
+**Task DoD**
+- [ ] V1 — `GET /visits` list + `?status` filter (CSV or single per FE) + offset pagination + canonical Visit serializer.
+- [ ] V2 — `verify-manual` **atomic (§4.9)**: status update + audit trail in ONE transaction; no partial state visible. (Socket `verification:resolved` emit is **T20** — leave a clearly-named no-op/hook seam, do NOT wire socket here.)
+- [ ] V3 — valid transitions only: `pending_verification → checked_in` (approve) / `→ rejected` (reject). Any other current-status → `422 BUSINESS_RULE`. Reject/approve-manual for failed_3x is **T17**, not here.
+- [ ] V4 — checkout derivation correct (check_in date @13:00 local + nights, checkout @11:00); `nights` ∈ 1–7 zod-validated.
+- [ ] V5 — tenant guard + gm_admin scope; cross-tenant `:id` → 404 (`assertHotelOwnership`).
+- [ ] V6 — tests: unit (transition validation, checkout derivation, status filter build) + integration (seed visits across statuses; verify-manual tx atomicity; tenant isolation; 404).
+
+**Open Q**: Q-B-04 envelope (offset) shared with T14 — coordinate one answer. Q-B-06 (if any) verify-manual audit-log target: does visits reuse a generic audit table or a visits-local log? (spec §4.9 says "audit log entry" — confirm which table; propose in PLAN.)
+
+Awaiting exec-B PLAN for T16.
+
+---
+
+### ASSIGNMENT T19 — Notifications CRUD + optimistic ops — issued by PM B (Nathan) 2026-07-01 (H12) — ⛔ BLOCKED on seam extension
+- Branch: `feat/notifications-crud` · Routed from PARENT §1 T19 = MVP §1.2 **B9** · Spec: `02-hotel-core.md §1.9` (endpoints L219-222 + optimistic note L240) + §2.5 DDL (`notifications`)
+- **New greenfield module `src/modules/notifications/`.** Dependency: T02 ✓. **Inherited floor** as above.
+- ⛔ **BLOCKED — DEP-5**: notifications are **per-user** (`WHERE user_id = ctx.userId`), but `TenantContext` currently has **no `userId`** (`tenant-guard.ts:22-26`; `SessionUser.userId` exists but `deriveTenantContext` drops it). Slot A must add `userId` to `TenantContext` + `deriveTenantContext` (2-line foundation fix). **Escalated → PARENT §3b (DEP-5) + §10.** Executor MAY draft PLAN + module skeleton/schema/serializer now, but **must not hand-roll userId** from the JWT (bypasses the seam) — hold the scoping impl until Slot A ships `ctx.userId`.
+
+**Scope (all authenticated roles — NOT gm_admin-only)**
+- `GET /api/notifications` — current user's list, filter `?is_read`, pagination; scope `WHERE hotelId=ctx.hotelId AND userId=ctx.userId`.
+- `GET /api/notifications/unread-count` — `{ data: { count } }` (or per FE MSW — propose).
+- `PATCH /api/notifications/:id/read` — mark one read; ownership `userId=ctx.userId` (cross-user → 404).
+- `POST /api/notifications/mark-all-read` — mark all current-user unread → read.
+
+**Task DoD**
+- [ ] N1 — all 4 endpoints; **per-user scope** on every one (a user sees/mutates only their own notifications, within their hotel).
+- [ ] N2 — `unread-count` accurate; `mark-all-read` idempotent; `:id/read` sets `is_read`+`read_at`.
+- [ ] N3 — tenant + user guard (no cross-user, no cross-tenant); cross-user `:id` → 404.
+- [ ] N4 — tests: unit (scope build, read/unread transitions) + integration (seed multi-user notifications; assert user A can't see/mark user B's; unread-count; mark-all).
+
+**Open Q**: Q-B-07 — `unread-count` + list envelope shapes (propose per §2.7 + FE MSW).
+
+Awaiting Slot-A `TenantContext.userId` (DEP-5) before impl; exec-B may PLAN now.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -611,7 +701,11 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | GAP T11-#3    | `test:unit` glob collects `*.integration.test.ts` → `make check` now needs Docker; global `test-setup.ts` harness is a stub. | T11 · `package.json:25` / TESTING §5 | **open — foundation/Slot A** (escalated PARENT §3b) | Non-blocking (self-contained testcontainers, 0 `.skip`). Fix: Slot A adds `testPathIgnorePatterns:['\\.integration\\.test\\.ts$']` to `test:unit`. |
 | GAP T11-#1    | `make check` has no `prisma-generate` prereq + `prisma-client.ts` `{}` stub → fresh-checkout CI breaks on generated-client import. | T11 | **open — foundation/Slot A** (escalated PARENT §3b) | Affects all B/C Prisma tasks. Interim: executors + PM run `pnpm prisma:generate` before gates. |
 | Q-B-03        | Stats response shape for `GET /api/tickets/stats` — unpinned in specs (§1.2/§1.11 say only "counts by status"). | T13 · MVP §1.2 B3 | **RESOLVED (provisional) 2026-07-01** | Ratified `{ data: { by_status{8}, total, overdue, high_alert_count } }`. `high_alert_count` chosen over `high_alert` to avoid collision with `by_status.high_alert` (status vs flag). Provisional on FE MSW (absent); serializer-isolated. Noted PARENT §3a. |
-| DEP-4 (go-live) | After T04 merges, `api.ts` bootstrap must wire `configureTenantGuardHooks(app)` + `register(ticketsRoutes)` for tickets routes to actually serve. `api.ts` still a stub. | T11/T13 · DEP-2 | **open — foundation** (flagged PARENT §10) | Not B-task scope. True go-live step for all B routes. |
+| DEP-4 (go-live) | After T04 merges, `api.ts` bootstrap must wire `configureTenantGuardHooks(app)` + `register(<module>Routes)` for routes to actually serve. `api.ts` still a stub. | T11/T13 · DEP-2 | **open — foundation** (flagged PARENT §10) | Not B-task scope. True go-live step for all B routes. |
+| DEP-5         | `TenantContext` has no `userId` (`tenant-guard.ts:22-26`); `SessionUser.userId` exists but `deriveTenantContext` drops it. **Blocks T19** (notifications scope by `user_id`). | T19 · §2.5 DDL | **open — foundation/Slot A** (escalated PARENT §3b/§10) | 2-line fix: add `userId` to `TenantContext` + copy in `deriveTenantContext`. T19 executor may PLAN/skeleton; impl waits. Do NOT hand-roll userId from JWT. |
+| Q-B-04        | Guests + Visits **offset** pagination envelope (`{data,pageInfo}` vs `{data,page,pageSize,total}`?). §2.7 is cursor-shaped; these are page-based. | T14/T16 · §1.3 | **open** | exec-B propose one shared answer in PLAN (both T14+T16 use it); FE MSW tiebreaker. |
+| Q-B-05        | Canonical `Visit` wire shape (T14 embeds, T16 owns). | T14/T16 · §2.3 DDL | **RESOLVED (PM ratify) 2026-07-01** | Pinned in §2 (13 fields from DDL §2.3). T16 owns serializer; T14 embeds same shape module-local. Unblocks T14 ∥ T16 parallel. Provisional on FE MSW. |
+| Q-B-07        | Notifications list + `unread-count` envelope. | T19 · §1.9 | **open** | exec-B propose per §2.7 + FE MSW in PLAN. |
 
 ---
 
