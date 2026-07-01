@@ -16,8 +16,9 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T13 — Ticket stats + overdue** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ APPROVED (attempt 1) — code on branch awaiting PO merge.
-- **Branch**: T11 `feat/tickets-list-detail` @ `550e9ef` (approved, awaiting PO merge) · T13 `feat/tickets-stats-overdue` (pending)
+- **Active task**: **T13 — Ticket stats + overdue** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ APPROVED + **MERGED to main** (PR #1 `6c1e4e2`).
+- **Branch**: T11 merged ✓ · T13 `feat/tickets-stats-overdue` (exec-B creates on ACK)
+- **Runtime unblock watch**: T04 (RBAC, Slot A) now **wip** — once merged, `req.tenant` populated → T11 (and T13) routes go live automatically.
 - **Progress slot B**: 1/10 approved (T11). Next: T13 → then T14/T16/T19 (unblocked). T12 waits on T06 (Slot A).
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
@@ -34,7 +35,7 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-01) — PM rerun: make check + integration 11 + coverage 96% + drift clean. Code on `feat/tickets-list-detail` @ `550e9ef` → **awaiting PO merge**. Runtime gate: T04 preHandler (routes 401 until then). GAP T11-#2 (approach A) approved; GAP T11-#3 escalated. |
+| T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
 | T13 | Ticket stats + overdue                                    | assigned     | —              | ASSIGNMENT issued §2 (2026-07-01). Unblocked by T11. Extends `tickets` module (reuse). Awaiting exec-B PLAN. Possible Q-B-03 (stats shape). |
 | T12 | Ticket status transition + reroute                        | backlog      | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
 | T14/T16/T19 | Guests / Visits / Notifications CRUD               | backlog      | —              | Unblocked (T02 ✓) — release after T13 or in parallel |
