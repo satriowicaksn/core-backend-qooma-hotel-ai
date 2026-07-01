@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T04 (RBAC middleware) — ASSIGNMENT posted §2, awaiting exec-A PLAN. Includes Q-B-02 seam callout (option a canonicalize vs option b declare-authoritative — exec picks in PLAN).
-- **Branch**: `feat/foundation-rbac` (per PO branch-per-task policy — applies to all foundation tasks T04+ going forward; code lewat feature branch, PO manual merge to main; consistent dengan Slot B workflow). Historical T01–T03 landed pre-policy on `main` via solo-drive deviation.
-- **Completed today**: T01, T02, T03
+- **Active task**: T-INFRA-PRISMA-CI (foundation fix for GAP-T11-1 per PARENT §3b) — PM A to draft ASSIGNMENT next. T04 APPROVED.
+- **Branch (current active task)**: TBD for T-INFRA-PRISMA-CI (per PO branch-per-task policy). `feat/foundation-rbac` @ `df5648b` awaits PO manual merge to `main` (T04 code).
+- **Completed today**: T01, T02, T03, T04
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 (next) · T05–T10 backlog
+- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-PRISMA-CI (next, foundation) · T05 · T06 (parallel-friendly) · T07–T10 backlog
 
 ---
 
@@ -31,7 +31,7 @@
 | T01 | `make check` green dari boilerplate (lint+format+typecheck+test) | approved | PM A (Nanak) | env fix + ts-node + tsconfig ts-node override |
 | T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
-| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) | assigned | —            | Next up. Will consume tenant-guard's TenantContext + SessionUser types. |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
 | T06 | Ticket state-machine helper + unit-test the transition table | backlog | —              | Parallel-friendly after T01 |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
@@ -652,6 +652,73 @@ Notes
 - Line count in files changed above is measured post-Prettier; slightly larger than PLAN's ~53 prod / ~198 total estimate due to JSDoc verbosity — no functional expansion.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T04 — APPROVED (H0 2026-07-01, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on branch `feat/foundation-rbac` @ commit `df5648b`. All 7 gates green.
+
+**DoD verification (12 items from ASSIGNMENT + PLAN addendum)** — all ✓
+- `requireRole` guard fn (order: no-tenant → staff → super-bypass → allowed) verified at `src/plugins/rbac.ts:33-53`. `AuthError`/`ForbiddenError` used correctly, no `throw new Error(`.
+- `staff` hard-reject with defense-in-depth (rejects even if caller passes `['staff']`) — verified `rbac.ts:40-45` + tests at `rbac.test.ts:23-28`.
+- `super_admin` implicit all-access (works with `allowed=[]` too) — verified `rbac.ts:46` + tests at `rbac.test.ts:31-37`.
+- `applyDeptFilter` defer — accepted per PLAN addendum; T11 will inline per Prisma `WhereInput` shape.
+- Composition test — `rbac.test.ts:70-84` exercises full T03 chain (`deriveTenantContext → requireRole → assertHotelOwnership → assertDeptOwnership`) for dept_head own-dept without throw.
+- Test naming compliance — 14 new tests all match `it('should <expected> when <condition>')`.
+
+**Both REJECT-PLAN fixes verified in code (independent read)**
+- **Fix #1 (Fastify encapsulation)** — `src/plugins/tenant-guard.hooks.ts:31-38`: `configureTenantGuardHooks(app: FastifyInstance): void` factory. Direct `app.addHook('onRequest', ...)` on caller's instance. No `app.register()` wrapper → no encapsulation → hook fires globally for sibling-registered routes. JSDoc lines 1–25 document the rationale + wiring pattern for Nathan (`api.ts` root-scope invocation, order: JWT register → configure hooks → routes register). Zero new dep.
+- **Fix #2 (`FastifyJWT` augmentation)** — `src/plugins/tenant-guard.types.ts:24, 34-39`: bare type-only `import type {} from '@fastify/jwt'` forces module resolution + `declare module '@fastify/jwt' { interface FastifyJWT { payload: SessionUser; user: SessionUser } }`. T03's `FastifyRequest.tenant?: TenantContext` block preserved verbatim at lines 28-32. Canonical `@fastify/jwt` v8 consumer-typing pattern. `tsc --noEmit` clean — proves no collision.
+
+**Quality gate (independent re-run in `main` checkout of branch)**
+- `make check` overall: **PASS** — confirmed locally
+- `pnpm lint`: PASS (`--max-warnings 0`)
+- `pnpm format:check`: PASS
+- `pnpm typecheck`: PASS (both `declare module` blocks compile — Fix #2 verified at compile-time)
+- `pnpm test:unit`: PASS — 28 tests pass (14 T03 tenant-guard + 11 rbac + 3 tenant-guard.hooks), 2 `_template` skipped (pre-existing baseline)
+- **T03 regression check**: `PASS src/plugins/__tests__/tenant-guard.test.ts` — all 14 T03 tests green post-augmentation modify ✓
+
+**Drift scans** (per PM-AGENT §3 Step 2, all 7 categories on T04 files)
+- `any` types: **0 hits**
+- `console.log/info/debug`: **0 hits**
+- `throw new Error(`: **0 hits** (uses `AuthError`/`ForbiddenError`)
+- Forbidden imports (express/typeorm/sequelize/mongoose/moment/node-fetch): **0 hits**
+- Default export: **0 hits** (all named exports)
+- `.skip` in tests: **0 hits** (14 real tests)
+- Hardcoded URL: **0 hits**
+
+**Coverage — 100% claim independently verified**
+```
+File                   | % Stmts | % Branch | % Funcs | % Lines
+rbac.ts                |     100 |      100 |     100 |     100
+tenant-guard.hooks.ts  |     100 |      100 |     100 |     100
+```
+
+**Spot-check** (PM-AGENT §3 Step 5)
+- Naming: kebab-case files ✓; camelCase fns (`requireRole`, `configureTenantGuardHooks`) ✓; PascalCase types (via re-consumption of T03's `SessionUser`/`TenantContext`) ✓
+- Explicit return types on public fns: `requireRole(...): void` ✓ ; `configureTenantGuardHooks(...): void` ✓
+- No what-comments — JSDoc explains WHY (encapsulation caveat, canonical `@fastify/jwt` pattern) ✓
+- Import direction: plugin files import from same folder, no cross-module leak ✓
+- LOC per file (post-Prettier): `rbac.ts` 53, `hooks.ts` 38, `types.ts` 41, `rbac.test.ts` 85, `hooks.test.ts` 80 — all well under 300 rule-of-thumb ✓
+
+**Security floor** (PM-AGENT §3 Step 6) — N/A for T04 (no auth/webhook/crypto/PII surface). Confirmed: no config edits, no token storage, no HMAC surface, no log lines emit user data.
+
+**Follow-ups actioned in same commit**
+- → §1 task tracker: T04 → approved
+- → §0 Active task refreshed
+- → PARENT §1 row T04 → approved
+- → PARENT §2 short roll-up posted
+- → PARENT §3c Q-B-02 resolution strengthened with T04 ratification note (canonical path: `TenantContext`/`SessionUser`/`SessionRole` at `src/plugins/tenant-guard.ts`)
+- → PARENT §10 coord note: T11 seam **FULLY RESOLVED** (T03 pure fns + T04 factory + `@fastify/jwt` augmentation → Nathan can wire `configureTenantGuardHooks(app)` for global `req.tenant`)
+
+**PO action item — branch merge**
+`feat/foundation-rbac` @ `df5648b` on `origin`; `make check` verified green by PM A. Per CLAUDE.md §12 (code lewat feature branch, PO merge manual), **please merge `feat/foundation-rbac` → `main` when ready**. PM A will not auto-merge. Docs (PM-STATUS-A.md + PARENT roll-ups) already on `main`.
+
+**Next Slot A queue**
+1. **T-INFRA-PRISMA-CI** (foundation fix for GAP-T11-1 per PARENT §3b) — PM A to draft ASSIGNMENT next
+2. **T05** seed scripts
+3. **T06** ticket state-machine helper (parallel-friendly)
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
