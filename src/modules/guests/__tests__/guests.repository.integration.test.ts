@@ -1,0 +1,208 @@
+// Integration: real Postgres via testcontainers (TESTING.md §5 — no Prisma mock).
+// Self-contained: spins its own PG, applies migrations, seeds fixtures. Requires Docker.
+
+import { execFileSync } from 'node:child_process';
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { PrismaClient } from '@prisma/client';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+
+import { NotFoundError } from '@core/errors/app-errors.js';
+
+import type { TenantContext } from '@plugins/tenant-guard.js';
+
+import type { GuestsService } from '../guests.service.js';
+import { buildGuestsService } from '../index.js';
+
+const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const GUEST_A1 = 'c1111111-cccc-4ccc-8ccc-cccccccccccc';
+const GUEST_B1 = 'c2222222-cccc-4ccc-8ccc-cccccccccccc';
+
+const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };
+const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };
+
+let container: StartedPostgreSqlContainer;
+let db: PrismaClient;
+let service: GuestsService;
+
+function guestId(n: number): string {
+  return `a${String(n).padStart(7, '0')}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
+}
+
+async function seed(): Promise<void> {
+  await db.hotel.createMany({ data: [{ id: HOTEL_A }, { id: HOTEL_B }] });
+
+  // Named anchor guests.
+  await db.guest.create({
+    data: {
+      id: GUEST_A1,
+      hotelId: HOTEL_A,
+      name: 'Budi Santoso',
+      waPhone: '+6281234567890',
+      email: 'budi@example.com',
+    },
+  });
+  await db.guest.create({
+    data: { id: GUEST_B1, hotelId: HOTEL_B, name: 'Other Hotel Guest', waPhone: '+6289999' },
+  });
+
+  // Extra hotel-A guests for pagination (5 total in A incl. GUEST_A1).
+  for (let i = 0; i < 4; i += 1) {
+    await db.guest.create({
+      data: {
+        id: guestId(i),
+        hotelId: HOTEL_A,
+        name: `Guest ${i}`,
+        waPhone: `+628100000000${i}`,
+        createdAt: new Date(`2026-06-0${i + 1}T00:00:00.000Z`),
+      },
+    });
+  }
+
+  await db.guestPreference.createMany({
+    data: [
+      {
+        hotelId: HOTEL_A,
+        guestId: GUEST_A1,
+        preferenceType: 'pillow',
+        preferenceValue: 'soft',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      },
+      {
+        hotelId: HOTEL_A,
+        guestId: GUEST_A1,
+        preferenceType: 'allergy',
+        preferenceValue: 'peanut',
+        createdAt: new Date('2026-06-02T00:00:00.000Z'),
+      },
+    ],
+  });
+
+  await db.visit.createMany({
+    data: [
+      {
+        hotelId: HOTEL_A,
+        guestId: GUEST_A1,
+        checkIn: new Date('2026-05-01T06:00:00.000Z'),
+        status: 'checked_out',
+      },
+      {
+        hotelId: HOTEL_A,
+        guestId: GUEST_A1,
+        checkIn: new Date('2026-06-10T06:00:00.000Z'),
+        status: 'pending_verification',
+      },
+    ],
+  });
+}
+
+beforeAll(async () => {
+  container = await new PostgreSqlContainer('postgres:15-alpine').start();
+  const url = container.getConnectionUri();
+  execFileSync('pnpm', ['prisma', 'migrate', 'deploy'], {
+    env: { ...process.env, DATABASE_URL: url },
+    stdio: 'ignore',
+  });
+  db = new PrismaClient({ datasources: { db: { url } } });
+  service = buildGuestsService(db);
+}, 180_000);
+
+afterAll(async () => {
+  await db?.$disconnect();
+  await container?.stop();
+});
+
+beforeEach(async () => {
+  await db.guestPreference.deleteMany();
+  await db.visit.deleteMany();
+  await db.guest.deleteMany();
+  await db.hotel.deleteMany();
+  await seed();
+});
+
+describe('GuestsService.list (integration)', () => {
+  it('should return only the caller hotel guests', async () => {
+    const res = await service.list(gmA, { pageSize: '50' });
+    expect(res.data).toHaveLength(5);
+    expect(res.data.every((g) => g.name !== 'Other Hotel Guest')).toBe(true);
+  });
+
+  it('should offset-paginate with a total and hasMore', async () => {
+    const page1 = await service.list(gmA, { page: '1', pageSize: '2' });
+    expect(page1.data).toHaveLength(2);
+    expect(page1.pageInfo).toEqual({ page: 1, pageSize: 2, total: 5, hasMore: true });
+
+    const page3 = await service.list(gmA, { page: '3', pageSize: '2' });
+    expect(page3.data).toHaveLength(1);
+    expect(page3.pageInfo.hasMore).toBe(false);
+  });
+
+  it('should search by name and wa_phone', async () => {
+    const byName = await service.list(gmA, { q: 'Budi' });
+    expect(byName.data.map((g) => g.id)).toEqual([GUEST_A1]);
+
+    const byPhone = await service.list(gmA, { q: '81234567890' });
+    expect(byPhone.data.map((g) => g.id)).toEqual([GUEST_A1]);
+  });
+});
+
+describe('GuestsService.detail (integration)', () => {
+  it('should return preferences asc and visits desc', async () => {
+    const res = await service.detail(gmA, GUEST_A1);
+    expect(res.data.preferences.map((p) => p.preference_type)).toEqual(['pillow', 'allergy']);
+    expect(res.data.visits.map((v) => v.status)).toEqual(['pending_verification', 'checked_out']);
+    expect(res.data.wa_phone).toBe('+6281234567890');
+  });
+
+  it('should 404 a missing guest', async () => {
+    await expect(service.detail(gmA, guestId(9))).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should mask a cross-tenant guest as NotFoundError', async () => {
+    await expect(service.detail(gmB, GUEST_A1)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('GuestsService.update (integration)', () => {
+  it('should persist allowed profile fields', async () => {
+    const res = await service.update(gmA, GUEST_A1, {
+      is_vip: true,
+      vip_level: 'gold',
+      privacy_mode: 'vvip',
+    });
+    expect(res.data.is_vip).toBe(true);
+    expect(res.data.vip_level).toBe('gold');
+    const reread = await service.detail(gmA, GUEST_A1);
+    expect(reread.data.privacy_mode).toBe('vvip');
+  });
+
+  it('should mask a cross-tenant update as NotFoundError', async () => {
+    await expect(service.update(gmB, GUEST_A1, { is_vip: true })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+describe('GuestsService.addPreference (integration)', () => {
+  it('should upsert by preference_type (idempotent, no duplicate)', async () => {
+    await service.addPreference(gmA, GUEST_A1, {
+      preference_type: 'pillow',
+      preference_value: 'firm',
+    });
+    const res = await service.addPreference(gmA, GUEST_A1, {
+      preference_type: 'pillow',
+      preference_value: 'medium',
+    });
+    const pillow = res.data.filter((p) => p.preference_type === 'pillow');
+    expect(pillow).toHaveLength(1);
+    expect(pillow[0]?.preference_value).toBe('medium');
+    expect(res.data).toHaveLength(2); // pillow + allergy, not 3
+  });
+
+  it('should mask a cross-tenant preference add as NotFoundError', async () => {
+    await expect(
+      service.addPreference(gmB, GUEST_A1, { preference_type: 'x', preference_value: 'y' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
