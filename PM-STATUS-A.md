@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-PRISMA-CI (foundation fix for GAP-T11-1 per PARENT §3b) — PM A to draft ASSIGNMENT next. T04 APPROVED.
-- **Branch (current active task)**: TBD for T-INFRA-PRISMA-CI (per PO branch-per-task policy). `feat/foundation-rbac` @ `df5648b` awaits PO manual merge to `main` (T04 code).
-- **Completed today**: T01, T02, T03, T04
+- **Active task**: T-INFRA-01 (foundation fix for GAP-T11-1) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T04 merged to main (PO commit `a563fa4`).
+- **Branch (current active task)**: `feat/foundation-prisma-ci` (per PO branch-per-task policy)
+- **Completed today**: T01, T02, T03, T04 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-PRISMA-CI (next, foundation) · T05 · T06 (parallel-friendly) · T07–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 (assigned, next) · T05 · T06 (parallel-friendly) · T07–T10 backlog
 
 ---
 
@@ -38,6 +38,7 @@
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
+| T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | assigned | — | Addresses PARENT §3b GAP-T11-1. Small foundation fix — Makefile `check` target + `src/core/prisma/prisma-client.ts` uncomment. Unblocks any B/C module that imports generated `PrismaClient` at typecheck on fresh checkout. |
 
 ---
 
@@ -714,11 +715,102 @@ tenant-guard.hooks.ts  |     100 |      100 |     100 |     100
 `feat/foundation-rbac` @ `df5648b` on `origin`; `make check` verified green by PM A. Per CLAUDE.md §12 (code lewat feature branch, PO merge manual), **please merge `feat/foundation-rbac` → `main` when ready**. PM A will not auto-merge. Docs (PM-STATUS-A.md + PARENT roll-ups) already on `main`.
 
 **Next Slot A queue**
-1. **T-INFRA-PRISMA-CI** (foundation fix for GAP-T11-1 per PARENT §3b) — PM A to draft ASSIGNMENT next
+1. **T-INFRA-01** (foundation fix for GAP-T11-1 per PARENT §3b) — PM A to draft ASSIGNMENT next
 2. **T05** seed scripts
 3. **T06** ticket state-machine helper (parallel-friendly)
 
 Ship it.
+
+### ASSIGNMENT T-INFRA-01 — claimed by exec-A (Nanak) at H12 2026-07-01
+- Branch: `feat/foundation-prisma-ci` (per PO branch-per-task policy)
+- Routed from: PM-STATUS-PARENT.md §1 T-INFRA-01 + §3b GAP-T11-1 (escalated by PM B / Nathan during T11 wip)
+- Depends on: T02 (Prisma schema applied — done ✓), T04 (foundation-rbac merged — done ✓)
+- Downstream unblocks: any current or future B/C module that imports generated `PrismaClient` at typecheck (currently workarounded via pre-run `pnpm prisma:generate` before every `make check`). Nathan's T13 (stats+overdue) starts wip today — will benefit immediately.
+- Spec / reference:
+  - `docs/decisions/0001-hexagonal-disiplin.md` — Prisma client langsung, TIDAK di-wrap dengan interface (ADR-0001)
+  - `docs/decisions/0004-one-service-one-db.md` — 1 service = 1 DB = 1 Prisma schema
+  - `CLAUDE.md §4` — Aturan hexagonal: Prisma pakai langsung, no port-wrap
+  - `CLAUDE.md §12` — Branch/commit policy
+  - `Makefile:148` — current `check` target definition (no prisma-generate prereq — this is the gap)
+  - `src/core/prisma/prisma-client.ts:11-27` — commented-out real singleton pattern (this is the second gap; uncomment + activate)
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Two-part foundation fix in a single small PR:
+
+1. **Makefile `check` target — add `prisma-generate` as first prereq.**
+   - Current (Makefile:148): `check: lint format-check typecheck test-unit`
+   - Target: `check: prisma-generate lint format-check typecheck test-unit`
+   - Effect: on fresh checkout, `make check` regenerates Prisma Client into `node_modules/.prisma/client` before typecheck runs. `prisma-generate` target already exists (Makefile:87-88, calls `pnpm prisma:generate`) — just referenced as prereq.
+
+2. **`src/core/prisma/prisma-client.ts` — replace `{}` stub with real singleton.**
+   - Current (line 29): `export const db = {} as unknown as Record<string, unknown>; // placeholder`
+   - Target: real `PrismaClient` singleton per the commented-out template at lines 11-27:
+     ```ts
+     import { PrismaClient } from '@prisma/client';
+     import { loadConfig } from '@core/config/env.js';
+
+     const config = loadConfig();
+
+     export const db = new PrismaClient({
+       datasources: { db: { url: config.DATABASE_URL } },
+       log: config.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+     });
+
+     const shutdown = async (): Promise<void> => {
+       await db.$disconnect();
+     };
+     process.on('SIGTERM', shutdown);
+     process.on('SIGINT', shutdown);
+     ```
+   - Remove the TODO block (lines 11-27 as-comments) + the placeholder line (29). Keep the top-of-file JSDoc (lines 1-10) — accurate and durable.
+   - Verify `config.DATABASE_URL` is the correct env name (check `src/core/config/env.ts` if uncertain — sanity check before commit).
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — `@prisma/client` already in `package.json` deps. If exec-A finds anything else needed, escalate to PM A via GAP block, do NOT `pnpm add`.
+- **No wrap-Prisma interface** — per ADR-0001 + CLAUDE.md §4 anti-pattern table: Prisma is already an abstraction; DILARANG bikin `interface IUserRepository`-style wrapper. Consume `db` directly.
+- **No `any` / `console.log` / `throw new Error(` / default export** — same drift rules as prior tasks.
+- **Explicit return type** for `shutdown` fn (already `Promise<void>` in template — preserve).
+- **Named export only** (`db` + implicit `shutdown` fn kept module-local; do NOT export shutdown).
+- **Do NOT touch** `src/plugins/tenant-guard.hooks.ts` / `rbac.ts` / T03 files — T04 tests must remain green.
+- **Do NOT touch** `.github/workflows/*` — CI infrastructure is out of scope (Makefile-level fix is sufficient; CI runs `make install && make check` per standard convention, but validate via smoke if uncertain).
+
+**Files to modify** (exec-A finalize count in PLAN)
+- `Makefile` — line 148 `check` target: add `prisma-generate` as first prereq
+- `src/core/prisma/prisma-client.ts` — replace stub with real singleton per template. Rewrite entire file body (JSDoc lines 1-10 preserved).
+
+**Files that MAY need light touch (exec-A confirm in PLAN if applicable)**
+- No test file required — Prisma Client is a library wrapper; unit-testing "the wrapper wraps" is redundant per CLAUDE.md general principle. Integration coverage comes downstream via testcontainers in modules that use it (Nathan's T11 already does this).
+- **BUT**: exec-A should verify Nathan's T11 tests still pass end-to-end. T11 was merged with a workaround (exec-B likely instantiated its own `PrismaClient` in the tickets repo — verify in PLAN by grep). If T11 already injects `db` from `@core/prisma/prisma-client.js`, verify no runtime regression. If T11 has its own inline instantiation, note in PLAN — no need to refactor now, but flag for future cleanup.
+
+**T-INFRA-01 DoD**
+- [ ] `Makefile:148` `check` target has `prisma-generate` as first prereq — verified via `grep -n "^check:" Makefile`
+- [ ] `src/core/prisma/prisma-client.ts` exports real `PrismaClient` instance (not `{}` stub) — verified via file read
+- [ ] Fresh-checkout simulation passes: `rm -rf node_modules dist coverage .tsbuildinfo && pnpm install --frozen-lockfile && make check` → PASS. (This is the acceptance test — proves the gap is closed.)
+- [ ] `make check` PASS on already-generated checkout (standard case) — no regression
+- [ ] T04's `tenant-guard.hooks.test.ts` (3 tests) still green
+- [ ] T04's `rbac.test.ts` (11 tests) still green
+- [ ] T03's `tenant-guard.test.ts` (14 tests) still green
+- [ ] `_template` 2 skipped tests remain skipped (baseline behavior unchanged)
+- [ ] Drift scans clean on `Makefile` (N/A for TS rules) + `src/core/prisma/prisma-client.ts` (0 `any`, 0 `console.log`, 0 `throw new Error(`, 0 default export)
+- [ ] No new deps in `package.json` — verified via `git diff package.json` (should be empty)
+- [ ] Nathan's T13 unblocking implicit — SUBMIT should note that once merged, exec-B can drop the pre-run `pnpm prisma:generate` workaround
+
+**Additional PLAN checks (exec-A think through and address if applicable)**
+- **Env dependency at import time**: real singleton calls `loadConfig()` at module load. If env vars missing (mis. `DATABASE_URL`), import throws. Verify `loadConfig()` fails-fast behavior is acceptable — if not, wrap in lazy getter. Confirm in PLAN.
+- **`process.on('SIGTERM', ...)` at import time**: adding signal handlers at module import means every test file that (transitively) imports `prisma-client.ts` registers a handler. Jest may complain about open handles. Verify test-time behavior via `make check` — if flaky, guard with `if (process.env.NODE_ENV !== 'test')` and mention in PLAN.
+- **Circular import risk**: `prisma-client.ts` imports `loadConfig` from `@core/config/env.js`. If `env.ts` transitively imports anything from `@core/prisma/`, circular. Grep `src/core/config/env.ts` to confirm (should be safe — env is a leaf).
+
+**Coordination downstream (PM A tracking; exec-A no action)**
+- Post VERDICT APPROVED, PM A akan:
+  - Update PARENT §1 row T-INFRA-01 → approved
+  - Update PARENT §3b GAP-T11-1 → resolved
+  - Update PARENT §10 coord note: CI/build gap fixed
+  - Post roll-up to PARENT §2
+
+Awaiting **PLAN T-INFRA-01** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
