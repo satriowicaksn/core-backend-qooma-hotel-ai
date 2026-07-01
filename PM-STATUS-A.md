@@ -915,6 +915,32 @@ Rationale for 3 adaptations relative to PM A's raw template:
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T-INFRA-01 PLAN APPROVED, proceed to coding (H12 2026-07-01) by PM A (Nanak)
+
+All 3 advisory checks resolved cleanly + `no-misused-promises` catch verified real (`.eslintrc.cjs` has both `no-misused-promises: error` and `no-floating-promises: error` — the `void shutdown()` wrapper is the correct fix, not a bikeshed).
+
+**Verified in PLAN**:
+- **Adv #1 (fail-fast at import)** ✓ — grep evidence solid: T11 uses `import type { PrismaClient }` + constructor injection (`buildTicketsService(db, ...)`) + testcontainers spins its own client. Zero current runtime consumers of the singleton → `loadConfig()` at module load impacts no test in the suite today. `.env` present with all required fields for future consumers. Fallback plan (lazy `getPrisma()` factory) documented if fresh-checkout acceptance test surfaces env failure — well-scoped escape hatch.
+- **Adv #2 (SIGTERM jest guard)** ✓ — `NODE_ENV=test` set by jest CLI is documented default behavior; no override in this repo's config. Guard is idiomatic + future-proofs against any test that transitively loads the singleton. Zero prod/dev/staging behavior change.
+- **Adv #3 (circular import)** ✓ — `env.ts` only imports `zod` (leaf), clean 1-way chain `prisma-client.ts → env.ts → zod`. Confirmed via file read.
+
+**Bonus catch — `no-misused-promises` fix**: canonical `void shutdown()` inside sync arrow wrapper accepted. Named-helper vs inline-arrow style is preference — 2 inline arrows fine, matches Node stdlib idiom. Would also accept `const handleSignal = () => { void shutdown(); }; process.on('SIGTERM', handleSignal); process.on('SIGINT', handleSignal);` if exec-A prefers DRY — either is drift-clean.
+
+**Scope match**: 2 files modify (Makefile 1 line + prisma-client.ts body rewrite preserving JSDoc lines 1-10). Zero create. No dep add. HARD constraints all upheld in PLAN — no wrap-Prisma interface, no `any`, no `console.log`, no default export.
+
+**Proceed to implementation on branch `feat/foundation-prisma-ci`.**
+
+**SUBMIT expectations (reminders)**:
+- Fresh-checkout acceptance test WAJIB run + evidence in SUBMIT: `rm -rf node_modules dist coverage .tsbuildinfo && pnpm install --frozen-lockfile && make check` → PASS. This is the primary DoD signal that the CI gap is closed.
+- Standard `make check` (already-generated checkout) → PASS.
+- T03 14 + T04 14 (11 rbac + 3 hooks) + `_template` 2 skipped — states preserved.
+- `git diff package.json` → empty.
+- Drift scans on `src/core/prisma/prisma-client.ts` (Makefile is N/A for TS drift categories).
+- Include the Nathan T11 workaround note (exec-B can drop pre-run `pnpm prisma:generate` after merge).
+- If any advisory-#1 fallback triggers (env failure at test time), pivot to lazy getter + document reason in SUBMIT.
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
