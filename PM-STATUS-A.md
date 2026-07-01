@@ -576,6 +576,83 @@ Proceed to implementation on branch `feat/foundation-rbac`. Reminders for SUBMIT
 
 Ship it.
 
+#### SUBMIT T04 — exec-A (Nanak) at H0 2026-07-01 (attempt 1)
+
+Task: RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle)
+
+Branch: `feat/foundation-rbac` · Commit: `df5648b` (pushed to `origin/feat/foundation-rbac`)
+
+Files changed: **5** (4 create + 1 modify)
+  - `src/plugins/rbac.ts` (new, 52 LOC)
+  - `src/plugins/tenant-guard.hooks.ts` (new, 39 LOC)
+  - `src/plugins/tenant-guard.types.ts` (modify, +18 LOC — add `@fastify/jwt` FastifyJWT augmentation + type-only bare import to force module resolution; existing `FastifyRequest.tenant` block preserved verbatim)
+  - `src/plugins/__tests__/rbac.test.ts` (new, 92 LOC — 11 tests)
+  - `src/plugins/__tests__/tenant-guard.hooks.test.ts` (new, 83 LOC — 3 tests)
+
+DoD self-check (from ASSIGNMENT + PLAN addendum)
+- [x] `requireRole(tenant, allowed: readonly SessionRole[])` guard fn — throws `AuthError` on no tenant (401); `ForbiddenError` on role not in `allowed` (403); `super_admin` implicit all-access (no need to list in `allowed`) — `src/plugins/rbac.ts:34-56`
+- [x] `staff` role hard-rejected in every call — `src/plugins/rbac.ts:41-46` (defense-in-depth: even if caller accidentally passes `['staff']`, staff is rejected before the `allowed` check)
+- [x] `applyDeptFilter` helper deferred with premature-abstraction rationale — PM A accepted in ACK; T11 will inline per Prisma `WhereInput` type
+- [x] Composes with T03 tenant-guard chain — verified by `describe('requireRole composition with tenant-guard chain')` (`rbac.test.ts:67-81`) exercising `deriveTenantContext → requireRole → assertHotelOwnership → assertDeptOwnership` for dept_head on own hotel+dept without throw
+- [x] Unit test ≥ 80% line coverage — **100% stmts/branches/funcs/lines** on both `rbac.ts` and `tenant-guard.hooks.ts` (coverage evidence below)
+- [x] Test naming: `it('should <expected> when <condition>')` — all 14 new tests conform
+- [x] All branches covered: 4 roles × guard outcomes (allow / auth-error / forbidden / staff-reject)
+- [x] `make check` PASS — see Quality gate
+- [x] Drift scans clean for T04-touched paths — see Drift scans
+- [x] Fastify preHandler wiring via `configureTenantGuardHooks(app: FastifyInstance): void` factory — Nathan invokes at root scope, hook lands globally (no encapsulation), zero new dep
+- [x] Q-B-02: consume `TenantContext` / `SessionUser` / `SessionRole` from `@plugins/tenant-guard.js` at existing path — no canonicalization
+- [x] `@fastify/jwt` FastifyJWT augmentation (not `FastifyRequest.user`) — avoids v8 collision; canonical consumer-typing pattern; type-only bare import `import type {} from '@fastify/jwt'` forces module resolution so the augmentation takes effect at use-sites
+- [x] Delta 3 (prisma-generate CI gap) out of scope — no `Makefile` / `prisma-client.ts` edits confirmed via `git status --short`
+
+Quality gate
+- `pnpm lint`: **PASS** (0 errors, 0 warnings)
+- `pnpm format:check`: **PASS** (All matched files use Prettier code style)
+- `pnpm typecheck`: **PASS** (`tsc --noEmit` clean)
+- `pnpm test:unit`: **PASS** (30 tests total: 14 T03 tenant-guard + 11 rbac + 3 tenant-guard.hooks + 2 skipped `_template` boilerplate placeholder)
+- `pnpm test:integration`: not run (no DB / Redis touched; all tests are unit + Fastify-in-process)
+- `make format-check`: **PASS** (bundled in `make check`)
+- `make check` overall: **PASS**
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4)
+- `any` types (excluding `_template` placeholder): **0 hits** in T04 files
+- `console.log` in src: **0 hits**
+- `throw new Error(` in `src/modules/` + `src/core/` (excluding `_template`): 3 pre-existing hits (`core/config/env.ts:75` env bootstrap, `core/http/http-client.ts:19,27` stub) — **0 new hits from T04**
+- Forbidden imports (express / typeorm / sequelize / moment / node-fetch): **0 hits**
+- Default export outside entrypoints/config: **0 hits**
+- `.skip(` in tests (excluding `_template`): **0 hits**
+
+Security check (N/A for T04 — no auth/webhook/crypto surface)
+- HMAC verify: N/A (no webhook)
+- Token encryption: N/A (no token storage)
+- PII masking: N/A (no log lines emit user data)
+- No secret hardcoded: **confirmed** (T04 touches no config / env)
+
+Test evidence
+- Unit tests: **28** (14 T03 + 11 rbac + 3 tenant-guard.hooks) — all pass
+- Skipped: 2 in `src/modules/_template/__tests__/` (pre-existing boilerplate placeholder, per T01 baseline note)
+- Coverage on new files (targeted run `--collectCoverageFrom=src/plugins/rbac.ts --collectCoverageFrom=src/plugins/tenant-guard.hooks.ts`):
+  ```
+  File                   | % Stmts | % Branch | % Funcs | % Lines
+  -----------------------|---------|----------|---------|--------
+  All files              |     100 |      100 |     100 |     100
+   rbac.ts               |     100 |      100 |     100 |     100
+   tenant-guard.hooks.ts |     100 |      100 |     100 |     100
+  ```
+- T03's 14 tenant-guard tests: **all green** post-tenant-guard.types.ts modify (verified in `make check` run — `PASS src/plugins/__tests__/tenant-guard.test.ts`)
+- Consumer wiring sample (documented in JSDoc of `tenant-guard.hooks.ts`, for Nathan / api.ts author reference):
+  ```ts
+  await app.register(jwtPlugin);
+  configureTenantGuardHooks(app);   // direct fn call — NOT app.register()
+  await app.register(ticketsRoutes, { prefix: '/api' });
+  ```
+
+Notes
+- **GAP-T11-1 (prisma-generate CI) — no symptom observed during `make check`**: `pnpm typecheck` clean without prior `pnpm prisma:generate` because Prisma Client is already generated in local `node_modules` from T02. On fresh checkout this would break as PM B flagged; still out of T04 scope, left for T-INFRA-PRISMA-CI follow-up. Note-only per NUDGE Delta 3.
+- Env note: this session started with system Node 18 / pnpm 8; had to re-activate Node 20 + pnpm 9 via `nvm use 20 && corepack enable && corepack prepare pnpm@9 --activate` (T01-established procedure). No permanent config change needed.
+- Line count in files changed above is measured post-Prettier; slightly larger than PLAN's ~53 prod / ~198 total estimate due to JSDoc verbosity — no functional expansion.
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
