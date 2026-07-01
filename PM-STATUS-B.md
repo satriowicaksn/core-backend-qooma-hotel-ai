@@ -644,6 +644,21 @@ At SUBMIT I verify V1–V6 + tx atomicity (integration: no partial state) + chec
 
 Awaiting PM B ruling on GAP T16-#4 (class owner + `code` wire shape).
 
+#### CHECKPOINT T16 — exec-B (Nathan) at H13 (2026-07-02) — V1 (read-path) complete + green; V2–V5 held on GAP T16-#4
+Read-path shipped on branch `feat/visits-list-verify` (pushed, commit `feat(visits): … T16 V1`). **Not a SUBMIT** — DoD V2–V6 not fully ticked (verify-manual blocked on GAP T16-#4), so per EXECUTOR-PROTOCOL §4.5 I'm posting a checkpoint, not requesting VERDICT yet.
+
+**Done (V1):**
+- `GET /api/visits` — tenant-scoped list (`WHERE hotelId=ctx.hotelId`, explicit super_admin bypass; visits are not dept-scoped — gm_admin surface, no `departmentId` column), `?status` CSV filter over the 6 enum values, **offset pagination** (`page`/`pageSize`, clamp ≤100), `orderBy createdAt desc, id desc`.
+- **Canonical `visits.serializer.ts` (Q-B-05)** — owns the 13-field Visit wire shape verbatim; no PII masking needed (shape carries `guest_id` only, no guest name/phone/email → §4.5 N/A here, masking lives in guests module).
+- **Q-B-04 offset envelope** ratified shape emitted: `{ data, pageInfo: { page, pageSize, total, hasMore } }`, `hasMore = page*pageSize < total`.
+- Module layout per template: `visits.routes.ts` / `.service.ts` / `.repository.ts` / `.schema.ts` / `.serializer.ts` / `.types.ts` / `index.ts` barrel (exports `visitsRoutes` + `buildVisitsService`; repo/serializer unexported). 0 core edits, 0 cross-module imports.
+
+**Quality (my rerun):** `make check` PASS (lint + format + typecheck + 115 unit/component/integration, 2 skips = `_template` placeholders); visits integration green via testcontainers (real PG). Coverage on changed files: repository/serializer/service/types 100%, routes 93.75%, schema (post dead-code trim) ~100% — all ≥80%. Drift (visits): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+**Held on GAP T16-#4 (V2–V5):** `PATCH /api/visits/:id/verify-manual` (approve/reject), the status-guarded `$transaction`, checkout derivation (GAP T16-#3 seam ready via `config.TZ`), `recordVisitAudit` no-op seam (GAP T16-#1), `guest_name` validate-only (GAP T16-#2), and their unit/integration tests are drafted in approach but **not written to compile** — they need the 422 `BusinessRuleError` class + the `code` wire-shape ruling. The routes file registers only `GET` for now; a code comment marks the pending PATCH. **The moment you rule on T16-#4 I add V2–V5 + tests and post the full SUBMIT.**
+
+**Ask:** ruling on GAP T16-#4 (class owner A/B + envelope `code` = `"BUSINESS_RULE"` vs `"INVALID_VISIT_TRANSITION"`). Meanwhile V1 is independently reviewable on the branch if you want an early read.
+
 ---
 
 ### ASSIGNMENT T19 — Notifications CRUD + optimistic ops — issued by PM B (Nathan) 2026-07-01 (H12) — ⛔ BLOCKED on seam extension
