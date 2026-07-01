@@ -474,6 +474,85 @@ Direction sound (Option A bundle chosen wisely; dept-filter defer justified; RBA
 
 **Resubmit as PLAN T04 addendum** (append sub-block under this REJECT-PLAN, not a new PLAN block) — address Fix #1 + Fix #2 with chosen approach + updated LOC estimate. Same DoD/scope otherwise. PM A will ACK addendum if fixes clean.
 
+##### PLAN T04 addendum — exec-A (Nanak) at H0 2026-07-01 (response to REJECT-PLAN)
+
+Both fixes accepted; no rebuttal. Same DoD, same scope, same file count (4 create + 1 modify). Only shape adjustments below.
+
+**Fix #1 — adopt (A) factory fn (no fastify-plugin dep, no PO gating)**
+
+- Rename: `src/plugins/tenant-guard.plugin.ts` → `src/plugins/tenant-guard.hooks.ts` (test file: `__tests__/tenant-guard.hooks.test.ts`).
+- Export shape (final):
+  ```ts
+  // src/plugins/tenant-guard.hooks.ts
+  import type { FastifyInstance } from 'fastify';
+  import { deriveTenantContext } from './tenant-guard.js';
+
+  export function configureTenantGuardHooks(app: FastifyInstance): void {
+    app.addHook('onRequest', async (req) => {
+      if (req.user) {
+        req.tenant = deriveTenantContext(req.user);
+      }
+    });
+  }
+  ```
+- Nathan's future `api.ts` wiring (documented in JSDoc of the fn):
+  ```ts
+  await app.register(jwtPlugin);
+  configureTenantGuardHooks(app);       // direct fn call, hooks land on root scope
+  await app.register(ticketsRoutes, { prefix: '/api' });
+  ```
+- Test setup uses same direct call + pre-hook to inject `req.user` fixture before the tenant-guard hook (Fastify FIFO onRequest ordering guarantees user-set → tenant-derive):
+  ```ts
+  const app = Fastify({ logger: false });
+  app.addHook('onRequest', async (req) => { req.user = fixtureUser; });
+  configureTenantGuardHooks(app);
+  app.get('/_probe', async (req) => req.tenant ?? { unset: true });
+  const res = await app.inject({ method: 'GET', url: '/_probe' });
+  ```
+
+**Fix #2 — augment `@fastify/jwt` `FastifyJWT` interface (not `FastifyRequest.user`)**
+
+- `src/plugins/tenant-guard.types.ts` final shape:
+  ```ts
+  import type { SessionUser, TenantContext } from './tenant-guard.js';
+
+  declare module 'fastify' {
+    interface FastifyRequest {
+      tenant?: TenantContext;
+    }
+  }
+
+  declare module '@fastify/jwt' {
+    interface FastifyJWT {
+      payload: SessionUser;
+      user: SessionUser;
+    }
+  }
+
+  export {};
+  ```
+- Existing T03 `FastifyRequest.tenant?: TenantContext` block preserved verbatim (zero regression to T03's 14 unit tests — they don't touch types).
+- `req.user` becomes auto-typed as `SessionUser` everywhere via `@fastify/jwt`'s standard consumer-typing pattern. Works purely at typecheck level — no runtime dependency on JWT plugin being registered yet (aligns with api.ts still stub).
+
+**Updated LOC estimate**
+- `rbac.ts`: ~30 LOC (unchanged)
+- `tenant-guard.hooks.ts`: ~15 LOC (down from ~25 — plain factory fn, no fastify-plugin scaffolding)
+- `tenant-guard.types.ts` modify: +8 LOC (both `declare module` blocks, was +5)
+- Production delta total: **~53 LOC** (was ~60, down 7)
+- `rbac.test.ts`: ~100 LOC (unchanged)
+- `tenant-guard.hooks.test.ts`: ~45 LOC (down from ~50 — simpler setup, no `app.register` step)
+- Grand total delta: **~198 LOC** including test scaffolding (was ~210). Well within Option A bundle budget.
+
+**Accepted-as-planned items** (unchanged from original PLAN — PM A confirmed):
+- Q-B-02 handling (Delta 1 acknowledgment) — consume TenantContext/SessionUser/SessionRole from `@plugins/tenant-guard.js` as-is.
+- `applyDeptFilter` defer with premature-abstraction rationale (T11 inline; refactor if ≥3 modules repeat).
+- `requireRole` check order: no-tenant → staff-reject → super-bypass → allowed.
+- Delta 3 (prisma-generate CI gap) out-of-scope; no Makefile / prisma-client.ts edits.
+- Test plan: 10-12 unit + 3 integration-style via `fastify.inject()`; ≥ 80% line coverage; `it('should <expected> when <condition>')` naming.
+- Files count: 4 create + 1 modify (with Fix #1 rename applied).
+
+**GAPs / questions**: none. Ready to implement upon PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
