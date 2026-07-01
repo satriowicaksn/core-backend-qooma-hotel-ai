@@ -108,6 +108,7 @@
 > [YYYY-MM-DD H{N}] [PM <SLOT> <NAME>] <T## status — 1 liner>
 > ```
 
+[2026-07-01 H12] [PM B Nathan] Online. Last approved: none (slot B first activity). Active: T11 ASSIGNMENT issued (tickets list+detail), awaiting exec-B PLAN. Next-up: T12–T20. Open Qs: 2 (Q-B-01 contract envelope escalated §3a; Q-B-02 session-context shape §3c). ⚠ T11 merge-blocked on Slot A T03/T04 seam — see PARENT §10.
 [2026-07-01 H0] [PM A Nanak covering] T02 Prisma init migration APPROVED (attempt 1) — 18 HC tables + 19 CHECK + 11 partial/GIN indexes applied. DEV Opsi C deviation (fresh `hotel_core_dev` DB) logged in §4. UNBLOCKS T03–T30 impl chain (except T26/T30 tier-gated features pending Opsi A restore).
 [2026-07-01 H0] [PM A Nanak covering] T01 boilerplate `make check` APPROVED (attempt 1) — env upgraded Node 20/pnpm 9, ts-node@10 added, tsconfig ts-node override for jest config parser. All 4 gates green.
 
@@ -127,7 +128,7 @@
 
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
-| —             | —        | —         | —              | —      | —          |
+| Q-B-01        | Canonical response envelope for tickets list/detail (pagination wrapper, cursor field name, JSON casing). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from repo; truth = FE MSW handlers. | PM B (Nathan) | T11 · MVP §1.2/§6 | open | Needs PO/FE-shape ratify. Interim: exec-B proposes envelope in T11 PLAN for PM B ACK. |
 
 ### 3b. Package / tooling questions
 
@@ -139,7 +140,7 @@
 
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
-| —             | —        | —         | —              | —      | —          |
+| Q-B-02        | `SessionContext {hotelId,userId,role,deptId}` — Slot-A-owned shared type from T03/T04 middleware, or per-module? Slot B T11 consumes it as a seam now; needs a single owner to avoid divergence across B/C. | PM B (Nathan) | T11 · MVP §4.1 | open | Coordinate w/ Slot A (Nanak) on T03/T04 — see §10. |
 
 ---
 
@@ -292,7 +293,7 @@ ke §2 / §6 di sini, **bukan** ke PO langsung.
 
 | Tanggal | Topic                                         | Affects        | Action / decision                         |
 | ------- | --------------------------------------------- | -------------- | ----------------------------------------- |
-| —       | —                                             | —              | —                                         |
+| 2026-07-01 | Session-context seam blocks Core CRM merges. T11 (and all B tickets/guests/visits endpoints) need `SessionContext {hotelId,userId,role,deptId}` from Slot A's **T03 tenant-guard + T04 RBAC**. Both currently `assigned`/`backlog`. B can BUILD + unit/integration-test against an injected seam now, but nothing merges to main until Slot A lands the middleware + owns the shared type (Q-B-02). | B (blocked-to-merge), A (provider), C (same seam later) | *Proposed by PM B for Parent PM ratify*: prioritize T03/T04 in Slot A queue to unblock B/C merges; Nanak to declare the `SessionContext` type location so B/C consume one source. |
 
 <!-- Contoh:
 2026-06-30 | core/queue/ Bull factory pattern decision | B, C | A ship dulu (T05), B & C unblocked H+1

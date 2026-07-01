@@ -14,12 +14,16 @@
 
 ## 0. Current focus (slot B)
 
-- **Day**: H0 (belum ada aktivitas — Nathan belum onboard)
+- **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: — (Nathan pick up saat onboard — T11 tickets first, T02 sudah done oleh Nanak jadi unblocked)
-- **Branch**: —
+- **Active task**: **T11 — Tickets list + detail** (issued in §2; impl unblocked by T02, merge-blocked by T03/T04 seam — see below)
+- **Branch**: `feat/tickets-list-detail` (to be created by exec-B; code stays on branch, PO merges manually)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **Queue for Nathan onboard**: T11 assigned (tickets list+detail), T12–T20 backlog. Full unblocked oleh T02 (Nanak); T20 socket emitters butuh T11+T16+T19 selesai dulu.
+- **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
+- **⚠ Verified blockers (src/ inspection 2026-07-01)**:
+  1. `src/common/` empty → **T03 tenant-guard + T04 RBAC (Slot A) NOT built**. T11 codes against a `SessionContext` seam, injected in tests; NOT mergeable to main until Slot A lands the middleware (MVP §4.1).
+  2. `src/entrypoints/api.ts` still a stub (no Fastify bootstrap / `fastify.services`). T11 ships as `ticketsRoutes` plugin + service/repo behind barrel; live-server wiring = foundation scope.
+  3. `docs/API-CONTRACT.md §2.2` (canonical response envelope) absent from repo → open-Q Q-B-01 (§3).
 
 ---
 
@@ -29,7 +33,8 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| —   | (belum ada task aktif)             | —        | —              | Tunggu Parent PM assign               |
+| T11 | Tickets list + detail (GET + filters + cursor pagination) | assigned | — | ASSIGNMENT issued §2 (2026-07-01). Impl unblocked (T02). Merge-blocked on T03/T04 seam (Slot A). Contract GAP Q-B-01. Awaiting exec-B PLAN. |
+| T12–T20 | Core CRM backlog (see PARENT §1)  | backlog  | —              | Released per dependency chain / gate  |
 
 ---
 
@@ -37,7 +42,38 @@
 
 > **Executor B** append `ASSIGNMENT` block saat claim task. **PM B** append `ACK` / `VERDICT` sub-block di bawah block executor — JANGAN edit block lama.
 
-_(kosong — belum ada assignment)_
+### ASSIGNMENT T11 — Tickets list + detail — issued by PM B (Nathan) 2026-07-01, awaiting exec-B claim + PLAN
+- Branch: `feat/tickets-list-detail` (exec-B creates; **code stays on branch — PO merges to main manually**, per PO directive 2026-07-01)
+- Routed from: PARENT §1 T11 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 **B1**
+- Spec authority: `docs/spec/02-hotel-core.md §1.2` (endpoints + list/detail shape) + §2.4 DDL; correctness floor `MVP-HOTEL-CORE-FIRST §4.1/§4.5/§4.6`
+
+**Scope (read-only endpoints only — NO state transitions, that is T12)**
+- `GET /api/tickets` — list + filters + **cursor pagination**. Query params (spec §1.2): `status` (CSV), `department_id`, `priority`, `complaint_type` (CSV), `date_from`, `date_to`, `q` (search ticket_number + guest name + body), `is_high_alert` (bool), `is_overdue` (bool), `guest_id`, `limit` (default 20, max 100), `cursor` (opaque base64). Default sort `created_at DESC` + `id` tiebreaker (cursor encodes both).
+- `GET /api/tickets/:id` — detail + `updates[]` (order `created_at ASC`) + `messages[]` (order `sent_at ASC`). Shapes per §1.2 (updates: `{id,ticket_id,type,actor_user_id,actor_name,actor_role,from_status,to_status,note,created_at}`; messages: `{id,ticket_id,sender,sender_user_id,body,media,conversation_id,sent_at,delivered_at,read_at}`).
+
+**DoD (PM B will verify each at SUBMIT — PM-AGENT §3)**
+- [ ] D1 — List returns §1.2 field set incl. `wa_phone_masked`, `is_overdue`, `is_high_alert`, `priority`, `complaint_type`, `assigned_to` (staff name joined from `users`). All query filters implemented + zod-validated; `limit` clamped ≤100; invalid `cursor` → `400 ValidationError`.
+- [ ] D2 — Detail returns ticket + `updates[]` + `messages[]` in specified order; missing ticket → `NotFoundError` (404).
+- [ ] D3 — **Tenant guard (§4.1)**: every query scoped `WHERE hotelId = ctx.hotelId`; `super_admin` bypass is an explicit branch; `hotel_id` NEVER read from URL/body. Reads tenant/role/dept from the `SessionContext` seam (see DEP-1), not from request params.
+- [ ] D4 — **dept_head scoping (§4.6)**: list auto-filtered to `ctx.deptId`; cross-dept `:id` GET → `404 NOT_FOUND` (NOT 403, anti-enumeration).
+- [ ] D5 — **PII masking (§4.5)**: guest `wa_phone`/`name`/`email` masked when `guest.privacy_mode='vvip' AND ctx.role !== 'gm_admin'` (super_admin counts as gm_admin). Applied at a **serializer layer**, not per-handler. Use `maskWaPhone()`/`maskEmail()` from `shared/utils`.
+- [ ] D6 — Errors via `AppError` subclasses only (no `throw new Error`). Canonical error envelope.
+- [ ] D7 — Structured logging + correlation ID per request (`req.log` / context w/ correlationId).
+- [ ] D8 — Module layout per `docs/MODULE_TEMPLATE.md`: `tickets.routes.ts` / `tickets.service.ts` / `tickets.repository.ts` / `tickets.schema.ts` (zod) / `tickets.types.ts` / `index.ts` barrel. No cross-module internal imports (public API via barrel).
+- [ ] D9 — Tests: **unit** on service branching (filter build, dept_head scope, masking predicate, cursor encode/decode, super_admin bypass) — no port mocks needed here; **integration** on repository against real `hotel_core_dev` PG (do NOT mock Prisma — CLAUDE.md §8) with seeded hotel/dept/guest/user/ticket fixtures. Line coverage ≥80% on changed files. Naming `it('should <expected> when <condition>')`.
+- [ ] D10 — `make check` green (lint + format + typecheck + unit). No `any`, no `console.log`, no default export, explicit return types on public fns. `make test-integration` green (needs `make start`).
+
+**Flagged dependencies (record in PLAN; do not silently work around)**
+- **DEP-1 (merge-blocking) — session context seam**: T03 tenant-guard + T04 RBAC (Slot A, Nanak) are NOT built. Define/consume a typed `SessionContext { hotelId; userId; role: 'gm_admin'|'dept_head'|'super_admin'; deptId?: string }` seam (Fastify request decoration or `shared/types`). Inject it directly in tests. T11 is buildable + testable now but **not AC-complete / not mergeable to main** until Slot A middleware populates the seam. If the seam type needs to be shared infra, raise before defining (may affect Slot A/C).
+- **DEP-2 — server bootstrap**: `src/entrypoints/api.ts` is a stub. Ship `ticketsRoutes` as a `FastifyPluginAsync` + a service factory exported from the barrel; do NOT block T11 on wiring a live server. Note in PLAN whether any `api.ts` edit is in scope.
+- **DEP-3 — dev DB (Opsi C)**: `hotel_core_dev` has Auth `users`/`hotels` as id-only reference stubs, no rows. Integration tests must seed fixtures; `assigned_to` name join is limited in dev — cover via fixture user rows.
+
+**GAP / open question**
+- **Q-B-01 (contract)** — `docs/API-CONTRACT.md §2.2` (canonical list/detail **response envelope**: pagination wrapper `data`/`meta`, cursor field name, camelCase-vs-snake_case in JSON) is referenced by the MVP brief but is **absent from this repo**. Source of truth = FE MSW handlers (separate FE repo). Registered §3; escalated to Parent PM (PARENT §3a). **Until resolved**: exec-B builds against §1.2 field names and **proposes the envelope shape in PLAN for PM B ACK** — do not guess silently.
+
+**Before coding — session-start gate (EXECUTOR-PROTOCOL §2)**: confirm identity (Executor, Slot B, Nathan), CLAUDE.md loaded, read 02-hotel-core §1.2/§2.4 + MVP §4, `make typecheck`/`make lint` clean, state any scaffolder command in PLAN for overwrite-risk review.
+
+Awaiting exec-B PLAN (do not code before PM B ACK of the PLAN + Q-B-01 envelope proposal).
 
 <!--
 TEMPLATE — copy untuk task baru:
@@ -146,7 +182,8 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 
 | ID            | Question | Source         | Status | Resolution |
 | ------------- | -------- | -------------- | ------ | ---------- |
-| —             | —        | —              | —      | —          |
+| Q-B-01        | Canonical **response envelope** for `GET /api/tickets` (+ `/:id`): pagination wrapper (`data`/`meta`), cursor field name, JSON field casing (camel vs snake). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from this repo; truth = FE MSW handlers (separate repo). | T11 · MVP §1.2 / §6 | open — escalated to Parent PM (PARENT §3a) | Pending PO/Parent. Interim: exec-B proposes envelope in T11 PLAN for PM B ACK against §1.2 field names. |
+| Q-B-02        | Session context shape/ownership: is `SessionContext {hotelId,userId,role,deptId}` a Slot-A-owned shared type (from T03/T04 middleware) or per-module? Affects T11 seam + all B tasks. | T11 · MVP §4.1 | open — coordinate w/ Slot A via Parent §10 | Pending T03/T04 design (Nanak). |
 
 ---
 
