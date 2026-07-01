@@ -565,6 +565,61 @@ To let T14 (embeds `visits[]` in guest detail) and T16 (owns `GET /visits` + Vis
 
 Awaiting exec-B PLAN for T16.
 
+### ASSIGNMENT T16 — claimed by exec-B (Nathan, 2nd executor) at H13 (2026-07-02)
+- Branch: `feat/visits-list-verify` (created at coding-start after PM B ACK; code stays on branch → PO merges to main, per PO directive 2026-07-01)
+- Routed from: PARENT §1 T16 (Slot B) = MVP §1.2 B6
+- Claiming the PM-B-issued ASSIGNMENT above. Running as the **T16 thread in parallel with the T14 thread** — disjoint greenfield modules (`visits/` vs `guests/`), separate branches, Q-B-05 shape pinned → no file/shape collision (§7 parallel-executor rule). PLAN below.
+
+#### PLAN T16 — exec-B (Nathan) at H13 (2026-07-02)
+
+**Scope recap**
+Greenfield `src/modules/visits/`. Two endpoints: `GET /api/visits` (list + `?status` filter incl. `pending_verification`/`failed_verification`, **offset page/pageSize** pagination, serialized via the canonical Visit shape this module owns per Q-B-05) and `PATCH /api/visits/:id/verify-manual` (dual-mode: **approve** `{guest_name, room_number, nights∈1–7}` → `checked_in` with derived `check_out`; **reject** `{action:'reject'}` → `rejected`). verify-manual is **atomic** (V2). Tenant guard via T03 `TenantContext` (`WHERE hotelId=ctx.hotelId`, super_admin explicit bypass). Reject/approve of `failed_verification` and manual visit `POST` are out of scope (T17/T18). Socket `verification:resolved` emit is T20 — leave a named no-op seam only.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot B (Nathan), 2nd executor ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `02-hotel-core.md` §1.3 (visits endpoints + pending/failed_3x flows + `verify-manual` approve/reject) + §2.3 DDL (`visits` — 13 cols, status/nights/booking_source CHECKs) + §7 (error catalog) + socket table (`verification:resolved`); `docs/spec/README.md` §2.7 (envelope); Q-B-05 ratified Visit shape + Q-B-04 (offset envelope) in this file §2/§7 ✓
+- Parent docs spot-read: `docs/MODULE_TEMPLATE.md` pattern via `src/modules/_template/*` + the merged `src/modules/tickets/*` (canonical in-repo reference: routes `requireTenant`/correlationId, barrel `buildXService` factory, serializer-isolation, testcontainers integration); `src/plugins/tenant-guard.ts` (`TenantContext`, `assertHotelOwnership`); `prisma/schema.prisma:148` (Visit model — camelCase fields, `@map` snake_case) ✓
+- Dependencies: T02 ✓ (visits table migrated). T03 ✓ (`TenantContext` + `assertHotelOwnership` on main). No dependency on T14 (Q-B-05 pins the shared shape → module-local serializer, no import).
+- `node_modules` present + `@prisma/client` generated on this machine. `pnpm typecheck` clean ✓ ; `pnpm lint` clean ✓ (baseline green on `main` confirmed this session).
+- Scaffolder risk: **none**. No `pnpm create` / `prisma init`. No migration added (T02 covered all 18 tables). Only non-source CLI is `pnpm prisma:generate` (writes gitignored `node_modules/.prisma`).
+
+**Files to create**
+```
+src/modules/visits/visits.routes.ts        FastifyPluginCallback — GET /visits, PATCH /visits/:id/verify-manual (thin: requireTenant → validate → service → send)
+src/modules/visits/visits.service.ts       orchestration: list scope + offset paging; verify-manual approve/reject branch, status-transition guard, checkout derivation
+src/modules/visits/visits.repository.ts    Prisma direct (injected PrismaClient; no interface — ADR-0001); status-guarded atomic update
+src/modules/visits/visits.schema.ts        zod: list query (?status CSV, page, pageSize), :id param, verify-manual dual-mode body (discriminated on action / nights∈1–7)
+src/modules/visits/visits.serializer.ts    OWNS canonical Visit wire shape (Q-B-05, 13 fields) — module-local
+src/modules/visits/visits.types.ts         domain types + wire DTOs + offset-envelope type
+src/modules/visits/index.ts                barrel: export visitsRoutes + buildVisitsService factory (no repo/serializer export)
+src/modules/visits/__tests__/visits.service.test.ts               unit — transition guard, checkout derivation (13:00→+nights→11:00), status-filter build, offset math, super_admin bypass
+src/modules/visits/__tests__/visits.routes.test.ts                component — app.inject (401 pre-auth, 400 validation, approve/reject happy path)
+src/modules/visits/__tests__/visits.repository.integration.test.ts integration — real hotel_core_dev PG (testcontainers): seed visits across statuses, verify-manual tx atomicity, tenant isolation, 404
+```
+
+**Files to modify**
+- **None in `src/` core.** No `api.ts` / `prisma/schema.prisma` / `core/*` edits (DEP-2 bootstrap wires later via `buildVisitsService(db)` + `fastify.register(visitsRoutes, { prefix:'/api', service })`). No `declare module 'fastify'` — `req.tenant` augmentation already lives in `tenant-guard.types.ts` (reuse; a second block = TS merge error).
+
+**Approach**
+Mirror the ratified tickets module (reuse-before-create, CLAUDE §4). Repository = Prisma direct, injected `PrismaClient`. Service takes `ctx: TenantContext` as first arg on every method. **List (V1):** `where` = `hotelId: ctx.hotelId` unless `ctx.isSuperAdmin` (explicit branch drops the filter); `status` zod-parsed against the 6-value enum (CSV → `in`); offset via `skip=(page-1)*pageSize`, `take=pageSize`, plus a `count()` for `total`; `orderBy [{createdAt:'desc'},{id:'desc'}]`. **verify-manual (V2–V5):** repo fetch by id → `assertHotelOwnership(ctx, row.hotelId, 'Visit')` (cross-tenant → `NotFoundError` 404, anti-enumeration) → guard `row.status==='pending_verification'` else `BusinessRuleError` (422, spec §7 `BUSINESS_RULE`); `failed_verification`/others are **not** handled here (T17). **Atomicity:** the mutation is a **status-guarded conditional update** — `updateMany({ where:{ id, hotelId, status:'pending_verification' }, data })` inside `prisma.$transaction(...)`; `count===1` confirms the transition won the race, `0` → re-resolve to 404/422 (no lost update, no partial state — V2). **approve:** `data = { status:'checked_in', roomNumber, nights, checkOut: derived }`; **reject:** `data = { status:'rejected' }`. **Checkout derivation (V4):** `check_out =` calendar date of `check_in` **+ nights days at 11:00 local**, computed with `dayjs` + `utc`/`timezone` plugins; check-in standard is 13:00. `nights` zod-clamped **1–7** (stricter than the DDL 1–30 CHECK — the approve flow's contract; no conflict, zod ⊆ DB). **Serializer (Q-B-05):** module-local `visits.serializer.ts` emits the 13-field canonical shape verbatim (snake_case body inside the camelCase envelope, same casing contract ratified in Q-B-01). **Socket seam (V2):** a clearly-named `onVerificationResolved` no-op hook (default `() => {}` dep, like T11's `resolveUsers` seam) — T20 wires the real emit; **not** wired here. Errors: `AppError` subclasses only. **Tests:** unit on pure helpers (transition guard, checkout derivation across a fixed TZ, status-filter build, offset math, super_admin bypass) — no Prisma mock; integration seeds visits across all 6 statuses in `hotel_core_dev` and asserts list filter/paging, verify-manual approve+reject atomicity, invalid-status→422, cross-tenant→404.
+
+**Q-B-04 — offset pagination envelope proposal (ONE shared answer for T14 + T16, for PM B ACK)**
+§2.7 is cursor-shaped (`{data, pageInfo:{nextCursor, hasMore}}`); guests+visits are page-based, so we need an offset variant. **Proposal (minimize divergence from the already-ratified Q-B-01 envelope):** keep the **camelCase `pageInfo` wrapper** and swap only the inner fields for offset —
+```json
+{ "data": [ /* Visit[] */ ], "pageInfo": { "page": 1, "pageSize": 20, "total": 137, "hasMore": true } }
+```
+- **Why this over flat `{data,page,pageSize,total}`:** one wrapper key (`pageInfo`) across every list endpoint (cursor OR offset), differing only by inner fields — FE reads `res.pageInfo.*` uniformly; consistent with the camelCase-wrapper decision PM ratified in Q-B-01. `hasMore = page*pageSize < total` (derived, saves FE a computation).
+- **Shared-answer commitment:** T16 uses exactly this; **T14 (guests list)** must adopt the same `pageInfo` wrapper (offset fields for guests list, cursor fields for `/messages`). Flagging so the T14 thread locks the identical shape before either serializer is final. FE MSW is the tiebreaker; both are serializer-isolated → one-file change if it differs. **Awaiting PM B ACK on the wrapper before I lock `visits.serializer.ts`.**
+
+**GAPs / questions (recorded, not silently worked around)**
+
+- **GAP T16-#1 — verify-manual "audit trail" has no target table + spec §4.9 absent.** V2 requires "status update + audit trail in ONE transaction," and the assignment cites `spec §4.9` — but (a) `grep '4\.9'` finds **no §4.9** in `02-hotel-core.md`, and (b) there is **no audit table for visits** in `prisma/schema.prisma` (no `visit_updates`, no generic audit table; `Visit` has only `hotel`/`guest` relations). Ticket audit lives in `ticket_updates` — visit-scoped, not reusable. Adding a table needs a **migration**, out of B-task scope (T02 covered all 18 tables; migrations = foundation/Slot A). **Options:** **A)** Interpret "audit trail in one tx" as the **atomic status transition itself** (the status-guarded `updateMany` inside `$transaction`, no separate row) + leave a clearly-named `recordVisitAudit` **no-op seam** for when an audit table lands via a future foundation migration — zero shape churn, one-spot wire later (mirrors T11's approved `userDirectory` seam). **B)** Reuse the `notifications` table as the audit sink — semantically wrong (user-facing, not audit), reject. **C)** Request Slot A add a `visit_audit`/`visit_updates` table via migration now (cross-slot, foundation, needs PO) — heavier, blocks T16. **My intent: A** — keeps V2 atomicity satisfiable without a migration and isolates the future decision to one seam. Proceeding with A in the skeleton unless redirected.
+- **GAP T16-#2 — `verify-manual` approve `guest_name`: what does it mutate?** The approve body carries `guest_name`, but `visits` has **no** `guest_name` column (name lives on `Guest`, owned by T14's module). **Options:** **A)** validate presence only, treat as confirmation — do **not** write across the module boundary from `visits` repo (if the name must persist it belongs to a guests-module call/event). **B)** update `Guest.name` in the same tx (crosses bounded context — violates "no cross-module internal import"; a DB-level write to `guests` from `visits` repo is the same boundary leak). **C)** store on visit — impossible, no column. **My intent: A** (boundary-clean). Flag if FE expects the approve to rename the guest — then it's a guests-module concern to route, not visits.
+- **GAP T16-#3 — checkout-derivation timezone: no per-hotel TZ modeled.** V4 says "check_in 13:00 **local** → +nights → 11:00 local," but `Hotel` is **id-only** in this DB (Auth owns hotel attributes — same shape as the `User` stub behind GAP T11-#2), so there is **no per-hotel timezone**. Only a global `config.TZ` (env, default `UTC`) exists. **My intent:** derive using `dayjs.tz(..., config.TZ)` (service-level seam), isolated so a later per-hotel-TZ source (Auth cross-join / hotel-settings seam) is a one-spot change — same isolation pattern as the `resolveUsers` seam. Non-blocking; flagging the assumption so PM can confirm `config.TZ` is the accepted stand-in for MVP.
+
+Awaiting PM B ACK (PLAN + Q-B-04 offset envelope + GAP T16-#1/#2/#3). Not writing code before ACK — branch `feat/visits-list-verify` created only at coding-start.
+
 ---
 
 ### ASSIGNMENT T19 — Notifications CRUD + optimistic ops — issued by PM B (Nathan) 2026-07-01 (H12) — ⛔ BLOCKED on seam extension
