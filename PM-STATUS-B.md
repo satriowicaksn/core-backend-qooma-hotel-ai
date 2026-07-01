@@ -486,6 +486,8 @@ _(kosong)_
 - Branch naming: `feat/<modul>-<short>`, `fix/<modul>-<short>`, `chore/<short>`, `docs/<short>` (per `CLAUDE.md §12`).
 - Commit message: conventional commits — `feat(modul): X`, `fix(modul): Y`.
 - Gunakan `make commit MSG="..."` — auto lint + typecheck + format-check sebelum commit.
+- **Parallel-executor safety rule (Slot B)**: file-collision risk = **same-module, not same-slot**. Executors on **different modules** (`tickets` / `guests` / `visits` / `notifications`) touch disjoint folders + own barrels → **safe to run in parallel** on separate `feat/*` branches, merged independently as each passes VERDICT. Executors on the **same module** (e.g. T12 + T13 both extend `src/modules/tickets/*` + share `index.ts`) → **serialize** (git conflict on shared files otherwise). Dependency chains already serialize the risky same-module pairs (T12←T11, T15←T14, T17/T18←T16). No B task adds a migration (T02 covered all 18 tables) → no migration-numbering collision. Shared foundation files (`api.ts`, `prisma/schema.prisma`, `core/*`) are out-of-scope for B tasks → no cross-executor edit there.
+  - **Safe parallel window after T13**: T14 (guests) + T16 (visits) + T19 (notifications) = 3 separate modules → up to 3-way fan-out with zero file collision.
 
 ---
 
