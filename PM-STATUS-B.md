@@ -171,6 +171,70 @@ Proceed. 🟢
 - **Options**: **A)** Ship the three fields **present but nullable**, resolved via an isolated seam in `tickets.serializer.ts` (a `userDirectory: Map<id,{name,role}>` param the service passes; empty in dev → fields serialize `null`). Prod wires the map from Auth cross-join/RPC later — **one-spot change**, no shape churn. **B)** Slot A extends HC `User` model + dev migration to map Auth `users.name`/`role` read-only (cross-slot, foundation, needs PO). **C)** Add an Auth user-lookup RPC port now (Auth service not up for HC lookups in MVP → out of scope per MVP §2).
 - **My intent**: **A** — consistent with DEP-3's accepted dev limitation and the serializer-isolation PM ratified for Q-B-01. **Proceeding with A now** (resolution point isolated; a later B/C decision changes only the serializer wiring). Flagging for the record — redirect me if you prefer B/C before SUBMIT.
 
+### GAP T11-#3 — exec-B (Nathan) at H1 (2026-07-01) — `test:unit` collects integration files + global test harness is a stub (non-blocking, self-worked-around)
+- **Gap**: `package.json` `test:unit` pattern `__tests__/.*\.test\.ts` also matches `*.integration.test.ts` (integration pattern is a strict subset — no filename can separate them). So `make check`'s unit step pulls integration tests. Separately, `src/shared/utils/test-setup.ts` (the blessed global testcontainers harness per TESTING.md §5) is still a TODO stub.
+- **Doc reference**: `package.json:25-26`, `jest.config.ts` testMatch, `docs/TESTING.md §5`, `src/shared/utils/test-setup.ts`.
+- **Self-workaround (no wait)**: my integration test is **self-contained** — it spins its own `PostgreSqlContainer`, runs `prisma migrate deploy`, seeds, and disposes, with no dependency on the stubbed global harness and no `.skip` (drift-clean). Consequence: it also runs under `make check`/`test:unit`, so **`make check` now requires Docker** (~10s container spin). That's consistent with this repo already mandating Docker (docker-compose PG/Redis).
+- **Recommend (foundation, Slot A)**: add `testPathIgnorePatterns: ['\\.integration\\.test\\.ts$']` to `test:unit` (or implement the global `test-setup.ts` harness) so `make check` stays fast + Docker-free. Non-blocking for T11; flagging so PM can route to Slot A / Parent.
+
+### SUBMIT T11 — exec-B (Nathan) at H1 (2026-07-01) (attempt 1)
+
+Task: Tickets list + detail — `GET /api/tickets` (filters + cursor) + `GET /api/tickets/:id`
+Branch: **`feat/tickets-list-detail`** (pushed; commit `550e9ef`) — **PO merges to main manually**. Code is NOT on main.
+Files changed: 10 new (0 modified outside the module — no `api.ts`/`prisma`/`core` edits)
+  - src/modules/tickets/tickets.types.ts (wire DTOs, Prisma row types, seam consumption)
+  - src/modules/tickets/tickets.schema.ts (zod query/param + cursor codec)
+  - src/modules/tickets/tickets.serializer.ts (PII masking §4.5 + snake_case shaping — D5)
+  - src/modules/tickets/tickets.repository.ts (Prisma direct — ADR-0001)
+  - src/modules/tickets/tickets.service.ts (buildTicketWhere + scope/cursor orchestration)
+  - src/modules/tickets/tickets.routes.ts (Fastify plugin, service via options)
+  - src/modules/tickets/index.ts (barrel: ticketsRoutes + buildTicketsService factory)
+  - src/modules/tickets/__tests__/tickets.service.test.ts (26 unit)
+  - src/modules/tickets/__tests__/tickets.routes.test.ts (4 component via `app.inject`)
+  - src/modules/tickets/__tests__/tickets.repository.integration.test.ts (11 integration, testcontainers)
+
+DoD self-check
+- [x] **D1** — list returns §1.2 field set incl. `wa_phone_masked`, `is_overdue`, `is_high_alert`, `priority`, `complaint_type`, `assigned_to`. All 11 filters zod-validated; `limit` clamped ≤100; invalid `cursor` → 400. (`assigned_to` = null in dev per GAP T11-#2 seam.)
+- [x] **D2** — detail returns ticket + `updates[]` (created_at asc) + `messages[]` (sent_at asc); missing → `NotFoundError` (404). Integration-verified ordering.
+- [x] **D3** — tenant guard: every list query `WHERE hotelId = ctx.hotelId`; super_admin is an explicit `!isSuperAdmin` branch; detail uses T03 `assertHotelOwnership`. `hotel_id` never read from URL/body. Integration: cross-tenant `:id` → 404.
+- [x] **D4** — dept_head list auto-filtered to `ctx.deptId` (N2: missing deptId → `AuthError`, not a dropped filter); cross-dept `:id` → 404 via T03 `assertDeptOwnership`. Integration-verified.
+- [x] **D5** — PII masking at serializer layer; predicate `privacy_mode='vvip' && !(gm_admin||super_admin)`; `maskWaPhone`/`maskEmail` from `@shared/utils` + module-local `maskName`. Unit + integration verified (dept_head masked, gm_admin clear).
+- [x] **D6** — only `AppError` subclasses thrown (`ValidationError`/`NotFoundError`/`AuthError`); 0 `throw new Error`. Error envelope = `README.md §2.3` via `toJson()`.
+- [x] **D7** — `req.log.info` per request with `correlationId` (`x-correlation-id` header ?? `req.id`) + `module`/`action`; no PII logged.
+- [x] **D8** — module layout per template + a `tickets.serializer.ts` (D5 serializer layer, flagged in PLAN); barrel exports no repository/serializer. No cross-module internal imports.
+- [x] **D9** — unit on branching (filter build, dept scope, mask predicate, cursor codec, super_admin bypass) with no Prisma mock; integration on repo/service vs real PG (testcontainers) with seeded hotel/dept/guest/user/ticket/updates/messages. **Changed-file line coverage 95.85%** (repo 100 / routes 95.65 / schema 90.74 / serializer 100 / service 98.41 / types 100). Naming `it('should … when …')`.
+- [x] **D10** — `make check` green; no `any`/`console.log`/default-export/`.skip`; explicit return types on public fns. `make test-integration` green (testcontainers, 11 tests).
+
+Quality gate
+- `make check`: **PASS** (lint + format-check + typecheck + test-unit = 55 passed, 2 skipped = template placeholders)
+- `make test-integration`: **PASS** (11 tests, ~16s incl. container)
+- ⚠ CI ordering (per PM ACK of GAP T11-#1): `make prisma-generate` MUST run before `make check`/`make test-*` on a fresh checkout (I ran `pnpm prisma:generate` locally). Foundation escalation PARENT §3b tracks the permanent fix.
+
+Drift scans (scoped to src/modules/tickets)
+- `any`: 0 · `console.*`: 0 · `throw new Error(`: 0 · forbidden imports (express/typeorm/moment/node-fetch): 0 · default export: 0 · `.skip` in tests: 0
+
+Security check
+- Tenant/dept scope enforced on every query (D3/D4); cross-boundary masked as 404 (anti-enumeration, spec §7). PII masked at serializer (D5). No secrets/tokens; no PII in logs. HMAC/crypto: N/A (read-only, no webhook).
+
+Test evidence
+- Unit/component: 30 (service 26 + routes 4), `__tests__/tickets.service.test.ts`, `__tests__/tickets.routes.test.ts`
+- Integration: 11, `__tests__/tickets.repository.integration.test.ts` (real PG, cursor paging, ordering, tenant/dept isolation, vvip masking, 404 masking)
+- Sample list envelope (from route inject, ratified Q-B-01 shape):
+  ```json
+  { "data": [ { "id": "…", "ticket_number": "HSK-2606-048", "wa_phone_masked": "+628******7890",
+      "guest_name": "…", "assigned_to": null, "is_overdue": false, "is_high_alert": false,
+      "priority": "normal", "complaint_type": null, "status": "open", "created_at": "…" } ],
+    "pageInfo": { "nextCursor": null, "hasMore": false } }
+  ```
+
+Notes / open items for PM
+- **DEP-1 merge gate stands**: routes answer 401 until T04 wires the `req.tenant` preHandler. Service+repo+serializer are complete + tested by injecting `TenantContext` directly. Not mergeable to main until T04 (PO merge gate, not an approval blocker for this layer).
+- **GAP T11-#2**: shipped with approach **A** (fields present, null-in-dev via serializer `userDirectory` seam). Confirm A is acceptable, or redirect to B/C.
+- **GAP T11-#3**: `make check` now requires Docker due to the `test:unit` pattern; recommend Slot A add `testPathIgnorePatterns`. Non-blocking.
+- **DEP-2 unchanged**: no `api.ts`/singleton edits; bootstrap wires via `buildTicketsService(db, { resolveUsers })` + `fastify.register(ticketsRoutes, { prefix: '/api', service })`.
+
+Requesting PM B VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
