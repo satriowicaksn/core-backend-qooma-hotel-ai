@@ -7,7 +7,12 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { ticketsRoutes } from '../tickets.routes.js';
 import type { TicketsService } from '../tickets.service.js';
-import type { TicketDetailResponse, TicketListResponse } from '../tickets.types.js';
+import type {
+  OverdueListResponse,
+  TicketDetailResponse,
+  TicketListResponse,
+  TicketStatsResponse,
+} from '../tickets.types.js';
 
 const LIST_RESULT: TicketListResponse = {
   data: [],
@@ -42,10 +47,34 @@ const DETAIL_RESULT: TicketDetailResponse = {
   },
 };
 
+const STATS_RESULT: TicketStatsResponse = {
+  data: {
+    by_status: {
+      open: 1,
+      in_progress: 0,
+      awaiting_late_reason: 0,
+      done_pending: 0,
+      closed: 0,
+      high_alert: 0,
+      escalated: 0,
+      cancelled: 0,
+    },
+    total: 1,
+    overdue: 0,
+    high_alert_count: 0,
+  },
+};
+const OVERDUE_RESULT: OverdueListResponse = {
+  data: [],
+  pageInfo: { nextCursor: null, hasMore: false },
+};
+
 interface Recorder {
   listCtx?: TenantContext;
   listQuery?: unknown;
   detailId?: string;
+  statsHit?: boolean;
+  overdueHit?: boolean;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -58,6 +87,14 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     detail: (_ctx: TenantContext, id: string): Promise<TicketDetailResponse> => {
       recorder.detailId = id;
       return Promise.resolve(DETAIL_RESULT);
+    },
+    stats: (_ctx: TenantContext): Promise<TicketStatsResponse> => {
+      recorder.statsHit = true;
+      return Promise.resolve(STATS_RESULT);
+    },
+    overdue: (_ctx: TenantContext): Promise<OverdueListResponse> => {
+      recorder.overdueHit = true;
+      return Promise.resolve(OVERDUE_RESULT);
     },
   } as unknown as TicketsService;
 
@@ -117,6 +154,24 @@ describe('ticketsRoutes', () => {
     app = buildApp(GM, recorder);
     const res = await app.inject({ method: 'GET', url: '/tickets/not-a-uuid' });
     expect(res.statusCode).toBe(400);
+    expect(recorder.detailId).toBeUndefined();
+  });
+
+  it('should route /tickets/stats to the stats handler, not the :id param route (E4)', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({ method: 'GET', url: '/tickets/stats' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(STATS_RESULT);
+    expect(recorder.statsHit).toBe(true);
+    expect(recorder.detailId).toBeUndefined();
+  });
+
+  it('should route /tickets/overdue to the overdue handler, not the :id param route (E4)', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({ method: 'GET', url: '/tickets/overdue?limit=5' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(OVERDUE_RESULT);
+    expect(recorder.overdueHit).toBe(true);
     expect(recorder.detailId).toBeUndefined();
   });
 });

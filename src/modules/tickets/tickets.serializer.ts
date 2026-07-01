@@ -1,12 +1,17 @@
 import type { TenantContext } from '@plugins/tenant-guard.js';
 import { maskEmail, maskWaPhone } from '@shared/utils/masking.js';
 
+import { isOverdue } from './tickets.overdue.js';
+import { TICKET_STATUSES } from './tickets.types.js';
 import type {
   TicketDetailRow,
   TicketDetailWire,
   TicketListItemWire,
   TicketListRow,
   TicketMessageWire,
+  TicketStatsWire,
+  TicketStatus,
+  TicketStatusCounts,
   TicketUpdateWire,
   UserDirectory,
 } from './tickets.types.js';
@@ -36,6 +41,7 @@ function baseTicketWire(
   row: TicketListRow,
   ctx: TenantContext,
   dir: UserDirectory,
+  now: Date,
 ): TicketListItemWire {
   const mask = shouldMaskPii(row.guest, ctx);
   return {
@@ -52,7 +58,7 @@ function baseTicketWire(
     complaint_type: row.complaintType,
     subject: row.subject,
     is_high_alert: row.isHighAlert,
-    is_overdue: row.isOverdue,
+    is_overdue: isOverdue(row, now),
     resolved_satisfaction: row.resolvedSatisfaction,
     sla_due_at: iso(row.slaDueAt),
     closed_at: iso(row.closedAt),
@@ -65,8 +71,9 @@ export function serializeTicketListItem(
   row: TicketListRow,
   ctx: TenantContext,
   dir: UserDirectory,
+  now: Date = new Date(),
 ): TicketListItemWire {
-  return baseTicketWire(row, ctx, dir);
+  return baseTicketWire(row, ctx, dir, now);
 }
 
 function serializeUpdate(
@@ -103,14 +110,39 @@ function serializeMessage(message: TicketDetailRow['messages'][number]): TicketM
   };
 }
 
+function zeroFilledStatusCounts(): TicketStatusCounts {
+  const counts = {} as Record<TicketStatus, number>;
+  for (const status of TICKET_STATUSES) {
+    counts[status] = 0;
+  }
+  return counts;
+}
+
+export function serializeStats(
+  statusCounts: ReadonlyArray<{ status: string; count: number }>,
+  overdue: number,
+  highAlertCount: number,
+): TicketStatsWire {
+  const byStatus = zeroFilledStatusCounts();
+  let total = 0;
+  for (const { status, count } of statusCounts) {
+    if (status in byStatus) {
+      byStatus[status as TicketStatus] = count;
+    }
+    total += count;
+  }
+  return { by_status: byStatus, total, overdue, high_alert_count: highAlertCount };
+}
+
 export function serializeTicketDetail(
   row: TicketDetailRow,
   ctx: TenantContext,
   dir: UserDirectory,
+  now: Date = new Date(),
 ): TicketDetailWire {
   const mask = shouldMaskPii(row.guest, ctx);
   return {
-    ...baseTicketWire(row, ctx, dir),
+    ...baseTicketWire(row, ctx, dir, now),
     guest_email: row.guest.email ? (mask ? maskEmail(row.guest.email) : row.guest.email) : null,
     complaint_detail: row.complaintDetail,
     body: row.body,

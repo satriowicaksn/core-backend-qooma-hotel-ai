@@ -32,4 +32,28 @@ export class TicketsRepository {
       include: DETAIL_INCLUDE,
     });
   }
+
+  async groupCountByStatus(
+    where: Prisma.TicketWhereInput,
+  ): Promise<Array<{ status: string; count: number }>> {
+    const grouped = await this.db.ticket.groupBy({
+      by: ['status'],
+      where,
+      _count: { _all: true },
+    });
+    return grouped.map((g) => ({ status: g.status, count: g._count._all }));
+  }
+
+  async countWhere(where: Prisma.TicketWhereInput): Promise<number> {
+    return this.db.ticket.count({ where });
+  }
+
+  async findOverdue(where: Prisma.TicketWhereInput, take: number): Promise<TicketListRow[]> {
+    return this.db.ticket.findMany({
+      where,
+      include: LIST_INCLUDE,
+      orderBy: [{ slaDueAt: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
 }

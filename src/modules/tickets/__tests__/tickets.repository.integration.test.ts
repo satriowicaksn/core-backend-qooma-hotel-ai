@@ -13,8 +13,14 @@ import { NotFoundError } from '@core/errors/app-errors.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { buildTicketsService } from '../index.js';
+import { isOverdue } from '../tickets.overdue.js';
 import { encodeCursor } from '../tickets.schema.js';
 import type { TicketsService } from '../tickets.service.js';
+
+// Fixed reference clock for deterministic overdue/stats assertions.
+const NOW = new Date('2026-06-11T12:00:00.000Z');
+const PAST_SLA = new Date('2026-06-11T11:00:00.000Z');
+const FUTURE_SLA = new Date('2026-06-11T13:00:00.000Z');
 
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -71,6 +77,15 @@ async function seed(): Promise<void> {
   });
 
   // Five HSK tickets in hotel A with strictly increasing createdAt (for cursor order).
+  // SLA/status/flag spread for T13: 0,1 overdue · 2 future(not) · 3 high-alert flag
+  // · 4 closed+past (terminal → NOT overdue, proves status exclusion).
+  const slaByIndex: Record<number, Date | null> = {
+    0: PAST_SLA,
+    1: PAST_SLA,
+    2: FUTURE_SLA,
+    3: null,
+    4: PAST_SLA,
+  };
   for (let i = 0; i < 5; i += 1) {
     await db.ticket.create({
       data: {
@@ -80,6 +95,9 @@ async function seed(): Promise<void> {
         guestId: GUEST_A,
         departmentId: DEPT_1,
         assignedUserId: USER_1,
+        status: i === 4 ? 'closed' : 'open',
+        isHighAlert: i === 3,
+        slaDueAt: slaByIndex[i] ?? null,
         subject: `Handuk tambahan ${i}`,
         body: `Kamar 120${i} minta handuk`,
         createdAt: new Date(`2026-06-11T07:0${i}:00.000Z`),
@@ -96,6 +114,7 @@ async function seed(): Promise<void> {
       departmentId: DEPT_2,
       subject: 'Late checkout',
       body: 'minta perpanjang',
+      slaDueAt: PAST_SLA,
       createdAt: new Date('2026-06-11T08:00:00.000Z'),
     },
   });
@@ -260,5 +279,60 @@ describe('TicketsService.detail (integration)', () => {
       'HSK-2606-001',
       'HSK-2606-000',
     ]);
+  });
+});
+
+describe('TicketsService.stats (integration)', () => {
+  it('should return status counts + aggregates scoped to the hotel for gm_admin', async () => {
+    const res = await service.stats(gmA, NOW);
+    expect(res.data.by_status.open).toBe(5); // tickets 0,1,2,3 + FO-90
+    expect(res.data.by_status.closed).toBe(1); // ticket 4
+    expect(res.data.by_status.high_alert).toBe(0); // no ticket has STATUS high_alert
+    expect(res.data.total).toBe(6);
+    expect(res.data.overdue).toBe(3); // tickets 0,1 + FO-90 (ticket 4 closed excluded)
+    expect(res.data.high_alert_count).toBe(1); // ticket 3 has the FLAG
+  });
+
+  it('should scope stats to the own department for dept_head', async () => {
+    const res = await service.stats(deptHead1, NOW);
+    expect(res.data.total).toBe(5); // dept_1 tickets 0-4 only (FO-90 excluded)
+    expect(res.data.overdue).toBe(2); // tickets 0,1
+    expect(res.data.high_alert_count).toBe(1);
+  });
+});
+
+describe('TicketsService.overdue (integration)', () => {
+  it('should list overdue tickets ordered by sla_due_at asc with is_overdue=true', async () => {
+    const res = await service.overdue(gmA, { limit: '10' }, NOW);
+    expect(res.data.map((t) => t.ticket_number)).toEqual([
+      'HSK-2606-000',
+      'HSK-2606-001',
+      'FO-2606-001',
+    ]);
+    expect(res.data.every((t) => t.is_overdue)).toBe(true);
+    expect(res.pageInfo.hasMore).toBe(false);
+  });
+
+  it('should top-N paginate overdue with hasMore', async () => {
+    const res = await service.overdue(gmA, { limit: '2' }, NOW);
+    expect(res.data).toHaveLength(2);
+    expect(res.pageInfo.hasMore).toBe(true);
+    expect(res.pageInfo.nextCursor).toBeNull();
+  });
+
+  it('should exclude terminal-status tickets even when past SLA', async () => {
+    const res = await service.overdue(gmA, { limit: '50' }, NOW);
+    expect(res.data.map((t) => t.ticket_number)).not.toContain('HSK-2606-004');
+  });
+
+  it('should agree with the isOverdue row predicate (SSOT coherence)', async () => {
+    const allRows = await db.ticket.findMany({ where: { hotelId: HOTEL_A } });
+    const expectedIds = allRows
+      .filter((r) => isOverdue(r, NOW))
+      .map((r) => r.id)
+      .sort();
+    const res = await service.overdue(gmA, { limit: '100' }, NOW);
+    const listedIds = res.data.map((t) => t.id).sort();
+    expect(listedIds).toEqual(expectedIds);
   });
 });
