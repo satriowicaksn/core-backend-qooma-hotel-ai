@@ -11,14 +11,21 @@ import {
   type TenantContext,
 } from '@plugins/tenant-guard.js';
 
+import { notOverdueWhere, overdueWhere } from './tickets.overdue.js';
 import type { TicketsRepository } from './tickets.repository.js';
-import { encodeCursor, parseListQuery } from './tickets.schema.js';
-import { serializeTicketDetail, serializeTicketListItem } from './tickets.serializer.js';
+import { encodeCursor, parseListQuery, parseOverdueQuery } from './tickets.schema.js';
+import {
+  serializeStats,
+  serializeTicketDetail,
+  serializeTicketListItem,
+} from './tickets.serializer.js';
 import type {
+  OverdueListResponse,
   TicketCursor,
   TicketDetailResponse,
   TicketListFilters,
   TicketListResponse,
+  TicketStatsResponse,
   UserDirectory,
 } from './tickets.types.js';
 
@@ -30,25 +37,43 @@ export interface TicketsServiceDeps {
   readonly resolveUsers?: (userIds: readonly string[]) => Promise<UserDirectory>;
 }
 
+// Tenant + dept scope arms — the single scope implementation reused by the list,
+// stats, and overdue builders (E3). Explicit super_admin bypass; N2: a dept_head
+// with no deptId must not silently drop the filter (tenant leak) → AuthError.
+export function buildScopeArms(ctx: TenantContext): Prisma.TicketWhereInput[] {
+  const arms: Prisma.TicketWhereInput[] = [];
+  if (!ctx.isSuperAdmin) {
+    arms.push({ hotelId: ctx.hotelId });
+  }
+  if (ctx.role === 'dept_head') {
+    if (!ctx.deptId) {
+      throw new AuthError('dept_head session is missing department scope');
+    }
+    arms.push({ departmentId: ctx.deptId });
+  }
+  return arms;
+}
+
+function scopeWhere(ctx: TenantContext): Prisma.TicketWhereInput {
+  const arms = buildScopeArms(ctx);
+  return arms.length > 0 ? { AND: arms } : {};
+}
+
+// Overdue is COMPUTED (tickets.overdue.ts is the single source of truth), never
+// read from the dormant is_overdue column.
+export function buildOverdueWhere(ctx: TenantContext, now: Date): Prisma.TicketWhereInput {
+  return { AND: [...buildScopeArms(ctx), overdueWhere(now)] };
+}
+
 // Pure WHERE builder — unit-tested without a DB. N1: the q-search OR and the
 // cursor keyset OR each live in their own AND arm so they never collapse together.
 export function buildTicketWhere(
   ctx: TenantContext,
   filters: TicketListFilters,
   cursor?: TicketCursor,
+  now: Date = new Date(),
 ): Prisma.TicketWhereInput {
-  const and: Prisma.TicketWhereInput[] = [];
-
-  if (!ctx.isSuperAdmin) {
-    and.push({ hotelId: ctx.hotelId });
-  }
-
-  if (ctx.role === 'dept_head') {
-    if (!ctx.deptId) {
-      throw new AuthError('dept_head session is missing department scope');
-    }
-    and.push({ departmentId: ctx.deptId });
-  }
+  const and: Prisma.TicketWhereInput[] = buildScopeArms(ctx);
 
   if (filters.status) {
     and.push({ status: { in: [...filters.status] } });
@@ -69,7 +94,7 @@ export function buildTicketWhere(
     and.push({ isHighAlert: filters.isHighAlert });
   }
   if (filters.isOverdue !== undefined) {
-    and.push({ isOverdue: filters.isOverdue });
+    and.push(filters.isOverdue ? overdueWhere(now) : notOverdueWhere(now));
   }
   if (filters.dateFrom || filters.dateTo) {
     and.push({
@@ -107,8 +132,9 @@ export class TicketsService {
   ) {}
 
   async list(ctx: TenantContext, rawQuery: unknown): Promise<TicketListResponse> {
+    const now = new Date();
     const query = parseListQuery(rawQuery);
-    const where = buildTicketWhere(ctx, query.filters, query.cursor);
+    const where = buildTicketWhere(ctx, query.filters, query.cursor, now);
     const rows = await this.repo.findMany(where, query.limit + 1);
 
     const hasMore = rows.length > query.limit;
@@ -120,11 +146,12 @@ export class TicketsService {
         : null;
 
     const dir = await this.resolveDirectory(page.map((r) => r.assignedUserId));
-    const data = page.map((r) => serializeTicketListItem(r, ctx, dir));
+    const data = page.map((r) => serializeTicketListItem(r, ctx, dir, now));
     return { data, pageInfo: { nextCursor, hasMore } };
   }
 
   async detail(ctx: TenantContext, id: string): Promise<TicketDetailResponse> {
+    const now = new Date();
     const row = await this.repo.findDetailById(id);
     if (!row) {
       throw new NotFoundError('Ticket', id);
@@ -136,7 +163,34 @@ export class TicketsService {
       row.assignedUserId,
       ...row.updates.map((u) => u.actorUserId),
     ]);
-    return { data: serializeTicketDetail(row, ctx, dir) };
+    return { data: serializeTicketDetail(row, ctx, dir, now) };
+  }
+
+  async stats(ctx: TenantContext, now: Date = new Date()): Promise<TicketStatsResponse> {
+    const scope = scopeWhere(ctx);
+    const [byStatus, overdue, highAlert] = await Promise.all([
+      this.repo.groupCountByStatus(scope),
+      this.repo.countWhere(buildOverdueWhere(ctx, now)),
+      this.repo.countWhere({ AND: [scope, { isHighAlert: true }] }),
+    ]);
+    return { data: serializeStats(byStatus, overdue, highAlert) };
+  }
+
+  async overdue(
+    ctx: TenantContext,
+    rawQuery: unknown,
+    now: Date = new Date(),
+  ): Promise<OverdueListResponse> {
+    const { limit } = parseOverdueQuery(rawQuery);
+    const where = buildOverdueWhere(ctx, now);
+    const rows = await this.repo.findOverdue(where, limit + 1);
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+
+    const dir = await this.resolveDirectory(page.map((r) => r.assignedUserId));
+    const data = page.map((r) => serializeTicketListItem(r, ctx, dir, now));
+    return { data, pageInfo: { nextCursor: null, hasMore } };
   }
 
   private async resolveDirectory(ids: readonly (string | null)[]): Promise<UserDirectory> {

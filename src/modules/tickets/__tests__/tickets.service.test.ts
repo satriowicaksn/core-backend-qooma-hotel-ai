@@ -246,13 +246,29 @@ describe('buildTicketWhere — scalar filters', () => {
       departmentId: 'dept-3',
       guestId: 'guest-3',
       isHighAlert: true,
-      isOverdue: false,
     });
     expect(where.AND).toContainEqual({ priority: 'urgent' });
     expect(where.AND).toContainEqual({ departmentId: 'dept-3' });
     expect(where.AND).toContainEqual({ guestId: 'guest-3' });
     expect(where.AND).toContainEqual({ isHighAlert: true });
-    expect(where.AND).toContainEqual({ isOverdue: false });
+  });
+
+  it('should route is_overdue=true through the computed overdue predicate, not the column', () => {
+    const now = new Date('2026-06-11T09:00:00.000Z');
+    const where = buildTicketWhere(ctx(), { isOverdue: true }, undefined, now);
+    expect(where.AND).toContainEqual({
+      slaDueAt: { lt: now },
+      status: { notIn: ['closed', 'cancelled'] },
+    });
+    expect(JSON.stringify(where.AND)).not.toContain('isOverdue');
+  });
+
+  it('should route is_overdue=false through the negated overdue predicate', () => {
+    const now = new Date('2026-06-11T09:00:00.000Z');
+    const where = buildTicketWhere(ctx(), { isOverdue: false }, undefined, now);
+    expect(where.AND).toContainEqual({
+      NOT: { slaDueAt: { lt: now }, status: { notIn: ['closed', 'cancelled'] } },
+    });
   });
 
   it('should build an open createdAt lower bound when only date_from is set', () => {

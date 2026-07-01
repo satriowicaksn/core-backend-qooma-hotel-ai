@@ -152,3 +152,25 @@ export interface TicketListResponse {
 export interface TicketDetailResponse {
   readonly data: TicketDetailWire;
 }
+
+export type TicketStatusCounts = Record<TicketStatus, number>;
+
+export interface TicketStatsWire {
+  readonly by_status: TicketStatusCounts;
+  readonly total: number;
+  readonly overdue: number;
+  readonly high_alert_count: number;
+}
+
+export interface TicketStatsResponse {
+  readonly data: TicketStatsWire;
+}
+
+export interface OverdueListResponse {
+  readonly data: readonly TicketListItemWire[];
+  readonly pageInfo: PageInfoWire;
+}
+
+export interface OverdueQuery {
+  readonly limit: number;
+}

@@ -44,6 +44,26 @@ export const ticketsRoutes: FastifyPluginCallback<TicketsRoutesOptions> = (fasti
     return reply.send(result);
   });
 
+  fastify.get('/tickets/stats', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    req.log.info(
+      { module: 'tickets', action: 'stats', correlationId: correlationIdOf(req) },
+      'ticket stats',
+    );
+    const result = await service.stats(ctx);
+    return reply.send(result);
+  });
+
+  fastify.get('/tickets/overdue', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    req.log.info(
+      { module: 'tickets', action: 'overdue', correlationId: correlationIdOf(req) },
+      'ticket overdue list',
+    );
+    const result = await service.overdue(ctx, req.query);
+    return reply.send(result);
+  });
+
   fastify.get('/tickets/:id', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     const id = parseTicketId(req.params);

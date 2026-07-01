@@ -51,6 +51,14 @@ const isoDate = z
   .datetime({ offset: true })
   .transform((v) => new Date(v));
 
+const limitField = z.coerce
+  .number()
+  .int()
+  .min(MIN_LIMIT)
+  .catch(DEFAULT_LIMIT)
+  .transform((v) => Math.min(v, MAX_LIMIT))
+  .default(DEFAULT_LIMIT);
+
 export const ListTicketsQuerySchema = z.object({
   status: csvStatus.optional(),
   department_id: z.string().uuid().optional(),
@@ -68,14 +76,12 @@ export const ListTicketsQuerySchema = z.object({
   is_high_alert: boolFlag.optional(),
   is_overdue: boolFlag.optional(),
   guest_id: z.string().uuid().optional(),
-  limit: z.coerce
-    .number()
-    .int()
-    .min(MIN_LIMIT)
-    .catch(DEFAULT_LIMIT)
-    .transform((v) => Math.min(v, MAX_LIMIT))
-    .default(DEFAULT_LIMIT),
+  limit: limitField,
   cursor: z.string().min(1).optional(),
+});
+
+export const OverdueQuerySchema = z.object({
+  limit: limitField,
 });
 
 export const TicketIdParamSchema = z.object({
@@ -146,4 +152,12 @@ export function parseTicketId(rawParams: unknown): string {
     throw toValidationError(result.error);
   }
   return result.data.id;
+}
+
+export function parseOverdueQuery(rawQuery: unknown): { limit: number } {
+  const result = OverdueQuerySchema.safeParse(rawQuery ?? {});
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  return { limit: result.data.limit };
 }
