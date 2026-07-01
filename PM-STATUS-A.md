@@ -12,11 +12,13 @@
 
 ## 0. Current focus (slot A)
 
-- **Day**: H0 (belum mulai)
-- **Active task**: — (belum dimulai)
-- **Branch**: —
+- **Day**: H0 (2026-07-01)
+- **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
+- **Active task**: T03 (tenant-guard middleware) — next to start
+- **Branch**: main (solo drive; feature branch discipline resumes when Nathan onboards to slot B and Satrio joins)
+- **Completed today**: T01, T02
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: lihat §8 di bawah (mirror dari PARENT §8 filter Slot=A)
+- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 (next) · T04–T10 backlog
 
 ---
 
@@ -26,9 +28,16 @@
 
 | T## | Title                                                        | Status   | Verified by PM       | Notes                                 |
 | --- | ------------------------------------------------------------ | -------- | -------------------- | ------------------------------------- |
-| T01 | `make check` green dari boilerplate (lint+format+typecheck+test) | approved | PM A (Nanak covering) | Nanak covering slot A per PARENT §4 (2026-07-01); env fix + ts-node + tsconfig ts-node override |
-| T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak covering) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
-| T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | assigned | —                    | Next up, Nanak covering              |
+| T01 | `make check` green dari boilerplate (lint+format+typecheck+test) | approved | PM A (Nanak) | env fix + ts-node + tsconfig ts-node override |
+| T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | assigned | —            | Next up. Permanent slot owner — see PARENT §4 2026-07-01 slot swap |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) | backlog | —            | After T03 |
+| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
+| T06 | Ticket state-machine helper + unit-test the transition table | backlog | —              | Parallel-friendly after T01 |
+| T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
+| T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
+| T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
+| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 
 ---
 

@@ -15,7 +15,7 @@
 - **Day**: H12+ (post-Auth bootstrap; Hotel Core handover landed 2026-06-29)
 - **Phase**: Bootstrap / pre-T01 — authoritative spec live di [`docs/spec/MVP-HOTEL-CORE-FIRST.md`](./docs/spec/MVP-HOTEL-CORE-FIRST.md) (Slice 2 of 3 backend MVP slices)
 - **Active gate**: G1 — Boilerplate + Prisma schema ready (kriteria default `PM-AGENT.md §5`; PO konfirmasi)
-- **Active devs**: Nanak covering slot A (T01–T03 unblocker chain) + slot B eventually. Nathan + Satrio not yet onboard — Nanak drives foundation until they join.
+- **Active devs**: **Permanent slot swap 2026-07-01** — Nanak = slot A (Foundation, T01–T10), Nathan = slot B (Core CRM, T11–T20) when onboard, Satrio = slot C unchanged (T21–T30). Approved by all 3 devs. See §4 deviation log.
 - **Progress (global)**: 0 / 30 task assigned (T01–T03 + T11 + T21 active per below; T04–T10, T12–T20, T22–T30 backlog — Parent PM release per gate)
 - **Reading order untuk fresh dev**: `KICKOFF.md` → `docs/SERVICE-CHARTER.md` → `docs/spec/MVP-HOTEL-CORE-FIRST.md` → `docs/spec/02-hotel-core.md` (full DDL + RBAC) → `docs/spec/data-model.md` → `docs/spec/open-questions.md` → claim task di §8 / §1a
 
@@ -31,26 +31,26 @@
 
 | T## | Title                                                                            | Slot | Owner   | Status   | Verified by | Notes                                              |
 | --- | -------------------------------------------------------------------------------- | ---- | ------- | -------- | ----------- | -------------------------------------------------- |
-| T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nanak (covering) | approved | PM A (Nanak covering) | Fixed via env upgrade (Node 20+pnpm 9), ts-node@10 dep, tsconfig ts-node override — see PM-STATUS-A.md §2 |
-| T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nanak (covering) | approved | PM A (Nanak covering) | Applied via 2 migrations (init + CHECK/partial-idx). DEV deviation: fresh `hotel_core_dev` DB (Opsi C) instead of shared `app` DB — see §4. UNBLOCKS T04–T30 impl (except tier-gated T26/T30 pending shared-DB restore) |
-| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nanak (covering) | assigned | —           | After T02; Nanak covers                            |
-| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nathan  | backlog  | —           | After T03                                          |
-| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)            | A    | Nathan  | backlog  | —           | After T04                                          |
-| T06 | Ticket state-machine helper + unit-test the transition table                     | A    | Nathan  | backlog  | —           | Parallel-friendly after T01                        |
-| T07 | Common error handlers (HC-specific codes per spec §7)                            | A    | Nathan  | backlog  | —           | After T01                                          |
-| T08 | Multipart upload utility (S3 / R2 abstraction)                                   | A    | Nathan  | backlog  | —           | After T01                                          |
-| T09 | CSV import utility (used by menu + knowledge)                                    | A    | Nathan  | backlog  | —           | After T01                                          |
-| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks              | A    | Nathan  | backlog  | —           | After T02                                          |
-| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nanak   | assigned | —           | Spec reading + module skeleton OK; impl blocked on T02 |
-| T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nanak   | backlog  | —           | After T11 + T06                                    |
-| T13 | Ticket stats + overdue                                                           | B    | Nanak   | backlog  | —           | After T11                                          |
-| T14 | Guests CRUD + preferences                                                        | B    | Nanak   | backlog  | —           | After T02                                          |
-| T15 | Guest messages history                                                           | B    | Nanak   | backlog  | —           | After T14                                          |
-| T16 | Visits list + pending verification flow                                          | B    | Nanak   | backlog  | —           | After T02                                          |
-| T17 | Visit reject + failed_3x override                                                | B    | Nanak   | backlog  | —           | After T16                                          |
-| T18 | Manual visit create                                                              | B    | Nanak   | backlog  | —           | After T16                                          |
-| T19 | Notifications CRUD + optimistic ops                                              | B    | Nanak   | backlog  | —           | After T02                                          |
-| T20 | Socket emitters (`ticket:*` + `verification:*` + `notification:new`)             | B    | Nanak   | backlog  | —           | After T11 + T16 + T19                              |
+| T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nanak   | approved | PM A (Nanak) | Fixed via env upgrade (Node 20+pnpm 9), ts-node@10 dep, tsconfig ts-node override — see PM-STATUS-A.md §2 |
+| T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nanak   | approved | PM A (Nanak) | Applied via 2 migrations (init + CHECK/partial-idx). DEV deviation: fresh `hotel_core_dev` DB (Opsi C) instead of shared `app` DB — see §4. UNBLOCKS T04–T30 impl (except tier-gated T26/T30 pending shared-DB restore) |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nanak   | assigned | —           | After T02; permanent slot A owner per §4 2026-07-01 |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nanak   | backlog  | —           | After T03                                          |
+| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)            | A    | Nanak   | backlog  | —           | After T04                                          |
+| T06 | Ticket state-machine helper + unit-test the transition table                     | A    | Nanak   | backlog  | —           | Parallel-friendly after T01                        |
+| T07 | Common error handlers (HC-specific codes per spec §7)                            | A    | Nanak   | backlog  | —           | After T01                                          |
+| T08 | Multipart upload utility (S3 / R2 abstraction)                                   | A    | Nanak   | backlog  | —           | After T01                                          |
+| T09 | CSV import utility (used by menu + knowledge)                                    | A    | Nanak   | backlog  | —           | After T01                                          |
+| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks              | A    | Nanak   | backlog  | —           | After T02                                          |
+| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nathan  | assigned | —           | Spec reading + module skeleton OK; impl unblocked (T02 done). Nathan pick up on onboard. |
+| T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nathan  | backlog  | —           | After T11 + T06                                    |
+| T13 | Ticket stats + overdue                                                           | B    | Nathan  | backlog  | —           | After T11                                          |
+| T14 | Guests CRUD + preferences                                                        | B    | Nathan  | backlog  | —           | After T02                                          |
+| T15 | Guest messages history                                                           | B    | Nathan  | backlog  | —           | After T14                                          |
+| T16 | Visits list + pending verification flow                                          | B    | Nathan  | backlog  | —           | After T02                                          |
+| T17 | Visit reject + failed_3x override                                                | B    | Nathan  | backlog  | —           | After T16                                          |
+| T18 | Manual visit create                                                              | B    | Nathan  | backlog  | —           | After T16                                          |
+| T19 | Notifications CRUD + optimistic ops                                              | B    | Nathan  | backlog  | —           | After T02                                          |
+| T20 | Socket emitters (`ticket:*` + `verification:*` + `notification:new`)             | B    | Nathan  | backlog  | —           | After T11 + T16 + T19                              |
 | T21 | Departments CRUD (escalation tree + operating hours)                             | C    | Satrio  | assigned | —           | Spec reading + module skeleton OK; impl blocked on T02 |
 | T22 | Menu CRUD + categories + multipart image                                         | C    | Satrio  | backlog  | —           | After T02 + T08                                    |
 | T23 | Menu bulk ops (CSV + bulk availability)                                          | C    | Satrio  | backlog  | —           | After T22 + T09                                    |
@@ -152,6 +152,7 @@
 | 2026-06-12 | docker-compose.yml, .env.example, README.md, .claude/settings.json | Shift host port Postgres 5432→5433 & Redis 6379→6380 untuk hindari bentrok dengan service lokal | (pre-T01 fix)  | PO             |
 | 2026-07-01 | PARENT §1 T01–T03 Owner column                                     | Temporary reassign Nathan→Nanak (foundation unblocker chain — Nathan+Satrio not yet onboard, verbal consent from all devs) | T01, T02, T03  | Parent PM (solo Nanak) |
 | 2026-07-01 | `.env` DATABASE_URL (dev-only)                                     | Opsi C: HC DEV uses fresh `hotel_core_dev` DB instead of shared `app` DB (which contains Auth+AI data). Reason: avoid destructive `prisma migrate reset` on Auth data when HC's schema.prisma reference stubs (Hotel/User with id-only) conflict with actual Auth tables. Trade-off: cross-DB FK impossible → HC's `tickets.hotelId` points to id-only stub, not real Auth `hotels`. Tier-gated features (T26/T30) blocked at DEV until shared-DB restored. **MUST revisit before staging/prod** — recommendation: Prisma multi-schema (previewFeatures=["multiSchema"]) with HC in `hotel_core` schema + Auth in `public` schema, in shared DB. | T02 | Parent PM (solo Nanak) |
+| 2026-07-01 | PARENT §1 Slot ownership (Slot A ↔ Slot B swap, permanent)         | **Permanent slot swap**: Nanak takes over slot A (Foundation, T01–T10) — Nathan takes over slot B (Core CRM, T11–T20) when he onboards. Satrio unchanged (slot C, T21–T30). Reason: Nanak is only active dev + already covered T01+T02 successfully (unblocker chain done); prefers to continue foundation domain rather than context-switch. **Approved by all 3 devs** (Nathan + Satrio verbal consent; Nathan explicitly asked Nanak to proceed). Supersedes 2026-07-01 temporary covering deviation. Historical audit blocks in PM-STATUS-A.md §2 retaining "(covering)" designation are accurate at time of writing — post-swap blocks drop the tag. | Slot restructure (affects T01–T20) | Parent PM (solo Nanak) — cross-dev consent recorded |
 | —          | —                                                                  | —                                                                                                 | —              | —              |
 
 ---

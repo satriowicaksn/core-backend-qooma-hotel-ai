@@ -1,10 +1,12 @@
-# PM-STATUS-B — Qooma Backend · Dev B (Nanak)
+# PM-STATUS-B — Qooma Backend · Dev B (Nathan)
 
-> **Per-dev tracker untuk slot B (Nanak).** PM B + Executor B komunikasi **hanya** via file ini. Roll-up short summary ke `PM-STATUS-PARENT.md §2` setelah tiap VERDICT atau end-of-session.
+> **Per-dev tracker untuk slot B (Nathan).** PM B + Executor B komunikasi **hanya** via file ini. Roll-up short summary ke `PM-STATUS-PARENT.md §2` setelah tiap VERDICT atau end-of-session.
 >
 > **PM A, PM C, Executor A, Executor C — JANGAN edit file ini.** File ini private ke slot B.
 >
-> **Identity check**: di response pertama session WAJIB confirm `Role: PM | Executor`, `Slot: B (Nanak)`. Bila user belum sebut slot — STOP, tanya dulu (lihat `KICKOFF.md §4`).
+> **⚠️ Ownership swap 2026-07-01**: Slot B originally assigned to Nanak → **swapped to Nathan** (permanent). Nanak now permanent owner slot A (Foundation, T01–T10). See `PM-STATUS-PARENT.md §4` for approved deviation. This file waits for Nathan onboard.
+>
+> **Identity check**: di response pertama session WAJIB confirm `Role: PM | Executor`, `Slot: B (Nathan)`. Bila user belum sebut slot — STOP, tanya dulu (lihat `KICKOFF.md §4`).
 >
 > Format block di §2 Active assignments **append-only** (lihat `EXECUTOR-PROTOCOL.md §0.5` & `PM-AGENT.md §0.4`).
 
@@ -12,11 +14,12 @@
 
 ## 0. Current focus (slot B)
 
-- **Day**: H0 (belum mulai)
-- **Active task**: — (belum dimulai)
+- **Day**: H0 (belum ada aktivitas — Nathan belum onboard)
+- **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
+- **Active task**: — (Nathan pick up saat onboard — T11 tickets first, T02 sudah done oleh Nanak jadi unblocked)
 - **Branch**: —
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: lihat §8 di bawah (mirror dari PARENT §8 filter Slot=B)
+- **Queue for Nathan onboard**: T11 assigned (tickets list+detail), T12–T20 backlog. Full unblocked oleh T02 (Nanak); T20 socket emitters butuh T11+T16+T19 selesai dulu.
 
 ---
 
