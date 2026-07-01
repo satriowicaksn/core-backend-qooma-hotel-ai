@@ -351,6 +351,90 @@ Awaiting **PLAN T04** dari exec-A.
 
 Proceed to PLAN T04. Address Delta 2 explicitly (Option A vs B + rationale). Delta 1 + Delta 3 need only 1-line acknowledgment each in PLAN.
 
+#### PLAN T04 — exec-A (Nanak) at H0 2026-07-01
+
+**Scope recap**
+- RBAC pure-fn guard (`requireRole`) yang compose bersih dengan T03 tenant-guard chain, plus (per NUDGE Delta 2) Fastify preHandler plugin yang populate `req.tenant` — shelf-ready untuk registrasi di `api.ts` ketika JWT plugin landing. Semua pure logic (no DB, no seed coupling). Sepenuhnya unit-testable.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md §6` (RBAC matrix — staff NEVER; dept_head auto-filter on tickets/knowledge/menu) + `§7` (404-mask cross-tenant, tidak downgrade) ✓
+- Parent docs spot-read: `src/plugins/tenant-guard.ts` (TenantContext shape, deriveTenantContext), `src/plugins/tenant-guard.types.ts` (FastifyRequest.tenant augmentation), `src/plugins/__tests__/tenant-guard.test.ts` (test pattern), `src/core/errors/app-errors.ts` (AuthError/ForbiddenError/NotFoundError), `src/entrypoints/api.ts` (masih stub — konfirmasi tidak register plugin runtime), `package.json` (fastify 4.28, `@fastify/jwt` present, `fastify-plugin` NOT present) ✓
+- Dependencies: T03 ✓ (approved di §1) — consume TenantContext + SessionUser + SessionRole as-is
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T03)
+- Scaffolder risk: none — no CLI generator, semua manual edit
+
+**NUDGE deltas — acknowledgment**
+- **Delta 1 (Q-B-02)**: acknowledged as resolved by PM B (Option b in effect). T04 consumes `TenantContext` / `SessionUser` / `SessionRole` dari `@plugins/tenant-guard.js` at their current path. **JANGAN** canonicalize ke `shared/types/`. No rebuttal.
+- **Delta 2 (preHandler wiring scope)**: pilih **Option A (bundle)** — see rationale below.
+- **Delta 3 (prisma-generate CI gap → T-INFRA-PRISMA-CI)**: acknowledged out-of-scope. Tidak sentuh `Makefile` / `src/core/prisma/prisma-client.ts`. Bila symptom muncul saat `make check`, note-only di SUBMIT.
+
+**Delta 2 rationale — Option A (bundle preHandler) chosen**
+
+Cost estimate:
+- New `src/plugins/tenant-guard.plugin.ts` (plain async Fastify plugin, ~25 LOC) — bare function karena `fastify-plugin` bukan direct dep (dan menambahkannya = escalation, delay Nathan's merge unblock). Nathan tinggal register di root scope api.ts sebelum module routes untuk hook propagate global (Fastify 4 default behavior tanpa encapsulation-escape).
+- Modify `src/plugins/tenant-guard.types.ts` (~5 LOC): tambah `FastifyRequest.user?: SessionUser` type augmentation supaya plugin bisa baca decoded JWT payload dengan proper typing.
+- New `src/plugins/__tests__/tenant-guard.plugin.test.ts` (~50 LOC): integration-style dengan `fastify.inject()` — tanpa DB, tanpa Redis. 3 case: (a) req dengan `user` → tenant populated correctly; (b) req tanpa `user` → tenant undefined (routes will explicit-check via requireRole → AuthError); (c) req dengan malformed user (missing hotelId) → deriveTenantContext throws AuthError → error propagates via Fastify error path.
+
+Total production delta ≈ 30 LOC + 50 LOC test (~80 LOC). Sedikit di atas soft-40 LOC hint, tapi majoritas overhead scaffolding test. Trade-off:
+- **Bundle wins**: Nathan T11 merge gate satisfied dalam 1 SUBMIT (no cross-task coordination hop, no separate T04b assignment overhead). Semua tenant-guard runtime story ter-consolidated di `src/plugins/`.
+- **Defer risk**: opening T04b = 1 more PM ↔ Parent PM ↔ PO hop, delay Nathan's merge minimum 1 half-day.
+
+If mid-implementation Option A ternyata butuh cross-plugin coupling (mis. `@fastify/jwt` decorator ordering), akan pause + post CHECKPOINT + escalate ke Option B.
+
+**Files to create**
+```
+src/plugins/rbac.ts
+src/plugins/__tests__/rbac.test.ts
+src/plugins/tenant-guard.plugin.ts
+src/plugins/__tests__/tenant-guard.plugin.test.ts
+```
+
+**Files to modify**
+- `src/plugins/tenant-guard.types.ts` — add `FastifyRequest.user?: SessionUser` augmentation (import type from `./tenant-guard.js`). Existing `req.tenant?: TenantContext` block preserved. Zero regression on T03 tests (they don't touch `req.user`).
+
+**Approach**
+
+**`src/plugins/rbac.ts`** — pure functions (mirror T03 tenant-guard.ts style):
+- `export function requireRole(tenant: TenantContext | undefined, allowed: readonly SessionRole[]): void` — guard fn dengan explicit return type. Order of checks:
+  1. `if (!tenant) throw new AuthError('No tenant context')` — 401
+  2. `if (tenant.role === 'staff') throw new ForbiddenError('staff role not permitted')` — 403 (hard-reject spec §6, defense-in-depth walau caller kadang keliru include 'staff' di `allowed`)
+  3. `if (tenant.isSuperAdmin) return` — implicit all-access (super_admin tidak perlu di-list oleh caller)
+  4. `if (!allowed.includes(tenant.role)) throw new ForbiddenError(...)` — 403
+- **DEFER `applyDeptFilter` helper**: justification — spec §6 rule 2 hanya applicable di 3 endpoint families (tickets, knowledge, menu list). Signature yang tepat depends on Prisma `where` type yang endpoint-specific (mis. `Prisma.TicketWhereInput` vs `Prisma.MenuItemWhereInput`). Bundling generic helper di T04 = premature abstraction (per CLAUDE.md general principle). T11 (Nathan / tickets) akan pakai chain `requireRole(tenant, ['gm_admin','dept_head']) + { hotelId: tenant.hotelId, ...(tenant.role === 'dept_head' && { deptId: tenant.deptId }) }` inline — clearer + type-safe per Prisma model. Kalau pattern repeat di > 3 modul dengan shape yang sama, refactor ke helper post-T11. PM A can call this out di VERDICT bila prefer bundle sekarang; happy to add ~10 LOC generic helper `applyDeptFilter<W>(tenant, where: W): W` yang untyped-passthrough kalau perlu.
+- Compose test: 1 unit test `it('should chain deriveTenantContext → requireRole → assertHotelOwnership → assertDeptOwnership without side-effect for dept_head on own resource')` — verify order + no throw.
+
+**`src/plugins/tenant-guard.plugin.ts`** — plain async Fastify plugin (bare function; register di root scope untuk hook propagation):
+```ts
+export async function tenantGuardPlugin(app: FastifyInstance): Promise<void> {
+  app.addHook('onRequest', async (req) => {
+    if (req.user) {
+      req.tenant = deriveTenantContext(req.user);
+    }
+  });
+}
+```
+- JSDoc jelaskan: (i) register at root scope; (ii) register AFTER JWT plugin yang populate `req.user`; (iii) leaves `req.tenant` undefined jika no JWT (webhook / public routes) — routes explicit-check via `requireRole` → AuthError.
+- No `fastify-plugin` wrapper (bukan dep). Hook propagation via natural Fastify 4 encapsulation ordering.
+
+**`src/plugins/tenant-guard.plugin.test.ts`** — integration-style dengan `fastify.inject()`:
+- Build minimal Fastify (`Fastify({ logger: false })`), register plugin, tambah test route `GET /_probe` yang return `req.tenant ?? { unset: true }`.
+- Decorate `req.user` via `preHandler` bypass (test harness) atau via `onRequest` yang jalan sebelum plugin's hook di sub-scope. Simpler: pakai `app.addHook('onRequest', (req, _, done) => { req.user = fixture; done(); })` di test setup order-BEFORE `tenantGuardPlugin` register.
+- Cases: (a) valid SessionUser → response has tenant; (b) no user → response has `unset: true`; (c) user missing hotelId → response 401 dengan AuthError code.
+- Tidak butuh Postgres / Redis (pure Fastify + in-process).
+
+**`src/plugins/rbac.test.ts`** — unit ≥ 80% line coverage:
+- 4 describe blocks:
+  - `deriveTenantContext + requireRole compose` — chain test (1 test).
+  - `requireRole` — 8-10 tests: (a) no tenant → AuthError; (b) staff → ForbiddenError even if allowed=['staff']; (c) super_admin → pass regardless of allowed; (d) gm_admin in allowed → pass; (e) gm_admin NOT in allowed → ForbiddenError; (f) dept_head in allowed → pass; (g) dept_head NOT in allowed → ForbiddenError; (h) empty allowed + super_admin → pass; (i) empty allowed + non-super → ForbiddenError.
+  - `requireRole error shape` — ForbiddenError.details includes actual role + allowed list (for observability, mask di error-handler nanti).
+- Test naming: `it('should <expected> when <condition>')` per CLAUDE.md.
+
+**GAPs / questions**: none.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
