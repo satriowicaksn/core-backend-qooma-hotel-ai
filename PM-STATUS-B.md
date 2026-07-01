@@ -16,7 +16,7 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T13 — Ticket stats + overdue** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ APPROVED + **MERGED to main** (PR #1 `6c1e4e2`).
+- **Active task**: **T13 — Ticket stats + overdue** (PLAN ACK'd w/ 1 required addition; coding `feat/tickets-stats-overdue`). T11 ✅ APPROVED + **MERGED** (PR #1). T04 ✅ APPROVED (Slot A) — runtime gate now just pending T04 merge + api.ts bootstrap wiring.
 - **Branch**: T11 merged ✓ · T13 `feat/tickets-stats-overdue` (exec-B creates on ACK)
 - **Runtime unblock watch**: T04 (RBAC, Slot A) now **wip** — once merged, `req.tenant` populated → T11 (and T13) routes go live automatically.
 - **Progress slot B**: 1/10 approved (T11). Next: T13 → then T14/T16/T19 (unblocked). T12 waits on T06 (Slot A).
@@ -36,7 +36,7 @@
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
-| T13 | Ticket stats + overdue                                    | assigned     | —              | ASSIGNMENT issued §2 (2026-07-01). Unblocked by T11. Extends `tickets` module (reuse). Awaiting exec-B PLAN. Possible Q-B-03 (stats shape). |
+| T13 | Ticket stats + overdue                                    | wip          | —              | PLAN ACK'd 2026-07-01 (§2) w/ 1 required addition (② is_overdue coherence: one computed predicate across serializer+filter+stats+overdue). Q-B-03 stats shape ratified (`high_alert_count` naming). Coding `feat/tickets-stats-overdue`. Merge-gated on T04 (approved, awaiting merge) + api.ts bootstrap wiring. |
 | T12 | Ticket status transition + reroute                        | backlog      | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
 | T14/T16/T19 | Guests / Visits / Notifications CRUD               | backlog      | —              | Unblocked (T02 ✓) — release after T13 or in parallel |
 | T15/T17/T18/T20 | Downstream CRM + socket                       | backlog      | —              | T15←T14; T17/T18←T16; T20←T11✓+T16+T19 |
@@ -352,6 +352,36 @@ Two read-only dashboard-KPI endpoints, **extending the existing `tickets` module
 
 Awaiting PM B ACK (PLAN + Q-B-03 shape + overdue-predicate/top-N decisions). Not coding before ACK.
 
+##### PM B ACK — T13 PLAN APPROVED with 1 required addition (2026-07-01, H12)
+Verified against spec + merged T11 code. **ACK — create `feat/tickets-stats-overdue`, implement.** Rulings:
+
+**① Q-B-03 stats shape — RATIFIED provisionally (in-repo spec confirms it's unpinned; FE MSW = tiebreaker).** I checked: `02-hotel-core.md §1.2` + §1.11 (L319-330) only say "Counts by status (dashboard KPI)" — 0 shape hits, your report is accurate. Approved structure, with the naming collision resolved:
+```json
+{ "data": {
+    "by_status": { "open":0,"in_progress":0,"awaiting_late_reason":0,"done_pending":0,"closed":0,"high_alert":0,"escalated":0,"cancelled":0 },
+    "total": 0, "overdue": 0, "high_alert_count": 0 } }
+```
+- **Naming decision (mine):** top-level flag count = **`high_alert_count`** (NOT `high_alert` — collides with `by_status.high_alert`; NOT your `high_alert_flagged` — invented). `by_status.high_alert` = tickets whose **status** = `high_alert`; `high_alert_count` = tickets with the **`is_high_alert` flag** true. Two different populations, now unambiguous. `total` = sum of `by_status`; `overdue` = computed-overdue count (see ②). snake_case, consistent with the ratified resource-body convention.
+- **Provisional** on FE MSW (`tickets.handlers.ts`, absent repo). Serializer-isolated → one-file change if FE differs. Registered §3 Q-B-03; noted to Parent §3a. **No PO action needed** unless FE MSW diverges.
+
+**② Overdue predicate — ACK, but ONE REQUIRED ADDITION (coherence).** Your computed predicate `sla_due_at IS NOT NULL AND sla_due_at < :now AND status NOT IN ('closed','cancelled')` shared by `/overdue` list + stats count is correct (the `is_overdue` worker isn't in MVP). **But you missed a coherence gap I verified in the merged T11 code:** `tickets.serializer.ts:55` emits `is_overdue: row.isOverdue` — the **dormant column** (default false, no worker sets it). So a ticket in your computed `/overdue` list would serialize `is_overdue: false`, and T11's `is_overdue=true` list filter (also reading the column) returns nothing. FE sees a contradiction.
+   - **REQUIRED**: make **one** `isOverdue(row, now)` helper the single source of truth, used in **all four** spots: (a) the serializer's `is_overdue` field (compute, don't read `row.isOverdue`), (b) the `/overdue` filter, (c) the stats `overdue` count, (d) **T11's `is_overdue` query filter** in `buildTicketWhere` (route it through the same predicate). This is *more reuse, not more code* — you're already writing the predicate.
+   - Inject `now` (service arg default `new Date()`) — no scattered `new Date()` (keeps tests deterministic, keeps the serializer pure).
+   - This edits merged T11 code within the same module on your branch — **legitimate**, but T11's existing unit + integration tests MUST stay green (update any assertion that expected the dormant column value). I will re-verify T11's endpoints for regression at SUBMIT.
+   - Forward-compat note: when the overdue worker lands later it just maintains the column to match this predicate — computing-at-read now is not throwaway.
+
+**③ Overdue pagination — ACK bounded top-N.** `limit` default 20 / max 100, `sla_due_at ASC`, reuse `serializeTicketListItem`, `{ data, pageInfo:{ nextCursor:null, hasMore } }`. **Requirement**: stats `overdue` must be the **true unbounded count** (not capped at the top-N) so the KPI card is accurate even when the list truncates — your `count()` approach already does this, just don't let the two share a LIMIT. If FE MSW needs cursor paging, generalize the T11 codec to an `sla_due_at` keyset then — your call to defer is correct.
+
+**④ `buildScopeArms(ctx)` extraction — ACK.** Good reuse (keeps super_admin bypass + N2 AuthError). T11 tests stay green (regression).
+**⑤ Route-collision `/stats` vs `/:id` — ACK.** Assert it in the route test (the classic radix trap). Required, not optional.
+**⑥ Single `groupBy` for status + 2 `count()` — ACK.** 3 queries total, never N-per-status.
+
+**Runtime gate update (good news):** T04 (RBAC) is now **APPROVED** (Slot A, `feat/foundation-rbac` @ `df5648b`, awaiting PO merge) — it ships `configureTenantGuardHooks(app)` + `rbac.ts`, so the `req.tenant` seam is fully built, not just stubbed. T11+T13 go live once (a) T04 merges AND (b) someone wires `configureTenantGuardHooks(app)` + `register(ticketsRoutes)` in the `api.ts` bootstrap — which is **still a stub (DEP-2, foundation)**. That bootstrap wiring is the true go-live step; I'm flagging it to Parent as the remaining integration item — **not T13 scope**, don't touch `api.ts`.
+
+**At SUBMIT I will verify:** E1–E7, the ② coherence requirement across all 4 spots, **T11 regression** (rerun its tests + spot the merged serializer/filter change), `pnpm prisma:generate && make check` + integration green on my rerun, ≥80% line coverage on changed files, route-collision test present, stats shape = ratified above. Same merge posture as T11.
+
+Proceed. 🟢
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -464,6 +494,8 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | GAP T11-#2    | `assigned_to`/`actor_name`/`actor_role` unresolvable in dev (HC `users` id-only, no name/role column). | T11 · DoD D1 + §1.2 | **RESOLVED (approach A) 2026-07-01** | Serializer `userDirectory` seam → fields serialize `null` in dev, resolve via `resolveUsers` dep in prod. One-spot change. **Follow-up**: wire `resolveUsers` when shared-DB restored / Auth RPC lands (not a T11 blocker). |
 | GAP T11-#3    | `test:unit` glob collects `*.integration.test.ts` → `make check` now needs Docker; global `test-setup.ts` harness is a stub. | T11 · `package.json:25` / TESTING §5 | **open — foundation/Slot A** (escalated PARENT §3b) | Non-blocking (self-contained testcontainers, 0 `.skip`). Fix: Slot A adds `testPathIgnorePatterns:['\\.integration\\.test\\.ts$']` to `test:unit`. |
 | GAP T11-#1    | `make check` has no `prisma-generate` prereq + `prisma-client.ts` `{}` stub → fresh-checkout CI breaks on generated-client import. | T11 | **open — foundation/Slot A** (escalated PARENT §3b) | Affects all B/C Prisma tasks. Interim: executors + PM run `pnpm prisma:generate` before gates. |
+| Q-B-03        | Stats response shape for `GET /api/tickets/stats` — unpinned in specs (§1.2/§1.11 say only "counts by status"). | T13 · MVP §1.2 B3 | **RESOLVED (provisional) 2026-07-01** | Ratified `{ data: { by_status{8}, total, overdue, high_alert_count } }`. `high_alert_count` chosen over `high_alert` to avoid collision with `by_status.high_alert` (status vs flag). Provisional on FE MSW (absent); serializer-isolated. Noted PARENT §3a. |
+| DEP-4 (go-live) | After T04 merges, `api.ts` bootstrap must wire `configureTenantGuardHooks(app)` + `register(ticketsRoutes)` for tickets routes to actually serve. `api.ts` still a stub. | T11/T13 · DEP-2 | **open — foundation** (flagged PARENT §10) | Not B-task scope. True go-live step for all B routes. |
 
 ---
 
