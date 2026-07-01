@@ -16,10 +16,10 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T13 — Ticket stats + overdue** (PLAN ACK'd w/ 1 required addition; coding `feat/tickets-stats-overdue`). T11 ✅ APPROVED + **MERGED** (PR #1). T04 ✅ APPROVED (Slot A) — runtime gate now just pending T04 merge + api.ts bootstrap wiring.
-- **Branch**: T11 merged ✓ · T13 `feat/tickets-stats-overdue` (exec-B creates on ACK)
-- **Runtime unblock watch**: T04 (RBAC, Slot A) now **wip** — once merged, `req.tenant` populated → T11 (and T13) routes go live automatically.
-- **Progress slot B**: 1/10 approved (T11). Next: T13 → then T14/T16/T19 (unblocked). T12 waits on T06 (Slot A).
+- **Active task**: **T14 — Guests CRUD + preferences** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ merged · T13 ✅ APPROVED (awaiting PO merge).
+- **Branch**: T11 merged ✓ · T13 `feat/tickets-stats-overdue` @ `3a6af90` (approved, awaiting PO merge) · T14 `feat/guests-crud` (pending)
+- **Runtime unblock**: T04 (RBAC) **MERGED to main** ✓ — `req.tenant` seam live. Only remaining go-live gate = **DEP-4** (`api.ts` bootstrap wiring, foundation).
+- **Progress slot B**: **2/10 approved (T11, T13)**. Next: T14. Fan-out window open (T14 ∥ T19; T16 coordinates Visit shape). T12 waits on T06 (Slot A).
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
 - **⚠ Verified blockers (src/ inspection 2026-07-01)**:
@@ -36,9 +36,10 @@
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
-| T13 | Ticket stats + overdue                                    | wip          | —              | PLAN ACK'd 2026-07-01 (§2) w/ 1 required addition (② is_overdue coherence: one computed predicate across serializer+filter+stats+overdue). Q-B-03 stats shape ratified (`high_alert_count` naming). Coding `feat/tickets-stats-overdue`. Merge-gated on T04 (approved, awaiting merge) + api.ts bootstrap wiring. |
+| T13 | Ticket stats + overdue                                    | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-01) — PM rerun: make check (93) + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② coherence SSOT verified across 4 sites. Code `feat/tickets-stats-overdue` @ `3a6af90` → **awaiting PO merge**. |
+| T14 | Guests CRUD + preferences                                 | assigned     | —              | ASSIGNMENT issued §2 (2026-07-01). Greenfield `guests/`. Awaiting exec-B PLAN. Q-B-04 (offset envelope) + Q-B-05 (embedded visit shape ↔ T16). |
 | T12 | Ticket status transition + reroute                        | backlog      | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
-| T14/T16/T19 | Guests / Visits / Notifications CRUD               | backlog      | —              | Unblocked (T02 ✓) — release after T13 or in parallel |
+| T16/T19 | Visits / Notifications CRUD                           | backlog      | —              | Unblocked (T02 ✓). Fan-out window open: T14 ∥ T19 safe; T16 shares Visit shape w/ T14 (Q-B-05) — sequence or lock shape. |
 | T15/T17/T18/T20 | Downstream CRM + socket                       | backlog      | —              | T15←T14; T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
@@ -430,6 +431,73 @@ Notes / open items
 
 Requesting PM B VERDICT.
 
+##### VERDICT T13 — APPROVED (attempt 1) by PM B (2026-07-01, H12)
+Verified by **my own rerun** on `feat/tickets-stats-overdue` @ `3a6af90` (checkout + `pnpm prisma:generate` + read the code).
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: lint/format/typecheck clean, **93 passed + 2 skipped** (2 skips = `_template` placeholders, not tickets).
+- `make test-integration` → **PASS**: **17 tests**, real Postgres (testcontainers).
+- **Coverage (PM rerun)** — lines **96.66%**; per file: overdue 100 / repository 100 / types 100 / serializer 100 / service 98.8 / routes 96.96 / schema 90.16. Every changed file ≥90% line ✓ E7.
+- **Drift** (src/modules/tickets): any 0 · console 0 · throw-Error 0 · default-export 0 · `.skip` 0 · forbidden imports 0. Clean.
+- **File inventory**: 12 files touched, **all** in `src/modules/tickets/`, 0 outside.
+
+**The ② coherence requirement — DONE and verified across all 4 sites:**
+- SSOT `tickets.overdue.ts`: `isOverdue(row, now)` (JS predicate) + `overdueWhere(now)` / `notOverdueWhere(now)` (Prisma WHERE, co-located). The `NOT overdueWhere` form correctly re-includes null-`slaDueAt` rows as not-overdue — JS and SQL forms equivalent.
+- Wired: (1) serializer `is_overdue: isOverdue(row, now)` `serializer.ts:61` (computed, no longer the dormant column), (2) `/overdue` filter `service.ts:65`, (3) stats overdue count `service.ts:173`, (4) T11's `?is_overdue` filter `service.ts:96-97` (`overdueWhere`/`notOverdueWhere`). 
+- The JS-predicate == Prisma-WHERE equivalence is asserted against a real DB (integration "SSOT coherence" test). **The contradiction I flagged is gone.**
+
+**DoD E1–E7 spot-verified in code:**
+- E1 ✓ stats `{by_status(8 zero-filled), total, overdue, high_alert_count}` `serializer.ts:121-134`; single `groupBy` `repository.ts:39` + 2 `count()` (never N-per-status).
+- E2 ✓ `/overdue` reuses `serializeTicketListItem`, `sla_due_at ASC`, top-N; stats `overdue` = true unbounded count (not LIMIT-capped).
+- E3 ✓ `buildScopeArms(ctx)` extracted `service.ts:43`, reused by `buildTicketWhere`/`buildOverdueWhere`/stats; super_admin bypass + N2 AuthError preserved.
+- E4 ✓ route-collision asserted `routes.test.ts:160` (`/tickets/stats` → statsHit true, not `:id`) + `/overdue` twin.
+- E5 ✓ masking/errors/logging reuse T11. E6 ✓ no cross-module import; barrel adds only response types. E7 ✓ coverage above.
+- Q-B-03 shape = ratified (`high_alert_count` distinct from `by_status.high_alert`) ✓.
+
+**T11 REGRESSION — clean.** T11's 3 test files pass after the shared serializer/filter change. Executor updated exactly 1 T11 unit assertion (column → computed predicate); T11 integration counts/orderings/masking/404s unchanged. I reran T11's suites myself — green. No behavior drift on the merged T11 endpoints beyond the intended coherence fix (which makes `?is_overdue=true` actually return overdue tickets now — a fix, not a regression).
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/tickets-stats-overdue` @ `3a6af90`. Attempt 1, zero rejects.
+- **T04 now MERGED to main** (`rbac.ts` + `tenant-guard.hooks.ts` present) — the `req.tenant` seam is live. Remaining go-live gate is **DEP-4 only**: `api.ts` bootstrap must wire `configureTenantGuardHooks(app)` + `register(ticketsRoutes)` (foundation, still a stub). Not a T13 blocker.
+- **→ PO action: merge `feat/tickets-stats-overdue` when ready.**
+- → §1 tracker updated (approved); PARENT §1 T13 → approved; roll-up PARENT §2.
+
+Another clean first pass — coherence trap closed properly with an SSOT + real-DB equality guard. **T13 closed.** Next (T14) issued below. 🟢
+
+---
+
+### ASSIGNMENT T14 — Guests CRUD + preferences — issued by PM B (Nathan) 2026-07-01 (H12)
+- Branch: `feat/guests-crud` (exec-B creates; code stays on branch, PO merges)
+- Routed from: PARENT §1 T14 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 **B4**
+- Spec authority: `docs/spec/02-hotel-core.md §1.3` (guests endpoints table + roles) + §2.3 DDL (`guests` + `guest_preferences`); envelope per **Q-B-01**; PII floor **MVP §4.5**
+- Dependency: T02 ✓ (tables exist). **New greenfield module `src/modules/guests/`** — do NOT touch `tickets`.
+
+**Scope (4 endpoints — all role `gm_admin` only; NOT dept_head)**
+- `GET /api/guests` — list + search (`q` matches `name` + `wa_phone`), **page/pageSize (offset) pagination** — ⚠ NOT cursor (§1.3 says page/pageSize; §2.7 allows offset per-endpoint). Do NOT reuse the tickets cursor codec here.
+- `GET /api/guests/:id` — profile + `preferences[]` + `visits[]` (nested arrays per §1.3).
+- `PATCH /api/guests/:id` — update profile, `privacy_mode`, VIP flag.
+- `POST /api/guests/:id/preferences` — add/update preference, **upsert by `preference_type`**.
+
+**DoD (PM B verifies at SUBMIT)**
+- [ ] G1 — `GET /guests` list + `q` search (name + wa_phone), page/pageSize pagination, envelope per Q-B-01 (confirm list wrapper: `{data, pageInfo}` vs an offset `{data, page, pageSize, total}` — **propose in PLAN → Q-B-04** if §1.3/FE MSW underpin differs; page-based lists may need a `total`).
+- [ ] G2 — `GET /guests/:id` returns profile + `preferences[]` + `visits[]`. **Visits shape coordination**: the visits module (T16) will own the canonical `Visit` serializer. Define a minimal embedded visit-summary here and **flag Q-B-05** so T14 + T16 agree on the shape (or reuse T16's serializer once it lands). Missing guest → `NotFoundError` 404.
+- [ ] G3 — `PATCH /guests/:id` updates allowed fields only (profile, `privacy_mode`, VIP flag); reject unknown/immutable fields via zod; `privacy_mode` ∈ enum. Returns updated guest.
+- [ ] G4 — `POST /guests/:id/preferences` **upserts by `preference_type`** (unique-per-guest); use a transaction if read-modify-write; return the guest's preferences.
+- [ ] G5 — **Tenant guard**: every query scoped `WHERE hotelId = ctx.hotelId` via `buildScopeArms`-style logic (reuse the pattern; guests are gm_admin-only so no dept filter, but super_admin bypass still explicit). `hotel_id` never from URL/body. Cross-tenant `:id` → 404 (reuse T03 `assertHotelOwnership`).
+- [ ] G6 — **PII masking (§4.5)** at a serializer layer: `wa_phone`/`name`/`email` masked when `privacy_mode='vvip' && ctx.role!=='gm_admin'` (super_admin counts as gm_admin). NOTE: since these endpoints are gm_admin-only, the predicate rarely fires — but implement it for correctness/defense (same helper as tickets; consider promoting the mask predicate to `@shared` if it's now duplicated — flag if so).
+- [ ] G7 — Errors via `AppError`; structured logging + correlationId; module layout per `MODULE_TEMPLATE.md` (`guests.routes/service/repository/schema/serializer/types/index`); no cross-module internal import (reading the `visits`/`tickets` *tables* via Prisma for the profile aggregation is fine — importing their *modules* is not).
+- [ ] G8 — Tests: unit (search/filter build, upsert-by-type logic, mask predicate, pagination math) + integration vs `hotel_core_dev` (seed guests + preferences + visits; assert search, upsert idempotency, tenant isolation, 404). ≥80% line coverage changed files. `make check` + `make test-integration` green.
+
+**Open questions to raise in PLAN (don't guess silently):**
+- **Q-B-04** — guests list envelope for **offset** pagination (does FE expect `{data, pageInfo}` or `{data, page, pageSize, total}`?). §2.7 is cursor-shaped; guests are page-based. Propose shape.
+- **Q-B-05** — embedded `visits[]` shape in guest detail vs the canonical `Visit` serializer that T16 will own. Coordinate to avoid divergence.
+
+**Parallelization note (per our §7 rule):** T14 is greenfield `guests/` — safe to run alongside **T19 (notifications)** in parallel (zero shared shape). **T16 (visits) shares the `Visit` shape with T14** (Q-B-05) — if you fan out, either sequence T16 first (it owns the Visit serializer) or lock the embedded-visit shape between them before both code. I'll issue T16/T19 blocks on request.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2): confirm identity, read `02-hotel-core.md §1.3` + §2.3 DDL, `make typecheck`/`make lint` clean, state scaffolder command. Then post PLAN. **No code before PM B ACK.**
+
+Awaiting exec-B PLAN for T14.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -553,6 +621,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | --- | ------------- | ----- | ----------- | ------------------ | ----------------- | ------------------------------ | ------- | ------------- | ------------------ | --------------------- |
 | H0 baseline | (no src/ touched) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | H12 (T11 SUBMIT) | src/modules/tickets/* (10 files) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (n/a read-only) | 0 |
+| H12 (T13 SUBMIT) | src/modules/tickets/* (12 files, +overdue SSOT) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (n/a read-only) | 0 |
 
 > H12 note: 2 `.skip` exist in `_template/*` (reference-module placeholders, pre-existing, out of slot-B scope) — T11 branch itself 0 `.skip`. PM verified via `grep -rn .skip src/modules/tickets` → 0.
 
