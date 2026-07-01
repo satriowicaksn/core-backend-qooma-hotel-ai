@@ -301,6 +301,57 @@ Excellent work, clean first-pass. **T11 closed.** Next assignment (T13) issued b
 
 Awaiting exec-B PLAN for T13.
 
+### ASSIGNMENT T13 — claimed by exec-B (Nathan) at H1 (2026-07-01)
+- Branch: `feat/tickets-stats-overdue` (exec-B creates on ACK; code stays on branch, PO merges)
+- Routed from: PARENT §1 T13 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 B3
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T13 — exec-B (Nathan) at H1 (2026-07-01)
+
+**Scope recap**
+Two read-only dashboard-KPI endpoints, **extending the existing `tickets` module** (no new module): `GET /api/tickets/stats` (status-count map + aggregates) and `GET /api/tickets/overdue` (over-SLA list, reusing the T11 list-item serializer). Reuse T11 scope logic, serializer, envelope, and error/logging patterns.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot B (Nathan) ✓
+- CLAUDE.md loaded ✓
+- Task spec re-read: `02-hotel-core.md §1.2` (stats/overdue rows + §1.11 dashboard refs L323-324) + §2.4 DDL (`is_overdue`/`sla_due_at` + `idx_tickets_overdue` L477) + `MVP §1.2 B3`; envelope `docs/spec/README.md §2.7/§2.3` ✓
+- Dependency: **T11 APPROVED + merged to main** ✓ (module present on `main`); T04 **APPROVED** (Slot A) — runtime `req.tenant` wiring lands when merged (same DEP-1 posture).
+- `pnpm typecheck` clean ✓ ; `pnpm lint` clean ✓ (on `main`, after `pnpm install` + `pnpm prisma:generate` already done this session).
+- Scaffolder risk: **none** (no new deps, no scaffolder; `prisma generate` already run).
+
+**Files to modify** (all within `src/modules/tickets/` — extend, don't fork)
+- `tickets.service.ts` — extract `buildScopeArms(ctx)` from `buildTicketWhere` (pure refactor; T11 tests stay green), reuse it in new `buildOverdueWhere(ctx, now)`; add `stats(ctx, now?)` + `overdue(ctx, rawQuery, now?)`.
+- `tickets.repository.ts` — add `groupCountByStatus(where)` (**single `groupBy`**), `countWhere(where)`, `findOverdue(where, take)`.
+- `tickets.serializer.ts` — add `serializeStats(...)` (zero-fill 8-status map); overdue items reuse `serializeTicketListItem`.
+- `tickets.schema.ts` — add `parseOverdueQuery` (limit clamp, reuse pattern); stats takes no query.
+- `tickets.types.ts` — add `TicketStatsWire` / `TicketStatsResponse` / `OverdueListResponse`.
+- `tickets.routes.ts` — add `GET /tickets/stats` + `GET /tickets/overdue`.
+- `index.ts` — export new response types.
+
+**Files to create**
+- `__tests__/tickets.stats.test.ts` — unit: stats aggregation shaping + zero-fill, overdue scope/order, **`/stats`-vs-`/:id` route-collision** test.
+- extend `__tests__/tickets.repository.integration.test.ts` — seed tickets across all statuses + past/future `sla_due_at`; assert group counts, overdue predicate + ordering, dept scope.
+
+**Approach**
+- **Reuse (E3)**: refactor the tenant+dept scope arms of `buildTicketWhere` into `buildScopeArms(ctx)` (keeps the explicit super_admin bypass + N2 `AuthError` on dept_head-without-deptId). `buildTicketWhere`, stats, and overdue all consume it — one scope implementation.
+- **stats (E1)**: `repo.groupCountByStatus(scopeWhere)` = one `groupBy({ by:['status'], _count })`; serializer zero-fills all 8 enum keys. `overdue` + `high_alert` totals = two cheap `count()` aggregates (3 queries total, **never N-per-status**). `total` = sum of the groupBy.
+- **overdue predicate (my intent — confirm)**: `sla_due_at IS NOT NULL AND sla_due_at < :now AND status NOT IN ('closed','cancelled')` — computed, robust even though the `is_overdue` denormalized flag's worker isn't in the MVP. Same predicate drives both the `/overdue` list and the stats `overdue` count (consistency). `now` is injected (service arg, defaults to `new Date()`) for deterministic tests.
+- **overdue list (E2)**: **bounded top-N** — `limit` (default 20, max 100), `ORDER BY sla_due_at ASC` (oldest breach first), reuse `serializeTicketListItem`. Envelope `{ data, pageInfo: { nextCursor: null, hasMore } }` (`hasMore` = truncated at limit). Chosen over cursor because it's a dashboard card; **if FE MSW expects cursor pagination I'll generalize the T11 codec to a `sla_due_at` keyset** — flagging, not guessing.
+- **route collision (E4)**: register `/tickets/stats` + `/tickets/overdue` as static routes; Fastify's radix router matches static-before-param, but I'll **assert** it (a `/tickets/stats` request hits the stats handler, not `/:id`→400-uuid) in the route test.
+- **carry-forward**: consume T03 `TenantContext`; masking/logging/error patterns identical to T11; still merge-gated on T04 preHandler + `make prisma-generate`-before-CI (GAP T11-#1). Buildable + fully testable now by injecting `ctx`.
+
+**GAP / open question**
+- **Q-B-03 (contract) — stats response shape.** `02-hotel-core.md §1.2` only says "Counts by status (dashboard KPI)"; no JSON is pinned (confirmed: 0 shape hits across `docs/spec/*`). Source of truth = FE MSW (`src/mocks/handlers/tickets.handlers.ts`, separate repo, absent). **Proposing** (single-object `{ data }` per ratified Q-B-01):
+  ```json
+  { "data": {
+      "by_status": { "open": 0, "in_progress": 0, "awaiting_late_reason": 0,
+        "done_pending": 0, "closed": 0, "high_alert": 0, "escalated": 0, "cancelled": 0 },
+      "total": 0, "overdue": 0, "high_alert": 0 } }
+  ```
+  Note the deliberate distinction: `by_status.high_alert` = tickets whose **status** is `high_alert`; top-level `high_alert` = tickets with the **`is_high_alert` flag** true (different concept). If that dual naming risks FE confusion, I'll rename the top-level flag count to `high_alert_flagged` — PM's call. **Until ACK**: build against this proposal; do not guess further.
+
+Awaiting PM B ACK (PLAN + Q-B-03 shape + overdue-predicate/top-N decisions). Not coding before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
