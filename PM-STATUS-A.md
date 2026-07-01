@@ -321,6 +321,36 @@ Rebuttal welcome jika exec-A yakin ada Option (c) lebih tepat — sertakan di PL
 
 Awaiting **PLAN T04** dari exec-A.
 
+#### NUDGE T04 — PM A (Nanak) at H0 2026-07-01 · post-ASSIGNMENT delta from Slot B activity (commits `3f682df` → `04bf313`)
+
+> Nathan pushed 3 updates between my ASSIGNMENT commit and now. Read this before writing PLAN — 3 things changed.
+
+**Delta 1 — Q-B-02 already RESOLVED by PM B (effectively Option b)**
+- Nathan declared `TenantContext` (di `src/plugins/tenant-guard.ts:22`) sebagai **Slot-A-owned canonical**. PARENT §3c marked resolved. B/C consume it via `@plugins/tenant-guard`.
+- **Consequence for T04**: skip the Option (a) vs (b) decision in your PLAN — Q-B-02 is settled. Just consume `TenantContext` as-is; do NOT canonicalize to `shared/types/` (would force B to re-import + regen tests he already wrote).
+- If exec-A rebuts (e.g. still believes canonical location should be `shared/types/`), sertakan justification di PLAN + PM A akan re-check dengan PM B via PARENT §10 sebelum ACK. Default: leave path as `src/plugins/tenant-guard.ts`.
+
+**Delta 2 — preHandler runtime wiring: T04 scope question (WAJIB address di PLAN)**
+- PARENT §10 (updated post-Q-B-02 resolve) now says T11 merge gate = "**T04 must wire the `req.tenant` preHandler (runtime population)** — until then B routes build + test but do not merge live". This subtly expands T04 beyond original "RBAC middleware" (spec §6 role-check only).
+- Reality check: JWT plugin doesn't exist yet → `req.user` will be `undefined` at runtime → preHandler `deriveTenantContext(req.user)` throws `AuthError`. So a wired preHandler is effectively dormant sampai JWT plugin lands.
+- Exec-A pilih di PLAN:
+  - **Option A (bundle — PREFERRED jika < 20 LOC delta)**: T04 ships (1) `requireRole` guard fn + (2) `src/plugins/tenant-guard.plugin.ts` Fastify preHandler yang attach `req.tenant = deriveTenantContext(req.user)`, ready to register di `api.ts` (tapi tidak wajib register sekarang since api.ts stub). Includes 1 integration-style Fastify test yang inject mock `req.user` via decorator. **Efek**: Nathan's T11 merge gate satisfied — B tinggal register both JWT plugin (future) + this preHandler; preHandler file exists as "shelf-ready".
+  - **Option B (defer to T04b)**: T04 pure-fn RBAC only per original scope. PM A open T04b (preHandler wiring) sebagai follow-up task, escalate ke Parent PM untuk sequence sebelum Nathan needs merge. Use jika Option A punya hidden complexity (mis. Fastify decorator ordering, JWT-plugin coupling yang tidak obvious).
+- Rekomendasi kalau ragu: **Option A**. Cheap to bundle, unblocks slot B faster, no cross-task coordination overhead. Kalau exec-A implement dan ternyata cost > 40 LOC atau butuh JWT plugin coupling → switch ke Option B mid-PLAN + document reason.
+
+**Delta 3 — GAP-T11-1 (prisma-generate ⇄ `make check` CI gap) escalated to Slot A**
+- Nathan raised PARENT §3b + §10: `make check` (Makefile:148) lacks `prisma-generate` prereq + `src/core/prisma/prisma-client.ts:29` is `{}` stub. Once B/C imports generated `PrismaClient`, CI typecheck breaks on fresh checkout.
+- **Out of T04 scope.** PM A will open separate follow-up task (working title: T-INFRA-PRISMA-CI, likely inserts before T05 seed) — Parent PM to slot officially. Do NOT bundle into T04 SUBMIT. Exec-A: JANGAN edit `Makefile` atau `prisma-client.ts` di PR T04.
+- If exec-A observes symptom while running `make check` for T04, note in SUBMIT tapi tidak fix.
+
+**Unchanged HARD constraints (recap — semua di ASSIGNMENT tetap berlaku)**
+- Pure fn RBAC (no Prisma mock, no T05 seed coupling)
+- `AppError` subclass only (`ForbiddenError` / `AuthError` / `NotFoundError` per T03 mask rule)
+- No new deps, no `any` / `console.log` / `throw new Error(` / default export
+- ≥ 80% unit coverage; `make check` green
+
+Proceed to PLAN T04. Address Delta 2 explicitly (Option A vs B + rationale). Delta 1 + Delta 3 need only 1-line acknowledgment each in PLAN.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
