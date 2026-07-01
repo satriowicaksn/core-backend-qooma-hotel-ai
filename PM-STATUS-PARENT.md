@@ -15,7 +15,7 @@
 - **Day**: H12+ (post-Auth bootstrap; Hotel Core handover landed 2026-06-29)
 - **Phase**: Bootstrap / pre-T01 — authoritative spec live di [`docs/spec/MVP-HOTEL-CORE-FIRST.md`](./docs/spec/MVP-HOTEL-CORE-FIRST.md) (Slice 2 of 3 backend MVP slices)
 - **Active gate**: G1 — Boilerplate + Prisma schema ready (kriteria default `PM-AGENT.md §5`; PO konfirmasi)
-- **Active devs**: A (Nathan) · B (Nanak) · C (Satrio) — semua belum claim task
+- **Active devs**: Nanak covering slot A (T01–T03 unblocker chain) + slot B eventually. Nathan + Satrio not yet onboard — Nanak drives foundation until they join.
 - **Progress (global)**: 0 / 30 task assigned (T01–T03 + T11 + T21 active per below; T04–T10, T12–T20, T22–T30 backlog — Parent PM release per gate)
 - **Reading order untuk fresh dev**: `KICKOFF.md` → `docs/SERVICE-CHARTER.md` → `docs/spec/MVP-HOTEL-CORE-FIRST.md` → `docs/spec/02-hotel-core.md` (full DDL + RBAC) → `docs/spec/data-model.md` → `docs/spec/open-questions.md` → claim task di §8 / §1a
 
@@ -31,9 +31,9 @@
 
 | T## | Title                                                                            | Slot | Owner   | Status   | Verified by | Notes                                              |
 | --- | -------------------------------------------------------------------------------- | ---- | ------- | -------- | ----------- | -------------------------------------------------- |
-| T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nathan  | assigned | —           | Foundation critical path — start here              |
-| T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nathan  | assigned | —           | ⚠ Blocks B (T11+) and C (T21+) implementation     |
-| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nathan  | assigned | —           | After T02                                          |
+| T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nanak (covering) | approved | PM A (Nanak covering) | Fixed via env upgrade (Node 20+pnpm 9), ts-node@10 dep, tsconfig ts-node override — see PM-STATUS-A.md §2 |
+| T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nanak (covering) | assigned | —           | Nanak covers; still blocks other impl until done   |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nanak (covering) | assigned | —           | After T02; Nanak covers                            |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nathan  | backlog  | —           | After T03                                          |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)            | A    | Nathan  | backlog  | —           | After T04                                          |
 | T06 | Ticket state-machine helper + unit-test the transition table                     | A    | Nathan  | backlog  | —           | Parallel-friendly after T01                        |
@@ -108,7 +108,7 @@
 > [YYYY-MM-DD H{N}] [PM <SLOT> <NAME>] <T## status — 1 liner>
 > ```
 
-_(kosong — belum ada activity)_
+[2026-07-01 H0] [PM A Nanak covering] T01 boilerplate `make check` APPROVED (attempt 1) — env upgraded Node 20/pnpm 9, ts-node@10 added, tsconfig ts-node override for jest config parser. All 4 gates green.
 
 <!-- TEMPLATE:
 [2026-06-25 H3] [PM A Nathan] T01 boilerplate scaffold APPROVED (attempt 2) — make check green, 0 drift hits.
@@ -149,6 +149,7 @@ _(kosong — belum ada activity)_
 | Tanggal    | Doc / lokasi                                                       | Perubahan singkat                                                                                 | Driver task    | Disetujui oleh |
 | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | -------------- | -------------- |
 | 2026-06-12 | docker-compose.yml, .env.example, README.md, .claude/settings.json | Shift host port Postgres 5432→5433 & Redis 6379→6380 untuk hindari bentrok dengan service lokal | (pre-T01 fix)  | PO             |
+| 2026-07-01 | PARENT §1 T01–T03 Owner column                                     | Temporary reassign Nathan→Nanak (foundation unblocker chain — Nathan+Satrio not yet onboard, verbal consent from all devs) | T01, T02, T03  | Parent PM (solo Nanak) |
 | —          | —                                                                  | —                                                                                                 | —              | —              |
 
 ---

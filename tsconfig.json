@@ -41,5 +41,12 @@
     "tsBuildInfoFile": ".tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.integration.test.ts"]
+  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.integration.test.ts"],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "Node",
+      "verbatimModuleSyntax": false
+    }
+  }
 }

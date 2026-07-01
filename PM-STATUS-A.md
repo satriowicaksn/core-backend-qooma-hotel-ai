@@ -24,9 +24,11 @@
 
 > Mirror dari `PM-STATUS-PARENT.md §1` di mana Slot=A. PM A update status row di sini + push status update ke PARENT §1 setelah verdict.
 
-| T## | Title                              | Status   | Verified by PM | Notes                                 |
-| --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| —   | (belum ada task aktif)             | —        | —              | Tunggu Parent PM assign               |
+| T## | Title                                                        | Status   | Verified by PM       | Notes                                 |
+| --- | ------------------------------------------------------------ | -------- | -------------------- | ------------------------------------- |
+| T01 | `make check` green dari boilerplate (lint+format+typecheck+test) | approved | PM A (Nanak covering) | Nanak covering slot A per PARENT §4 (2026-07-01); env fix + ts-node + tsconfig ts-node override |
+| T02 | Prisma schema initial migration (13 HC tables + indexes)     | assigned | —                    | Next up, Nanak covering              |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | backlog  | —                    | After T02, Nanak covering            |
 
 ---
 
@@ -34,7 +36,71 @@
 
 > **Executor A** append `ASSIGNMENT` block saat claim task. **PM A** append `ACK` / `VERDICT` sub-block di bawah block executor — JANGAN edit block lama.
 
-_(kosong — belum ada assignment)_
+### ASSIGNMENT T01 — claimed by exec-A (Nanak covering) at H0 2026-07-01
+- Branch: feat/foundation-boilerplate-check
+- Routed from: PM-STATUS-PARENT.md §1 T01 (Parent PM assigned; Nanak covering per §4 deviation 2026-07-01 — Nathan not yet onboard)
+
+#### PLAN T01 — exec-A (Nanak covering) at H0 2026-07-01
+
+**Scope recap**
+- Verify `make check` (lint + format-check + typecheck + unit test) hijau dari boilerplate current state.
+- Env prerequisite (Node 20 + pnpm 9) di-fix dulu di terminal (via nvm + corepack).
+
+**Approach**
+1. Local env: `nvm install 20 && nvm use 20 && corepack enable && corepack prepare pnpm@9 --activate`
+2. Fresh install: `rm -rf node_modules && pnpm install`
+3. Diagnose `make check` failures.
+4. Fix minimal.
+5. Rerun sampai green.
+
+**Files modified**
+- `package.json` — add devDependency `ts-node@10.9.2` (required for jest to parse jest.config.ts)
+- `pnpm-lock.yaml` — auto-updated by pnpm add
+- `tsconfig.json` — add `ts-node.compilerOptions` override (module: CommonJS, verbatimModuleSyntax: false, moduleResolution: Node) so ts-node can parse jest.config.ts without conflicting with strict ESM settings used for src/ build
+
+**GAPs / questions**: none
+
+#### SUBMIT T01 — exec-A (Nanak covering) at H0 2026-07-01 (attempt 1)
+
+Task: `make check` green dari boilerplate
+Files changed: 3
+  - package.json (add ts-node@10)
+  - pnpm-lock.yaml (auto)
+  - tsconfig.json (add ts-node override block)
+
+DoD self-check
+- [x] `make check` PASS — verified in terminal
+- [x] All 4 sub-commands green: lint, format:check, typecheck, test:unit (2 tests skipped in _template — intentional placeholder)
+- [x] No src/ changes (verification-only task per T01 scope)
+
+Quality gate
+- `pnpm lint`: PASS (only harmless @typescript-eslint TS-version warning — non-blocking, will resolve when eslint bumps supported range)
+- `pnpm format:check`: PASS
+- `pnpm typecheck`: PASS
+- `pnpm test:unit`: PASS (2 skipped in _template)
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4)
+- `any` types: 0 hits di src/
+- console.log: 0 hits di src/
+- `throw new Error(`: 0 hits di src/modules/core
+- forbidden imports (express/typeorm/moment/node-fetch): 0 hits
+- default export di luar entrypoints/config: 0 hits
+- `.skip` di test: 2 hits di `_template/__tests__/` (intentional placeholder, tidak dihitung drift per template convention — will be replaced when new modules copy from _template)
+
+Notes
+- ts-node@10 added as devDependency (approved by Parent PM = Nanak solo drive; noted for Nathan handoff).
+- tsconfig.json ts-node override affects ONLY ts-node runtime (jest config parsing). Actual `tsc --noEmit` build uses main compilerOptions unchanged.
+
+##### PM A ACK — T01 PLAN APPROVED (H0) by PM A (Nanak covering)
+- Approach reasonable (fix env + minimal boilerplate patch). Proceed.
+
+##### VERDICT T01 — APPROVED (H0, attempt 1) by PM A (Nanak covering)
+- All DoD verified ✓
+- Drift scans clean ✓ (`.skip` in _template noted as boilerplate-intentional)
+- `make check` PASS confirmed
+- → §1 task tracker updated: T01 approved
+- → Row mirrored to PARENT §1
+- → Short roll-up posted to PARENT §2
 
 <!--
 TEMPLATE — copy untuk task baru:
