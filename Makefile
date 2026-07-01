@@ -145,7 +145,7 @@ test-coverage: ## Test + coverage report
 	pnpm test:coverage
 
 # Kombinasi: gate sebelum commit (lint + format + typecheck + unit test)
-check: lint format-check typecheck test-unit ## Lint + format-check + typecheck + unit test
+check: prisma-generate lint format-check typecheck test-unit ## Prisma-generate + lint + format-check + typecheck + unit test
 
 # ----------------------------------------------------------------------------
 # Pre-commit & commit
