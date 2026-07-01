@@ -33,8 +33,8 @@
 | --- | -------------------------------------------------------------------------------- | ---- | ------- | -------- | ----------- | -------------------------------------------------- |
 | T01 | `make check` green dari boilerplate (lint + typecheck + format)                  | A    | Nanak   | approved | PM A (Nanak) | Fixed via env upgrade (Node 20+pnpm 9), ts-node@10 dep, tsconfig ts-node override — see PM-STATUS-A.md §2 |
 | T02 | Prisma schema initial migration (13 HC tables + indexes per §2 DDL)              | A    | Nanak   | approved | PM A (Nanak) | Applied via 2 migrations (init + CHECK/partial-idx). DEV deviation: fresh `hotel_core_dev` DB (Opsi C) instead of shared `app` DB — see §4. UNBLOCKS T04–T30 impl (except tier-gated T26/T30 pending shared-DB restore) |
-| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nanak   | assigned | —           | After T02; permanent slot A owner per §4 2026-07-01 |
-| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nanak   | backlog  | —           | After T03                                          |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere)                     | A    | Nanak   | approved | PM A (Nanak) | 3 files: tenant-guard.ts pure fns + .types.ts req.tenant augmentation + test 14 pass. Wire as preHandler hook when JWT auth lands (T04+). Bonus: jest config alias+.js fix. |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access)                  | A    | Nanak   | assigned  | —           | After T03                                          |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)            | A    | Nanak   | backlog  | —           | After T04                                          |
 | T06 | Ticket state-machine helper + unit-test the transition table                     | A    | Nanak   | backlog  | —           | Parallel-friendly after T01                        |
 | T07 | Common error handlers (HC-specific codes per spec §7)                            | A    | Nanak   | backlog  | —           | After T01                                          |
@@ -109,6 +109,7 @@
 > ```
 
 [2026-07-01 H12] [PM B Nathan] Online. Last approved: none (slot B first activity). Active: T11 ASSIGNMENT issued (tickets list+detail), awaiting exec-B PLAN. Next-up: T12–T20. Open Qs: 2 (Q-B-01 contract envelope escalated §3a; Q-B-02 session-context shape §3c). ⚠ T11 merge-blocked on Slot A T03/T04 seam — see PARENT §10.
+[2026-07-01 H0] [PM A Nanak] T03 tenant-guard APPROVED (attempt 1) — 3 files (tenant-guard.ts + .types.ts + test 14 pass) + bonus jest config alias+.js fix. Pure fn approach; wire as Fastify preHandler when JWT plugin lands. ⚠ Nathan flag T11 merge-blocked on this + T04 (see §10) — plan T04 next.
 [2026-07-01 H0] [PM A Nanak covering] T02 Prisma init migration APPROVED (attempt 1) — 18 HC tables + 19 CHECK + 11 partial/GIN indexes applied. DEV Opsi C deviation (fresh `hotel_core_dev` DB) logged in §4. UNBLOCKS T03–T30 impl chain (except T26/T30 tier-gated features pending Opsi A restore).
 [2026-07-01 H0] [PM A Nanak covering] T01 boilerplate `make check` APPROVED (attempt 1) — env upgraded Node 20/pnpm 9, ts-node@10 added, tsconfig ts-node override for jest config parser. All 4 gates green.
 

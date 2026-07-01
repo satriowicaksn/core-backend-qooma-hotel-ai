@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T03 (tenant-guard middleware) — next to start
+- **Active task**: T04 (RBAC middleware) — next to start
 - **Branch**: main (solo drive; feature branch discipline resumes when Nathan onboards to slot B and Satrio joins)
-- **Completed today**: T01, T02
+- **Completed today**: T01, T02, T03
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 (next) · T04–T10 backlog
+- **My queue (T01–T10)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 (next) · T05–T10 backlog
 
 ---
 
@@ -30,8 +30,8 @@
 | --- | ------------------------------------------------------------ | -------- | -------------------- | ------------------------------------- |
 | T01 | `make check` green dari boilerplate (lint+format+typecheck+test) | approved | PM A (Nanak) | env fix + ts-node + tsconfig ts-node override |
 | T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
-| T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | assigned | —            | Next up. Permanent slot owner — see PARENT §4 2026-07-01 slot swap |
-| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) | backlog | —            | After T03 |
+| T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
+| T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) | assigned | —            | Next up. Will consume tenant-guard's TenantContext + SessionUser types. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
 | T06 | Ticket state-machine helper + unit-test the transition table | backlog | —              | Parallel-friendly after T01 |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
@@ -174,6 +174,77 @@ Notes / deviations
 - → §1 task tracker updated: T02 approved
 - → Row mirrored to PARENT §1 (status approved)
 - → T03 (tenant-guard) moves from `backlog` → `assigned`
+- → Short roll-up posted to PARENT §2
+
+### ASSIGNMENT T03 — claimed by exec-A (Nanak) at H0 2026-07-01
+- Branch: main (solo drive)
+- Routed from: PM-STATUS-PARENT.md §1 T03 (Nanak permanent slot A owner per §4 2026-07-01 slot swap)
+
+#### PLAN T03 — exec-A (Nanak) at H0 2026-07-01
+
+**Scope recap**
+- Tenant-guard middleware per spec §6 (RBAC & tenant guard summary) + §7 (cross-tenant enumeration masked as 404).
+- Approach: pure functions (not yet Fastify plugin) since api.ts entrypoint is stub — will wire as preHandler hook when JWT auth plugin lands (T04+).
+
+**Approach**
+- 3 files: `tenant-guard.ts` (deriveTenantContext + assertHotelOwnership + assertDeptOwnership) + `tenant-guard.types.ts` (Fastify req.tenant augmentation) + unit test.
+- Uses existing `AuthError` and `NotFoundError` from `@core/errors/app-errors`.
+- Cross-tenant / cross-dept violations mask 403 → 404 per spec §7 (prevent enumeration).
+
+**Files created**
+- `src/plugins/tenant-guard.ts` — 3 exported functions + 3 exported types (86 lines)
+- `src/plugins/tenant-guard.types.ts` — Fastify FastifyRequest augmentation (18 lines)
+- `src/plugins/__tests__/tenant-guard.test.ts` — 14 unit tests (94 lines)
+
+**Files modified**
+- `jest.config.ts` — moduleNameMapper: add `.js` extension handling for alias paths (`@core/`, `@modules/`, `@plugins/`, `@shared/`). Bonus fix; unblocks future alias+.js imports in tests (previously only relative-path+.js was handled). Discovered when tenant-guard.test.ts failed to resolve `@core/errors/app-errors.js`.
+
+**GAPs / questions**: none
+
+#### SUBMIT T03 — exec-A (Nanak) at H0 2026-07-01 (attempt 1)
+
+Task: Tenant-guard middleware (pure functions)
+Files changed: 4
+  - src/plugins/tenant-guard.ts (new)
+  - src/plugins/tenant-guard.types.ts (new)
+  - src/plugins/__tests__/tenant-guard.test.ts (new)
+  - jest.config.ts (modified — alias+.js fix)
+
+DoD self-check
+- [x] `hotel_id` extraction from session — via `deriveTenantContext(user)`
+- [x] Super-admin bypass — `tenant.isSuperAdmin` flag + short-circuits in assert fns
+- [x] dept_head scoping — `assertDeptOwnership` allows only own-dept access
+- [x] Cross-tenant → 404 mask (spec §7) — `NotFoundError` on hotel_id mismatch
+- [x] Cross-dept → 404 mask (spec §7) — `NotFoundError` on dept_id mismatch for dept_head
+- [x] Unit tests cover all branches (14 tests, all pass)
+
+Quality gate
+- `make check`: PASS (lint + format + typecheck + test:unit 14 pass + 2 skipped in _template)
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4)
+- `any` types: 0 hits in new files
+- console.log: 0 hits
+- `throw new Error(`: 0 hits — uses AppError subclasses (AuthError, NotFoundError)
+- forbidden imports: 0 hits
+- default export: 0 hits (all named exports)
+- `.skip` in test: 0 hits (14 real tests)
+
+Notes
+- Not yet a Fastify plugin — will wire as preHandler hook after JWT auth plugin lands (T04+).
+- SessionUser type is HC's opinion of JWT payload shape; when JWT plugin is added, may need coordination with Auth service repo. If mismatch discovered, adjust here (low risk — no downstream consumers yet).
+
+##### PM A ACK — T03 PLAN APPROVED (H0) by PM A (Nanak)
+- Approach solid. Pure fn approach + defer plugin wiring to T04 is pragmatic given api.ts still stub.
+
+##### VERDICT T03 — APPROVED (H0, attempt 1) by PM A (Nanak)
+- All DoD verified ✓
+- 14/14 unit tests pass ✓
+- Drift scans clean ✓
+- `make check` PASS ✓
+- Bonus jest config fix improves DX for future alias+.js imports
+- → §1 task tracker updated: T03 approved
+- → Row mirrored to PARENT §1
+- → T04 (RBAC middleware) moves from `backlog` → `assigned`
 - → Short roll-up posted to PARENT §2
 
 <!--
