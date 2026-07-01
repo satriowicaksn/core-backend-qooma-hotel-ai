@@ -12,8 +12,8 @@
 
 | Slot | Nama   | Owns (default domain — PO bisa override)                                                                          |
 | ---- | ------ | ----------------------------------------------------------------------------------------------------------------- |
-| A    | Nathan | **Foundation** — Prisma schema + migrations, tenant-guard + RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload, CSV import utility, workers harness |
-| B    | Nanak  | **Core CRM** — tickets (state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual), notifications, socket emitters |
+| A    | Nanak | **Foundation** — Prisma schema + migrations, tenant-guard + RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload, CSV import utility, workers harness |
+| B    | Nathan  | **Core CRM** — tickets (state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual), notifications, socket emitters |
 | C    | Satrio | **Settings + Analytics** — departments, menu (+ CSV + bulk), knowledge (+ import), WA templates lifecycle (incl. Meta-callback ingest), feature flags (tier-gated), billing (quota meter + invoices + upgrade + daily brief), settings/agents, settings/voice groundwork, all 8 analytics endpoints |
 
 > **H12 2026-06-29 change**: Satrio's bucket no longer includes "integrations config CRUD" — that moved to Integration repo (`integration-backend-qooma-hotel-ai`). Satrio retains Meta-callback ingest for WA templates because `wa_templates` table stays HC-owned. See `docs/SERVICE-CHARTER.md` §3.
@@ -39,8 +39,8 @@ Plus **satu session shared** (boleh di mesin siapa saja, biasanya PO/Tech-lead):
 | File                       | Siapa nulis                              | Isi                                                                  |
 | -------------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
 | `PM-STATUS-PARENT.md`      | Parent PM (utama) + PM A/B/C (short report) | Cross-dev roll-up: task tracker global, gate, open Qs, deviations, daily standup roll-up |
-| `PM-STATUS-A.md`           | PM A (Nathan) + Executor A (assignment/PLAN/SUBMIT) | Per-dev assignments lengkap (ASSIGNMENT → PLAN → CHECKPOINT → SUBMIT → VERDICT) untuk Nathan |
-| `PM-STATUS-B.md`           | PM B (Nanak) + Executor B  | Sama, untuk Nanak                                                    |
+| `PM-STATUS-A.md`           | PM A (Nanak) + Executor A (assignment/PLAN/SUBMIT) | Per-dev assignments lengkap (ASSIGNMENT → PLAN → CHECKPOINT → SUBMIT → VERDICT) untuk Nanak |
+| `PM-STATUS-B.md`           | PM B (Nathan) + Executor B  | Sama, untuk Nathan                                                    |
 | `PM-STATUS-C.md`           | PM C (Satrio) + Executor C | Sama, untuk Satrio                                                   |
 | `CLAUDE.md`                | Planning (PO approval)                   | Code rulebook — auto-loaded                                          |
 | `PM-AGENT.md`              | Planning (PO approval)                   | PM role spec (untuk Parent PM + PM A/B/C)                            |
@@ -78,13 +78,13 @@ Setiap session (PM atau Executor) **WAJIB** sebut identitas di response pertama:
 
 ```
 Role: PM | Executor
-Slot: A | B | C   (Nathan | Nanak | Satrio)
+Slot: A | B | C   (Nanak | Nathan | Satrio)
 Reading: PM-STATUS-{A|B|C}.md + PM-STATUS-PARENT.md (PM) / PM-STATUS-{A|B|C}.md only (Executor)
 ```
 
 **Bila user (PO / dev) belum sebut slot identitas di prompt awal — STOP, tanya dulu**:
 
-> "Sebelum mulai: ini Dev slot mana ya — A (Nathan), B (Nanak), atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
+> "Sebelum mulai: ini Dev slot mana ya — A (Nanak), B (Nathan), atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
 
 JANGAN tebak slot dari context lain. JANGAN mulai baca file atau write apapun sampai slot konfirmed.
 
@@ -139,7 +139,7 @@ Confirm bootstrap done + 3-bullet summary of current backend phase
 ```
 You are the PARENT PM Agent for Qooma Backend.
 
-You coordinate 3 sub-PMs (PM A = Nathan, PM B = Nanak, PM C = Satrio).
+You coordinate 3 sub-PMs (PM A = Nanak, PM B = Nathan, PM C = Satrio).
 You do NOT validate executor SUBMITs directly — that's the per-dev PM's job.
 You consolidate, set priorities, escalate to PO, manage gates.
 
@@ -195,7 +195,7 @@ status report.
 
 ## 7. PROMPT B — PM Agent (per dev, paste ke fresh PM session)
 
-**Replace `<SLOT>` (A|B|C) and `<NAME>` (Nathan|Nanak|Satrio)**:
+**Replace `<SLOT>` (A|B|C) and `<NAME>` (Nanak|Nathan|Satrio)**:
 
 ```
 You are PM Agent for Qooma Backend, slot <SLOT> (<NAME>).
@@ -208,7 +208,7 @@ Identity confirmation (WAJIB di response pertama):
 "Role: PM. Slot: <SLOT> (<NAME>). Reading: PM-STATUS-<SLOT>.md + PM-STATUS-PARENT.md."
 
 Bila user belum sebut slot — STOP, tanya:
-"Sebelum mulai: ini PM untuk Dev slot mana — A (Nathan), B (Nanak),
+"Sebelum mulai: ini PM untuk Dev slot mana — A (Nanak), B (Nathan),
  atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
 
 Bootstrap on session start:
@@ -253,7 +253,7 @@ Parent PM assignment.
 
 ## 8. PROMPT C — Executor Agent (per dev, paste ke fresh executor session)
 
-**Replace `<SLOT>` (A|B|C) and `<NAME>` (Nathan|Nanak|Satrio)**:
+**Replace `<SLOT>` (A|B|C) and `<NAME>` (Nanak|Nathan|Satrio)**:
 
 ```
 You are Executor Agent for Qooma Backend, slot <SLOT> (<NAME>).
@@ -265,7 +265,7 @@ Identity confirmation (WAJIB di response pertama):
 "Role: Executor. Slot: <SLOT> (<NAME>). Reading: PM-STATUS-<SLOT>.md."
 
 Bila user belum sebut slot — STOP, tanya:
-"Sebelum mulai: ini Executor untuk Dev slot mana — A (Nathan), B (Nanak),
+"Sebelum mulai: ini Executor untuk Dev slot mana — A (Nanak), B (Nathan),
  atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
 
 Bootstrap on session start:

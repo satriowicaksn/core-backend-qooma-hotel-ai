@@ -12,7 +12,7 @@
 
 | Dokumen | Untuk siapa | Isi |
 |---|---|---|
-| **[KICKOFF.md](./KICKOFF.md)** | Onboarding tim | Master kickoff prompt — 3 dev paralel (Nathan/Nanak/Satrio), 3 agent per dev (Planning/PM/Executor), Parent PM cross-coordinator, identity check rule, PROMPT A/B/C copy-paste |
+| **[KICKOFF.md](./KICKOFF.md)** | Onboarding tim | Master kickoff prompt — 3 dev paralel (Nanak/Nathan/Satrio), 3 agent per dev (Planning/PM/Executor), Parent PM cross-coordinator, identity check rule, PROMPT A/B/C copy-paste |
 | **[CLAUDE.md](./CLAUDE.md)** | AI agent + developer | Aturan coding, struktur, pattern (Hexagonal Disiplin), security guard, anti-patterns |
 | **[PM-AGENT.md](./PM-AGENT.md)** | Parent PM + PM A/B/C | Role spec PM — validation procedure, drift scans, roll-up protocol, escalation |
 | **[EXECUTOR-PROTOCOL.md](./EXECUTOR-PROTOCOL.md)** | Executor A/B/C | Workflow rulebook — session bootstrap, PLAN/SUBMIT format, self-validate, block protocol |
@@ -30,8 +30,8 @@
 
 | Slot | Nama   | PM file (per-dev)                | Default domain                                    |
 | ---- | ------ | -------------------------------- | ------------------------------------------------- |
-| A    | Nathan | [PM-STATUS-A.md](./PM-STATUS-A.md) | Foundation / shared infra (core, plugins, ADR)    |
-| B    | Nanak  | [PM-STATUS-B.md](./PM-STATUS-B.md) | Business modules batch 1 (auth, hotel-core)        |
+| A    | Nanak | [PM-STATUS-A.md](./PM-STATUS-A.md) | Foundation / shared infra (core, plugins, ADR)    |
+| B    | Nathan  | [PM-STATUS-B.md](./PM-STATUS-B.md) | Business modules batch 1 (auth, hotel-core)        |
 | C    | Satrio | [PM-STATUS-C.md](./PM-STATUS-C.md) | Business modules batch 2 + integration channels    |
 
 Cross-dev roll-up & gates: **[PM-STATUS-PARENT.md](./PM-STATUS-PARENT.md)** (Parent PM authority).
@@ -46,8 +46,8 @@ Onboard via **[KICKOFF.md](./KICKOFF.md)** — di sana ada PROMPT A (Planning), 
 
 | Slot | Dev    | Active task | Status   | Last approved | Branch |
 | ---- | ------ | ----------- | -------- | ------------- | ------ |
-| A    | Nathan | —           | idle     | —             | —      |
-| B    | Nanak  | —           | idle     | —             | —      |
+| A    | Nanak | —           | idle     | —             | —      |
+| B    | Nathan  | —           | idle     | —             | —      |
 | C    | Satrio | —           | idle     | —             | —      |
 
 **Gates** (target H per PO, criteria default `PM-AGENT.md §5`):
@@ -169,7 +169,7 @@ Detail: [docs/SECURITY.md](./docs/SECURITY.md).
 ### Bila kamu Claude Code session baru
 
 1. Baca **[KICKOFF.md](./KICKOFF.md)** dulu — di sana ada PROMPT untuk Planning / Parent PM / sub-PM / Executor sesuai role.
-2. Di response pertama kamu **WAJIB** confirm identitas: `Role: PM | Executor | Parent PM | Planning` + `Slot: A (Nathan) | B (Nanak) | C (Satrio)`. Bila user belum sebut slot — STOP, tanya dulu.
+2. Di response pertama kamu **WAJIB** confirm identitas: `Role: PM | Executor | Parent PM | Planning` + `Slot: A (Nanak) | B (Nathan) | C (Satrio)`. Bila user belum sebut slot — STOP, tanya dulu.
 3. Baca file PM-STATUS yang sesuai slot kamu (PM A → PM-STATUS-A.md + PM-STATUS-PARENT.md; Executor A → PM-STATUS-A.md only; dst).
 4. Baca [CLAUDE.md](./CLAUDE.md) untuk code rules.
 5. Follow work loop di [EXECUTOR-PROTOCOL.md §4](./EXECUTOR-PROTOCOL.md) (executor) atau [PM-AGENT.md §3](./PM-AGENT.md) (PM).

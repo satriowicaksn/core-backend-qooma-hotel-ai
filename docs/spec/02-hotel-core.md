@@ -856,14 +856,14 @@ See `shared/open-questions.md`. Hotel Core-relevant:
 
 ---
 
-## 9. Slot routing (3 devs — Nathan / Nanak / Satrio)
+## 9. Slot routing (3 devs — Nanak / Nathan / Satrio)
 
 Matches `core-backend-qooma-hotel-ai/KICKOFF.md §1` post-H12 update.
 
 | Slot       | Owner   | Scope                                                                                                                                |
 | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A (Nathan) | Nathan  | **Foundation** — Prisma schema + initial migration, tenant-guard middleware, RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload utility, CSV import utility |
-| B (Nanak)  | Nanak   | **Core CRM** — tickets (+state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual + checkin/checkout), notifications, socket emitters for `ticket:*` + `verification:*` + `notification:new` |
+| A (Nanak) | Nanak  | **Foundation** — Prisma schema + initial migration, tenant-guard middleware, RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload utility, CSV import utility |
+| B (Nathan)  | Nathan   | **Core CRM** — tickets (+state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual + checkin/checkout), notifications, socket emitters for `ticket:*` + `verification:*` + `notification:new` |
 | C (Satrio) | Satrio  | **Settings + Analytics** — departments, menu + categories (CSV + bulk + multipart), knowledge + import, WA templates (incl. resubmit relay), feature flags (tier-gated), billing (quota meter + invoices + upgrade + daily brief), settings/agents (config), settings/voice (groundwork), all 8 analytics endpoints (Luxury gate) |
 
 **Critical sequencing**: A ships first (foundation unblocks both B and C). B and C can run in parallel after A.

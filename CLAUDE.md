@@ -339,9 +339,11 @@ export class FooService {
 - Branch: `feat/<modul>-<short>`, `fix/<modul>-<short>`, `chore/<short>`, `docs/<short>`.
 - Commit message **conventional commits**: `feat(modul): tambah X`, `fix(modul): perbaiki Y`.
 - 1 PR = 1 fitur/fix logis. Jangan campur.
-- Squash merge ke `main`.
-- Wajib lewat CI (lint, typecheck, test, build).
-- TIDAK BOLEH push ke `main` langsung.
+- Squash merge ke `main` (untuk code branch).
+- **Kebijakan merge docs vs code** (PO directive 2026-07-01):
+  - **Docs / koordinasi** (`*.md` — `PM-STATUS-*.md`, `docs/*`, `CLAUDE.md`, `README.md`, ADR): boleh commit + **push LANGSUNG ke `main`** (low-risk, tidak break build).
+  - **Code** (`src/`, `prisma/`, `package.json`, `Makefile`, config, `Dockerfile`): WAJIB lewat feature branch `feat/<modul>-<short>`; **PO merge manual** ke `main`. TIDAK BOLEH push code langsung ke `main`.
+- Wajib lewat CI (lint, typecheck, test, build) untuk perubahan code sebelum PO merge.
 - TIDAK BOLEH `git push --force` ke branch shared.
 
 Gunakan `make commit MSG="feat(modul): X"` — auto lint + typecheck + format-check sebelum commit.

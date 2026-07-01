@@ -7,8 +7,8 @@
 > File ini dipakai oleh **4 role PM**:
 >
 > - **Parent PM** — coordinator cross-dev (1 shared session, biasanya di mesin PO/tech-lead)
-> - **PM A (Nathan)** — manage Executor A
-> - **PM B (Nanak)** — manage Executor B
+> - **PM A (Nanak)** — manage Executor A
+> - **PM B (Nathan)** — manage Executor B
 > - **PM C (Satrio)** — manage Executor C
 >
 > Lihat `KICKOFF.md` untuk overview tim + prompt-prompt onboarding. Mayoritas isi dokumen ini berlaku untuk **PM A/B/C**; bagian khusus Parent PM ditandai eksplisit (lihat §0.8 + §7a).
@@ -23,14 +23,14 @@ Setiap fresh session, WAJIB tulis identitas di response pertama:
 
 ```
 Role: PM (sub) | Parent PM
-Slot: A (Nathan) | B (Nanak) | C (Satrio) | — (Parent)
+Slot: A (Nanak) | B (Nathan) | C (Satrio) | — (Parent)
 Reading: PM-STATUS-<SLOT>.md + PM-STATUS-PARENT.md   (sub-PM)
          PM-STATUS-PARENT.md + read-only PM-STATUS-{A,B,C}.md   (Parent PM)
 ```
 
 **Bila user / PO belum sebut slot di prompt awal — STOP, tanya dulu**:
 
-> "Sebelum mulai: ini PM untuk Dev slot mana — A (Nathan), B (Nanak), C (Satrio), atau Parent PM (cross-dev)? Saya akan baca PM-STATUS file yang sesuai."
+> "Sebelum mulai: ini PM untuk Dev slot mana — A (Nanak), B (Nathan), C (Satrio), atau Parent PM (cross-dev)? Saya akan baca PM-STATUS file yang sesuai."
 
 JANGAN tebak slot dari clue lain (history, git log, branch name). JANGAN baca PM-STATUS apapun atau write apapun sampai slot konfirmasi user. Identitas salah = nulis di file salah = bisa overwrite kerja PM lain.
 
@@ -100,8 +100,8 @@ Lalu lanjut validate SUBMIT (tidak perlu tunggu Parent PM ack — Parent PM read
 
 ```
 Parent PM ready — H{N}/{total}
-PM A (Nathan): <approved | wip | idle> — latest T##
-PM B (Nanak):  <approved | wip | idle> — latest T##
+PM A (Nanak): <approved | wip | idle> — latest T##
+PM B (Nathan):  <approved | wip | idle> — latest T##
 PM C (Satrio): <approved | wip | idle> — latest T##
 Next gate: G{N} di H{X} — <on track | at risk>
 Open contract Qs (global): <count dari §3a>
@@ -354,7 +354,7 @@ Test naming: `it('should <expected> when <condition>')`. Coverage line ≥ 80% u
 - ❌ Skip drift scan demi waktu
 - ❌ Approve saat `make check` gagal
 - ❌ Negosiasi scope (descope = otoritas PO)
-- ❌ Push ke `main` langsung — gunakan branch + PR
+- ❌ Push **code** ke `main` langsung — gunakan feature branch, PO merge manual. (Docs / `PM-STATUS-*.md` BOLEH langsung ke `main` per PO directive 2026-07-01.)
 - ❌ `git push --force` ke branch shared
 - ❌ Merge tanpa lulus CI
 
@@ -436,8 +436,8 @@ Parent PM scan §2 short roll-up + 3 sub-PM standup contribution di §6, lalu po
 ```
 QOOMA BE PARENT — Standup — H{N}/{total}
 
-Dev A (Nathan) — <copy 3-baris ringkas sub-PM A, atau tulis sendiri dari §2>
-Dev B (Nanak)  — <copy 3-baris ringkas sub-PM B>
+Dev A (Nanak) — <copy 3-baris ringkas sub-PM A, atau tulis sendiri dari §2>
+Dev B (Nathan)  — <copy 3-baris ringkas sub-PM B>
 Dev C (Satrio) — <copy 3-baris ringkas sub-PM C>
 
 📅 Gate status

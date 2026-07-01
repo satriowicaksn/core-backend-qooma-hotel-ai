@@ -43,8 +43,8 @@ Repo ini = service **Hotel Core (CRM)**. Pattern boilerplate (`_template/`, `MOD
 
 | Slot       | Owner   | Default scope (PO can override per task)                                                                                                              |
 | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A (Nathan) | Nathan  | **Foundation** — Prisma schema + initial migration, tenant-guard + RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload, CSV import utility, workers harness |
-| B (Nanak)  | Nanak   | **Core CRM** — tickets (state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual + checkin/checkout), notifications, socket emitters |
+| A (Nanak) | Nanak  | **Foundation** — Prisma schema + initial migration, tenant-guard + RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload, CSV import utility, workers harness |
+| B (Nathan)  | Nathan   | **Core CRM** — tickets (state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual + checkin/checkout), notifications, socket emitters |
 | C (Satrio) | Satrio  | **Settings + Analytics** — departments, menu (+ CSV + bulk + multipart), knowledge (+ import), WA templates lifecycle (incl. Meta callback ingest), feature flags (tier-gated), billing (quota meter + invoices + upgrade + daily brief), settings/agents config, settings/voice groundwork, all 8 analytics endpoints |
 
 > **H12 change**: Satrio's bucket no longer includes "integrations config CRUD" — that moved to Integration repo. Satrio retains the Meta-callback ingest path for WA templates (because the `wa_templates` table stays HC-owned).

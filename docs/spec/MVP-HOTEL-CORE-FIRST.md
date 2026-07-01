@@ -12,7 +12,7 @@
 
 Endpoints grouped by capability. Each row is a discrete deliverable a single executor can ship in one PR.
 
-### 1.1 Foundation (Slot A — Nathan, ships first)
+### 1.1 Foundation (Slot A — Nanak, ships first)
 
 | #   | Capability                                                  | Endpoint(s) / artifact                                                 |
 | --- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -25,7 +25,7 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 | F7  | Multipart upload utility (image to object storage)          | `src/common/upload.ts`                                                 |
 | F8  | CSV import utility (used by menu + knowledge)               | `src/common/csv-import.ts`                                             |
 
-### 1.2 Core CRM (Slot B — Nanak)
+### 1.2 Core CRM (Slot B — Nathan)
 
 | #   | Capability                              | Endpoint(s)                                                                                 | Roles                    |
 | --- | --------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------ |
@@ -55,7 +55,7 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 | C9  | Settings/voice groundwork               | `GET, PUT /api/settings/voice` · `POST /api/settings/voice/test`                                     | `gm_admin`              |
 | C10 | Analytics (8 endpoints, Luxury-gated)   | `/api/analytics/{overview,tickets,departments,peak-hours,top-requests,satisfaction,high-alert,export}` | `gm_admin`, `dept_head` (own-dept slice) |
 
-### 1.4 Workers (Slot A — Nathan, after F1-F8)
+### 1.4 Workers (Slot A — Nanak, after F1-F8)
 
 | #   | Worker                                  | Trigger                                                                |
 | --- | --------------------------------------- | ---------------------------------------------------------------------- |
@@ -221,8 +221,8 @@ If you're picking this up fresh:
 
 | Slot       | Owner   | Deliverables in this MVP                                                                                              |
 | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| A (Nathan) | Nathan  | F1–F8 foundation, W1–W5 workers (or deferred)                                                                         |
-| B (Nanak)  | Nanak   | B1–B10 core CRM                                                                                                       |
+| A (Nanak) | Nanak  | F1–F8 foundation, W1–W5 workers (or deferred)                                                                         |
+| B (Nathan)  | Nathan   | B1–B10 core CRM                                                                                                       |
 | C (Satrio) | Satrio  | C1–C10 settings + analytics                                                                                           |
 
 A ships first (1–2 weeks). B and C run in parallel (2–3 weeks). Workers can land in a follow-up if time-boxed.

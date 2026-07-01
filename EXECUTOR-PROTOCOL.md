@@ -4,8 +4,8 @@
 >
 > 3 dev paralel — slot identitas:
 >
-> - **Executor A** = Nathan (PM A counterpart)
-> - **Executor B** = Nanak (PM B counterpart)
+> - **Executor A** = Nanak (PM A counterpart)
+> - **Executor B** = Nathan (PM B counterpart)
 > - **Executor C** = Satrio (PM C counterpart)
 >
 > `CLAUDE.md` (auto-loaded) adalah **code rulebook** — apa yang ditulis & dilarang di kode. File INI adalah **workflow rulebook** — cara kerja di dalam tim. Keduanya binding.
@@ -24,13 +24,13 @@ Setiap fresh session, WAJIB tulis identitas di response pertama:
 
 ```
 Role: Executor
-Slot: A (Nathan) | B (Nanak) | C (Satrio)
+Slot: A (Nanak) | B (Nathan) | C (Satrio)
 Reading: PM-STATUS-<SLOT>.md only (per-dev tracker)
 ```
 
 **Bila user belum sebut slot di prompt awal — STOP, tanya dulu**:
 
-> "Sebelum mulai: ini Executor untuk Dev slot mana — A (Nathan), B (Nanak), atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
+> "Sebelum mulai: ini Executor untuk Dev slot mana — A (Nanak), B (Nathan), atau C (Satrio)? Saya akan baca PM-STATUS file yang sesuai."
 
 JANGAN tebak slot dari clue lain (history, git log, branch name). JANGAN baca file PM-STATUS apapun atau write apapun sampai slot konfirmasi user. Identitas salah = nulis di file slot lain = bisa overwrite kerja executor lain + bikin PM lain bingung.
 
@@ -124,6 +124,8 @@ Bila `git pull --rebase` konflik dengan edit PM-STATUS session lain, keep both s
 ### 0.6 End of session — disiplin push
 
 Tiap session diakhiri push. Tidak ada pengecualian.
+
+**Kebijakan branch (PO directive 2026-07-01):** perubahan **code** (`src/`, `prisma/`, `package.json`, config) → feature branch `feat/<modul>-<short>`, **PO merge manual ke `main`** (JANGAN push code ke `main`). Perubahan **`PM-STATUS-<SLOT>.md` + docs** → push **langsung ke `main`** supaya board selalu update. Jadi: code nunggu di branch untuk PO review, status board jalan terus di `main`. Sertakan nama branch di SUBMIT supaya PO tahu apa yang harus di-merge.
 
 ```bash
 # Bila task selesai + PM-approved:
