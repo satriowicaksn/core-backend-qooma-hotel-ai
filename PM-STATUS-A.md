@@ -553,6 +553,29 @@ Both fixes accepted; no rebuttal. Same DoD, same scope, same file count (4 creat
 
 **GAPs / questions**: none. Ready to implement upon PM A ACK.
 
+##### PM A ACK — T04 PLAN addendum APPROVED, proceed to coding (H0 2026-07-01) by PM A (Nanak)
+
+Both REJECT-PLAN fixes cleanly addressed:
+
+- **Fix #1** — factory fn `configureTenantGuardHooks(app: FastifyInstance): void` with direct `app.addHook('onRequest', ...)` call. Hook lands on root scope (no encapsulation), Fastify FIFO onRequest ordering makes the test pre-hook → tenant-derive sequence deterministic. Nathan's wiring pattern documented in JSDoc — clear consumer contract. File rename applied (`tenant-guard.hooks.ts` + test). No `fastify-plugin` dep needed. ✓
+- **Fix #2** — `declare module '@fastify/jwt' { interface FastifyJWT { payload: SessionUser; user: SessionUser } }`. Canonical `@fastify/jwt` v8 consumer-typing pattern; `req.user` auto-types as `SessionUser` everywhere via the plugin's own `FastifyRequest.user = FastifyJWT['user']` internal link. T03's `FastifyRequest.tenant?: TenantContext` block preserved verbatim → 0 regression on 14 T03 tests. Type-only augmentation → works whether JWT plugin registered at runtime or not (aligns with `api.ts` stub state). ✓
+
+LOC estimate (~53 prod / ~198 total incl. tests) reasonable. No new deps. No `any` / `console.log` / `throw new Error(` / default export planned. Accepted-as-planned items reconfirmed:
+- Q-B-02 handling (consume `TenantContext` as-is from `@plugins/tenant-guard.js`)
+- `applyDeptFilter` defer (endpoint-specific Prisma `WhereInput` in T11 inline; revisit if ≥3 modules repeat)
+- `requireRole` check order (auth → staff-reject → super-bypass → allowed)
+- Test plan (10-12 unit + 3 integration-style via `fastify.inject()`, ≥ 80% coverage, `it('should <expected> when <condition>')`)
+- Delta 3 (prisma-generate CI gap) OUT of T04 — no `Makefile` / `prisma-client.ts` edits
+
+Proceed to implementation on branch `feat/foundation-rbac`. Reminders for SUBMIT (drift + gate):
+- `make check` PASS (lint + format:check + typecheck + test:unit)
+- Drift scans clean per PM-AGENT §3 Step 2
+- Test coverage evidence in SUBMIT block (unit count + integration count + line coverage %)
+- Confirm 14 T03 tests still green after `tenant-guard.types.ts` modify
+- Note in SUBMIT if `make check` symptoms hint at GAP-T11-1 (prisma-generate CI) — note-only, do not fix
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
