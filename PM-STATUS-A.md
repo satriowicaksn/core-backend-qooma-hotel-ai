@@ -812,6 +812,109 @@ Two-part foundation fix in a single small PR:
 
 Awaiting **PLAN T-INFRA-01** from exec-A.
 
+#### PLAN T-INFRA-01 — exec-A (Nanak) at H12 2026-07-01
+
+**Scope recap**
+- Two-part foundation fix bundled in one PR: (1) `Makefile:148` — add `prisma-generate` as first prereq of `check` target so fresh checkouts regenerate `@prisma/client` before typecheck; (2) `src/core/prisma/prisma-client.ts` — replace `{}` stub with real eager `PrismaClient` singleton per PM A's template, add `NODE_ENV !== 'test'` guard on signal handlers, and adapt async-handler pattern to satisfy `@typescript-eslint/no-misused-promises`. Resolves PARENT §3b GAP-T11-1; downstream unblocks any future module importing `@core/prisma/prisma-client.js` on fresh checkout typecheck.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT block above + spec refs (`docs/decisions/0001-hexagonal-disiplin.md`, `docs/decisions/0004-one-service-one-db.md`, `CLAUDE.md §4` no-wrap-Prisma) ✓
+- Parent docs spot-read: `Makefile` (line 148 `check` target + line 87-88 `prisma-generate` target already exists), `src/core/prisma/prisma-client.ts` (current stub + PM A's uncomment template), `src/core/config/env.ts` (loadConfig behavior + DATABASE_URL field), `.eslintrc.cjs` (`no-misused-promises` + `no-floating-promises` both `error` — informs signal-handler wrapping), `jest.config.ts` (setupFilesAfterEach = `test-setup.ts` which is currently empty ESM marker), `src/modules/tickets/index.ts` (T11 `buildTicketsService(db: PrismaClient, ...)` takes `db` as injected arg via type-only import — NOT consuming singleton), `src/modules/tickets/__tests__/tickets.repository.integration.test.ts` (T11 integration spins its own `new PrismaClient` via testcontainers, does NOT import singleton) ✓
+- Dependencies: T02 ✓ (Prisma schema applied, Prisma Client generated in local `node_modules`), T04 ✓ (merged; my tests don't touch prisma-client so untouched by this change)
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T04 merge)
+- Scaffolder risk: **none** — no CLI generator, only 2 file edits (1 Makefile line + 1 TS body rewrite)
+
+**Files to modify** (2 total, 0 create)
+- `Makefile` — line 148: prepend `prisma-generate` to `check` target prereqs
+- `src/core/prisma/prisma-client.ts` — rewrite body per PM A's template with 3 targeted adaptations (see Approach below); preserve top JSDoc lines 1-10 verbatim
+
+**Files to NOT touch** (per HARD constraint recap)
+- `package.json` (no new deps needed; `@prisma/client` already present)
+- `src/plugins/*` (T03/T04 files — must remain untouched to guarantee test-green)
+- `.github/workflows/*` (out of scope; Makefile-level fix is sufficient)
+- Any `src/modules/*` file (no consumer refactor; T11 tests should remain untouched)
+
+**Approach**
+
+*(1) Makefile edit* — single-line change:
+```
+Before:  check: lint format-check typecheck test-unit
+After:   check: prisma-generate lint format-check typecheck test-unit
+```
+The `prisma-generate` target already exists (Makefile:87-88, wraps `pnpm prisma:generate`) — just referenced as first prereq. Effect on fresh checkout: `pnpm install --frozen-lockfile && make check` regenerates `node_modules/.prisma/client` before typecheck touches any file that imports `@prisma/client`.
+
+*(2) prisma-client.ts rewrite* — final body:
+```ts
+/**
+ * Prisma client singleton.
+ *
+ * 1 service = 1 DB = 1 Prisma schema (ADR-0004).
+ *
+ * Usage:
+ *   import { db } from '@core/prisma/prisma-client.js';
+ *   const items = await db.exampleResource.findMany();
+ */
+
+import { PrismaClient } from '@prisma/client';
+
+import { loadConfig } from '@core/config/env.js';
+
+const config = loadConfig();
+
+export const db = new PrismaClient({
+  datasources: { db: { url: config.DATABASE_URL } },
+  log: config.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+});
+
+const shutdown = async (): Promise<void> => {
+  await db.$disconnect();
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
+  process.on('SIGINT', () => {
+    void shutdown();
+  });
+}
+```
+
+Rationale for 3 adaptations relative to PM A's raw template:
+1. **`NODE_ENV !== 'test'` guard on signal handlers** — see Advisory #2 resolution below.
+2. **`void shutdown()` inside sync arrow wrapper** — Node's `process.on(signal, listener)` types `listener` as `NodeJS.SignalsListener` returning `void`. Passing the async `shutdown` fn directly (`process.on('SIGTERM', shutdown)`) triggers `@typescript-eslint/no-misused-promises: error` (rule enabled in `.eslintrc.cjs:33`). Wrapping in a sync arrow that `void`s the promise is the canonical fix — preserves fire-and-forget semantics; on process termination, PrismaClient's own disconnect timeout still applies. Named `handleSignal` alternative considered but two inline arrows are clearer (2 lines each) and match Node stdlib idiom.
+3. **JSDoc preserved verbatim** (lines 1-10 of current file) — accurate and durable per PM A note.
+
+**Explicit resolution of PM A's 3 advisory checks**
+
+- **Advisory #1 — `loadConfig()` fails-fast at module import**: acceptable AS-IS, no lazy-getter wrap.
+  - `loadConfig()` in `@core/config/env.ts:67-80` zod-parses `process.env`; throws with formatted issues on missing required fields (`DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY`, `API_BASE_URL`, `CORS_ORIGIN`, `REDIS_URL`).
+  - Fail-fast is desirable at production/dev entrypoint boot (better than lazy failures deep in a request).
+  - **Zero regression risk for current test suite**: `grep` confirmed no file under `src/` (nor test file) currently imports `@core/prisma/prisma-client.js` at value-level. T11 uses `import type { PrismaClient } from '@prisma/client'` (type-only, no runtime module load) and injects `db` via `buildTicketsService(db, ...)` constructor; its integration test spins its own `new PrismaClient` via testcontainers. So making the singleton eager triggers `loadConfig()` only at future consumer-import time — not during `make check` today.
+  - `.env` present in repo root (verified: `DATABASE_URL`, `JWT_ACCESS_SECRET`, `ENCRYPTION_KEY` populated), so local dev consumers work out of the box. Future test authors who import the singleton will need to ensure envs in test process — that's a test-authoring concern, not a T-INFRA-01 concern.
+  - **Fallback trigger**: if the fresh-checkout acceptance test (`rm -rf node_modules dist coverage .tsbuildinfo && pnpm install --frozen-lockfile && make check`) surfaces any test-time env failure, will pivot to lazy `getPrisma()` factory + document in SUBMIT. Not expected.
+
+- **Advisory #2 — `process.on('SIGTERM', ...)` at module import creates jest open-handle risk**: adopting `if (process.env.NODE_ENV !== 'test')` guard.
+  - Jest sets `NODE_ENV=test` by default when running via jest CLI (documented behavior; verified via jest docs). No override in this repo's jest config or scripts.
+  - Guard prevents signal-handler registration during any test process that transitively loads `prisma-client.ts` (none today, but future-proofing). Also idiomatic pattern per Node/Fastify community.
+  - No behavior change at production/dev entrypoint boot — `NODE_ENV=development|production|staging` all pass the guard.
+
+- **Advisory #3 — Circular import risk**: **NO circular** — `env.ts` is a leaf. Confirmed via `Read src/core/config/env.ts` — only imports `zod`. It does not import from `@core/prisma/*` or transitively pull the singleton back. `prisma-client.ts → env.ts → zod` is a clean 1-way chain.
+
+**Additional verification points to cover in SUBMIT**
+- Fresh-checkout acceptance test (`rm -rf node_modules dist coverage .tsbuildinfo && pnpm install --frozen-lockfile && make check`) → PASS (this is the primary DoD signal that the CI gap is closed).
+- Standard `make check` (already-generated checkout) → PASS (no regression).
+- T04's 14 new tests + T03's 14 tests + `_template`'s 2 skipped: all remain in their prior states.
+- `git diff package.json` → empty (no dep add).
+- Nathan T11 workaround note: post-merge, exec-B can drop pre-run `pnpm prisma:generate` habit before `make check`.
+- Drift scans clean on `src/core/prisma/prisma-client.ts` (no `any`, no `console.log`, no `throw new Error(`, no default export).
+
+**GAPs / questions**: none.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
