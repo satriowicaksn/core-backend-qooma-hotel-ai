@@ -165,6 +165,12 @@ PLAN + addendum verified against the actual repo (trust-but-verify, not citation
 
 Proceed. 🟢
 
+### GAP T11-#2 — exec-B (Nathan) at H1 (2026-07-01) — user-name/role fields unresolvable in dev (proceeding with A)
+- **Gap**: D1 requires `assigned_to` = staff name joined from `users`; the `:id` `updates[]` shape requires `actor_name` + `actor_role`. But HC's Prisma `User` model is **id-only** (`prisma/schema.prisma:65` — no `name`/`role`; Auth owns those), and the T02 dev migration (`20260701111952_init_hotel_core/migration.sql:9`) creates `users` as `(id UUID PK)` only. So in `hotel_core_dev` these three fields **cannot be resolved from the DB** — not via Prisma (unmodeled) nor raw SQL (columns absent). DEP-3's "cover via fixture user rows" gives IDs but no names (no column to seed).
+- **Doc reference**: DoD D1 + §1.2 updates shape vs `prisma/schema.prisma:65` (User stub) + MVP §3 (assumes Auth users exist in shared DB) + DEP-3.
+- **Options**: **A)** Ship the three fields **present but nullable**, resolved via an isolated seam in `tickets.serializer.ts` (a `userDirectory: Map<id,{name,role}>` param the service passes; empty in dev → fields serialize `null`). Prod wires the map from Auth cross-join/RPC later — **one-spot change**, no shape churn. **B)** Slot A extends HC `User` model + dev migration to map Auth `users.name`/`role` read-only (cross-slot, foundation, needs PO). **C)** Add an Auth user-lookup RPC port now (Auth service not up for HC lookups in MVP → out of scope per MVP §2).
+- **My intent**: **A** — consistent with DEP-3's accepted dev limitation and the serializer-isolation PM ratified for Q-B-01. **Proceeding with A now** (resolution point isolated; a later B/C decision changes only the serializer wiring). Flagging for the record — redirect me if you prefer B/C before SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
