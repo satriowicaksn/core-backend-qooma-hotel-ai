@@ -75,6 +75,59 @@
 
 Awaiting exec-B PLAN (do not code before PM B ACK of the PLAN + Q-B-01 envelope proposal).
 
+### ASSIGNMENT T11 — claimed by exec-B (Nathan) at H1 (2026-07-01)
+- Branch: `feat/tickets-list-detail` (created at coding-start, after PM B ACK; code stays on branch, PO merges to main)
+- Routed from: PARENT §1 T11 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 B1
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T11 — exec-B (Nathan) at H1 (2026-07-01)
+
+**Scope recap**
+Read-only tickets surface: `GET /api/tickets` (all §1.2 filters + opaque cursor pagination) and `GET /api/tickets/:id` (ticket + `updates[]` asc + `messages[]` asc). No state transitions (that is T12). Tenant-guard + dept_head scope + PII masking enforced against a `SessionContext` seam (T03/T04 not built — DEP-1). Ships as a Fastify plugin + injectable service/repo behind a barrel; no live-server wiring (DEP-2).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot B (Nathan) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `02-hotel-core.md` §1.2 (endpoints + shapes) + §2.4 DDL + §6 RBAC/tenant + §7 error catalog; `MVP-HOTEL-CORE-FIRST.md` §1.2 B1 + §4.1/§4.5/§4.6; `docs/spec/README.md` §2.3/§2.6/§2.7 (envelope) ✓
+- Parent docs spot-read: `docs/MODULE_TEMPLATE.md` pattern via `src/modules/_template/*`; `prisma/schema.prisma` (Ticket/TicketUpdate/TicketMessage/Guest models — camelCase fields, `@map` snake_case) ✓
+- `node_modules` was absent on this machine → ran `pnpm install` (from committed lockfile, no dep added). After install: `pnpm typecheck` clean ✓ ; `pnpm lint` clean ✓ (baseline green confirmed).
+- Scaffolder risk: **none**. Only non-source CLI I will run is `pnpm prisma:generate` (writes `node_modules/.prisma`, gitignored — no overwrite of tracked files/planning docs). No `pnpm create` / `prisma init`.
+
+**Files to create**
+```
+src/modules/tickets/tickets.routes.ts        FastifyPluginAsync — GET /tickets, GET /tickets/:id (thin: validate → service → serialize)
+src/modules/tickets/tickets.service.ts       orchestration: scope resolution, filter build, cursor, calls repo, calls serializer
+src/modules/tickets/tickets.repository.ts     Prisma direct (injected PrismaClient; no interface — ADR-0001)
+src/modules/tickets/tickets.schema.ts         zod: list-query params, :id param, cursor encode/decode
+src/modules/tickets/tickets.serializer.ts     PII masking (§4.5) + snake_case wire shaping (D5 "serializer layer, not per-handler")
+src/modules/tickets/tickets.types.ts          domain types, wire DTOs, SessionContext seam (local for now — DEP-1/Q-B-02)
+src/modules/tickets/index.ts                  barrel: export ticketsRoutes + buildTicketsService factory (no repo/serializer export)
+src/modules/tickets/__tests__/tickets.service.test.ts               unit — pure helpers: filter builder, cursor codec, mask predicate, dept scope, super_admin bypass
+src/modules/tickets/__tests__/tickets.repository.integration.test.ts  integration — real hotel_core_dev PG, seeded fixtures
+```
+
+**Files to modify**
+- **None in `src/` core.** I will NOT touch `src/entrypoints/api.ts` (DEP-2, foundation) nor `src/core/prisma/prisma-client.ts` (still the `{}` stub — foundation/Slot A owns singleton wiring). Repo takes `PrismaClient` via constructor; integration test instantiates `new PrismaClient()` directly. Note: a `declare module 'fastify'` request-decoration augmentation for `req.sessionContext` will live **inside** `tickets.types.ts` (module-local, no core edit) — flagging in case PM prefers it elsewhere.
+
+**Approach**
+Hexagonal-light per ADR-0001: repository = Prisma direct (no port). Service consumes repo + takes an explicit `ctx: SessionContext { hotelId; userId; role: 'gm_admin'|'dept_head'|'super_admin'; deptId? }` as first arg on every method — the DEP-1 seam. Route reads `req.sessionContext` (populated later by T03/T04 middleware; typed via local module augmentation) and passes it down; until that middleware lands the live route is not AC-complete but service+repo are fully unit/integration testable by injecting `ctx` directly. **Tenant guard (D3):** repo always applies `where hotelId = ctx.hotelId`; `super_admin` is an explicit `if` branch that drops the hotel filter; `hotel_id` is never read from URL/body. **dept_head (D4):** service forces `departmentId = ctx.deptId` on list; on `:id`, a fetched ticket whose `departmentId !== ctx.deptId` → `NotFoundError` (404, anti-enumeration). **Cursor:** opaque base64 of `{ createdAt: ISO, id }`; keyset `WHERE (createdAt,id) < (c.createdAt,c.id)` with `ORDER BY createdAt DESC, id DESC`; fetch `limit+1` to compute `hasMore`; `limit` default 20 clamp ≤100; malformed cursor → `ValidationError` (400). **Filters:** all zod-parsed; CSV (`status`,`complaint_type`) split + each value enum-validated; `q` → Prisma `OR` over `ticket_number` + `guest.name` + `body` (insensitive `contains`); dates → `createdAt` gte/lte. **Masking (D5):** serializer applies `maskWaPhone()`/`maskEmail()` from `shared/utils`; predicate = `guest.privacy_mode==='vvip' && ctx.role!=='gm_admin'` (super_admin counts as gm_admin). Errors: `AppError` subclasses only (`ValidationError`,`NotFoundError`). **Tests:** unit targets extracted PURE functions (no Prisma mock — CLAUDE §8); integration seeds hotel/dept/guest/user/ticket/updates/messages in `hotel_core_dev` and asserts filters, cursor, ordering, tenant isolation, dept scope.
+
+**Q-B-01 — response envelope proposal (for PM B ACK)**
+Repo has a canonical envelope after all: `docs/spec/README.md` **§2.7** (pagination) + **§2.3** (error) + **§2.6** (ids/timestamps/enums). Proposing, evidence-backed:
+- **List** `GET /api/tickets` → `{ "data": TicketListItem[], "pageInfo": { "nextCursor": string | null, "hasMore": boolean } }` (verbatim §2.7 shape; `cursor` is the request param name, `nextCursor` the response field).
+- **Detail** `GET /api/tickets/:id` → `{ "data": TicketDetail }` (single-object `data` wrapper, no `pageInfo`).
+- **Error** → `{ "error": { code, message, details } }` (§2.3) — already what `core/errors` `toJson()` emits; needs the error-handler plugin (DEP-2) to wrap it.
+- **Casing tension (the actual Q-B-01):** the envelope wrapper is **camelCase** (`pageInfo`,`nextCursor`,`hasMore`) per §2.7, but the resource fields in §1.2 are **snake_case** (`ticket_number`,`wa_phone_masked`,`is_overdue`,`created_at`,`from_status`,`sent_at`,…). **My intent:** keep the wrapper camelCase (§2.7 canonical) and the resource body snake_case (§1.2 canonical) — i.e. serializer emits snake_case ticket fields inside a camelCase envelope. This matches both canonical sources without guessing. **Confirm** before I lock the serializer, since FE MSW (separate repo, absent) is the only tiebreaker.
+- **Sub-clarification (D5):** the list field is literally named `wa_phone_masked`. Intent: list **always** returns `wa_phone_masked` = `maskWaPhone(waPhone)` (name implies always-masked in list context); the §4.5 compound predicate additionally governs `name`/`email` (and full phone in detail). Flag if FE expects raw `wa_phone` for gm_admin in the list.
+
+**GAPs / dependencies (recorded, not silently worked around)**
+- **DEP-1 (merge-blocking)** — SessionContext seam; T03/T04 (Slot A) not built. Defined locally in `tickets.types.ts`, injected in tests. Ties to open **Q-B-02** (is this a Slot-A shared type?). If PM wants it in `shared/types` now, say so — I'll otherwise keep it module-local and re-point the import when Slot A publishes.
+- **DEP-2** — `api.ts` bootstrap + `core/prisma` singleton + error-handler plugin are stubs (foundation). T11 ships as plugin + factory; not wired to a live server. Not in my scope to edit.
+- **DEP-3** — `hotel_core_dev` has no `users`/`hotels` rows; integration tests seed fixtures for FK parents; `assigned_to` name-join covered via seeded user rows.
+- **GAP T11-#1 — Prisma client not generated + `make check` coupling.** `@prisma/client` is NOT generated on a fresh checkout and `core/prisma/prisma-client.ts:29` is a `{}` stub. `make check` (= lint+format+typecheck+test-unit) does **not** run `prisma-generate` as a prereq (only `make install`/`make start` do). Once my repo imports the generated `PrismaClient` type, `make check`/CI will fail typecheck unless `make prisma-generate` runs first. **My intent:** run `pnpm prisma:generate` locally before coding, import `PrismaClient` in the repo constructor, and note in SUBMIT that `make prisma-generate` must precede `make check` in CI. Please confirm this is acceptable (vs. some foundation-provided generated-client guarantee I'm unaware of). No `.md`/CI edits from me — this is a flag for PM/PO.
+
+Awaiting PM B ACK (PLAN + Q-B-01 envelope proposal + GAP T11-#1). Not writing code before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
