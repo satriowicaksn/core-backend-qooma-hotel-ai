@@ -16,8 +16,9 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active task**: **T11 — Tickets list + detail** (PLAN ACK'd 2026-07-01, coding on `feat/tickets-list-detail`; consumes T03 `TenantContext`; merge-blocked only on T04 preHandler runtime wiring)
-- **Branch**: `feat/tickets-list-detail` (to be created by exec-B; code stays on branch, PO merges manually)
+- **Active task**: **T13 — Ticket stats + overdue** (ASSIGNMENT issued, awaiting exec-B PLAN). T11 ✅ APPROVED (attempt 1) — code on branch awaiting PO merge.
+- **Branch**: T11 `feat/tickets-list-detail` @ `550e9ef` (approved, awaiting PO merge) · T13 `feat/tickets-stats-overdue` (pending)
+- **Progress slot B**: 1/10 approved (T11). Next: T13 → then T14/T16/T19 (unblocked). T12 waits on T06 (Slot A).
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **Queue (Slot B, from PARENT §1)**: T11 assigned; T12–T19 backlog (transition/reroute needs T06, stats/overdue, guests CRUD, guest messages, visits+verify, notifications); T20 socket gated on T11+T16+T19.
 - **⚠ Verified blockers (src/ inspection 2026-07-01)**:
@@ -33,8 +34,11 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T11 | Tickets list + detail (GET + filters + cursor pagination) | wip | — | PLAN ACK'd 2026-07-01 (§2). Q-B-01+Q-B-02 resolved. Coding on `feat/tickets-list-detail`. Consumes T03 `TenantContext`. Merge-blocked on T04 preHandler wiring (DEP-1 runtime). GAP T11-#1 (prisma-generate⇄CI) escalated to Parent §3b. |
-| T12–T20 | Core CRM backlog (see PARENT §1)  | backlog  | —              | Released per dependency chain / gate  |
+| T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-01) — PM rerun: make check + integration 11 + coverage 96% + drift clean. Code on `feat/tickets-list-detail` @ `550e9ef` → **awaiting PO merge**. Runtime gate: T04 preHandler (routes 401 until then). GAP T11-#2 (approach A) approved; GAP T11-#3 escalated. |
+| T13 | Ticket stats + overdue                                    | assigned     | —              | ASSIGNMENT issued §2 (2026-07-01). Unblocked by T11. Extends `tickets` module (reuse). Awaiting exec-B PLAN. Possible Q-B-03 (stats shape). |
+| T12 | Ticket status transition + reroute                        | backlog      | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
+| T14/T16/T19 | Guests / Visits / Notifications CRUD               | backlog      | —              | Unblocked (T02 ✓) — release after T13 or in parallel |
+| T15/T17/T18/T20 | Downstream CRM + socket                       | backlog      | —              | T15←T14; T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
 
@@ -235,6 +239,67 @@ Notes / open items for PM
 
 Requesting PM B VERDICT.
 
+##### VERDICT T11 — APPROVED (attempt 1) by PM B (2026-07-01, H12)
+Verified by **my own rerun** on `feat/tickets-list-detail` @ `550e9ef` (not trust-of-claim). Checked out the branch, `pnpm prisma:generate`, then reran every gate + read the actual source.
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: lint 0 / format clean / typecheck clean / **55 passed + 2 skipped**. The 2 skips are `_template/*` reference placeholders (`_template.service.test.ts:17`, `_template.repository.integration.test.ts:6`) — **T11's branch has 0 `.skip`**. Confirmed baseline, not introduced here.
+- `make test-integration` → **PASS**: 11 tests, real Postgres via testcontainers (~8s).
+- **Coverage (PM rerun)** — lines 96% overall; per changed file: repository 100 / serializer 100 / types 100 / service 98.41 / routes 95.65 / schema 90.74. **Every changed file ≥80% line ✓ D9** (claim 95.85% confirmed).
+- **Drift scans** (src/modules/tickets): `any` 0 · `console.*` 0 · `throw new Error(` 0 · default export 0 · `.skip` 0 · forbidden imports 0 · cross-module internal import 0. Clean.
+- **File inventory**: 10 new files, **all** in `src/modules/tickets/`, 0 outside (no `api.ts`/`prisma`/`core` edits). Matches PLAN.
+
+**DoD spot-verified in code (not just checkboxes):**
+- D1 ✓ 11 filters `schema.ts:54-79`; `limit` clamp ≤100 `schema.ts:71-77`; invalid cursor→400 `schema.ts:94-107`.
+- D2 ✓ detail ordering updates asc / messages asc `repository.ts:13-14`; missing→`NotFoundError` `service.ts:129-131`.
+- D3 ✓ explicit super_admin branch `service.ts:42-44`; detail `assertHotelOwnership` `service.ts:132`; `hotel_id` never from URL/body.
+- D4 ✓ dept_head filter + **N2** `AuthError` on missing deptId `service.ts:46-51`; cross-dept `:id`→404 via `assertDeptOwnership` `service.ts:133`.
+- D5 ✓ masking at serializer layer; predicate `privacyMode==='vvip' && !(isSuperAdmin||gm_admin)` `serializer.ts:16-19`; `wa_phone_masked` always-masked in list (ratified), email/name compound.
+- D6 ✓ only `AppError` subclasses. D7 ✓ correlationId (`x-correlation-id` ?? `req.id`) + module/action, no PII `routes.ts:26-56`. D8 ✓ template layout + barrel hides repo/serializer.
+- D10 ✓ **N1** keyset as OR-decomposition in a **separate** AND arm `service.ts:83-98`; `orderBy [createdAt desc, id desc]` `repository.ts:24` — cursor correctness confirmed.
+- **Envelope**: list `{data,pageInfo:{nextCursor,hasMore}}` + detail `{data}` + snake_case body — matches ratified **Q-B-01** ✓.
+
+**GAP rulings:**
+- **GAP T11-#2 → approach A APPROVED.** `userDirectory` seam (`service.ts:142-152` + serializer `resolveUserName`) is serializer-isolated; `assigned_to`/`actor_name`/`actor_role` serialize `null` in dev, resolve via the `resolveUsers` dep in prod — one-spot change, no shape churn. **Follow-up obligation logged** (does NOT block T11): when the shared DB is restored OR an Auth user-resolution RPC lands, wire `resolveUsers`. Tracked as a future integration note against Slot B (I'll surface it when tier/shared-DB work is scheduled).
+- **GAP T11-#3 → non-blocking; ESCALATED to Parent PM (foundation/Slot A).** `test:unit` glob collects `*.integration.test.ts`, so `make check` now needs Docker. Self-workaround accepted (self-contained testcontainers, 0 `.skip`). Recommend Slot A add `testPathIgnorePatterns: ['\\.integration\\.test\\.ts$']` to `test:unit`. Routed to PARENT §3b.
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/tickets-list-detail` @ `550e9ef`. PM verdict = APPROVE, attempt 1, zero rejects.
+- Two **runtime/CI gates** remain (NOT code-quality blockers): (a) **T04** (Slot A) must wire the `req.tenant` preHandler for the live route — until then routes answer 401, which is the correct pre-auth behavior; (b) CI must run `make prisma-generate` before `make check` (GAP T11-#1, escalated).
+- **→ PO action: merge `feat/tickets-list-detail` when ready.** Live traffic works once T04 lands. Service/repo/serializer are complete and fully tested by injecting `TenantContext`.
+- → §1 tracker updated (approved); PARENT §1 T11 → approved; roll-up posted PARENT §2.
+
+Excellent work, clean first-pass. **T11 closed.** Next assignment (T13) issued below. 🟢
+
+---
+
+### ASSIGNMENT T13 — Ticket stats + overdue — issued by PM B (Nathan) 2026-07-01 (H12)
+- Branch: `feat/tickets-stats-overdue` (exec-B creates; **code stays on branch — PO merges to main**, per PO directive)
+- Routed from: PARENT §1 T13 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 **B3**
+- Spec authority: `docs/spec/02-hotel-core.md §1.2` (endpoints table rows `GET /api/tickets/stats`, `GET /api/tickets/overdue`) + §2.4 DDL + §1.2 dashboard refs (lines ~323-324); envelope per ratified **Q-B-01** (`README §2.7`/§2.3)
+- Dependency: **T11 APPROVED** ✓ (this task extends the same `tickets` module — reuse repo/serializer/schema/seam, do NOT fork a new module).
+
+**Scope (read-only, dashboard KPI)**
+- `GET /api/tickets/stats` — counts by status (dashboard KPI cards). Roles `gm_admin`, `dept_head`. Return per-status counts across the ticket status enum (`open`/`in_progress`/`awaiting_late_reason`/`done_pending`/`closed`/`high_alert`/`escalated`/`cancelled`) + any dashboard aggregates the spec/FE MSW shape requires (e.g. totals, overdue count, high-alert count — confirm exact keys against `02-hotel-core.md` §1.2 + FE MSW; propose shape in PLAN if underspecified → Q-B-03).
+- `GET /api/tickets/overdue` — list of tickets over SLA. Same list-item shape + serializer as T11 (`is_overdue`/`sla_due_at`), ordered by `sla_due_at` (oldest-breach first). Decide in PLAN: cursor-paginated (reuse T11 codec) vs bounded top-N — match FE MSW; state which.
+
+**DoD (PM B verifies at SUBMIT)**
+- [ ] E1 — `GET /api/tickets/stats` returns status-count map + dashboard aggregates per confirmed shape; single query or grouped aggregate (`groupBy`), not N per-status round-trips.
+- [ ] E2 — `GET /api/tickets/overdue` returns overdue tickets (reusing T11 list-item serializer), correct ordering; pagination decision stated + implemented.
+- [ ] E3 — **Tenant guard**: both scoped `WHERE hotelId = ctx.hotelId` (super_admin explicit bypass); **dept_head** stats + overdue auto-filtered to `ctx.deptId` (reuse the T11 `buildTicketWhere` scope logic — do NOT reimplement). `hotel_id` never from URL/body.
+- [ ] E4 — **Route ordering trap**: `/tickets/stats` and `/tickets/overdue` are static segments that MUST be registered so they never get captured by `/tickets/:id` (the T11 param route). Verify a request to `/tickets/stats` does not hit the `:id` handler (Fastify's radix router handles static-before-param, but assert it in a route test — this is the classic collision).
+- [ ] E5 — PII masking reused from T11 serializer (overdue list). Errors via `AppError`. Structured logging + correlationId (D7 pattern).
+- [ ] E6 — No cross-module import; barrel unchanged public surface; layout consistent with the existing `tickets` module.
+- [ ] E7 — Tests: unit on stats aggregation shaping + overdue scope/ordering + the `/stats`-vs-`/:id` route-collision test; integration against `hotel_core_dev` (seed tickets across statuses + past-SLA rows). Line coverage ≥80% changed files. `make check` + `make test-integration` green.
+
+**Notes / seams (carry forward from T11)**
+- Consume T03 `TenantContext`; still merge-gated on T04 preHandler (DEP-1) + `make prisma-generate` before CI (GAP T11-#1). Same posture as T11 — buildable + fully testable now.
+- If the exact stats response shape isn't pinned by `02-hotel-core.md` §1.2 / FE MSW, **raise Q-B-03 and propose it in PLAN** for my ACK (same playbook as Q-B-01 — do not guess silently).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2): confirm identity, re-read `02-hotel-core.md §1.2`, `make typecheck`/`make lint` clean, state any scaffolder command. Then post PLAN. **Do not code before PM B ACK.**
+
+Awaiting exec-B PLAN for T13.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -344,6 +409,9 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | ------------- | -------- | -------------- | ------ | ---------- |
 | Q-B-01        | Canonical **response envelope** for `GET /api/tickets` (+ `/:id`): pagination wrapper, cursor field name, JSON field casing (camel vs snake). `docs/API-CONTRACT.md §2.2` cited by MVP brief but absent from this repo. | T11 · MVP §1.2 / §6 | **RESOLVED (in-repo spec) 2026-07-01** | Canonical shape found by exec-B at `docs/spec/README.md §2.7` (list `{data,pageInfo:{nextCursor,hasMore}}`) + §2.3 (error `{error:{code,message,details}}`). Ratified by PM B: **camelCase envelope + snake_case resource fields (§1.2)** — §2.6 imposes no global casing rule, so no contradiction. Provisional on FE MSW (tiebreaker, absent repo); serializer-isolated → single-file change if it diverges. PARENT §3a downgraded from escalated → resolved. |
 | Q-B-02        | Session context shape/ownership: Slot-A-owned shared type vs per-module? Affects T11 seam + all B tasks. | T11 · MVP §4.1 | **RESOLVED 2026-07-01** | T03 (`9b55b86`) shipped `TenantContext` as **Slot-A-owned** in `src/plugins/tenant-guard.ts`. T11 consumes it (reuse-before-create). No per-module seam. PARENT §3c marked resolved. |
+| GAP T11-#2    | `assigned_to`/`actor_name`/`actor_role` unresolvable in dev (HC `users` id-only, no name/role column). | T11 · DoD D1 + §1.2 | **RESOLVED (approach A) 2026-07-01** | Serializer `userDirectory` seam → fields serialize `null` in dev, resolve via `resolveUsers` dep in prod. One-spot change. **Follow-up**: wire `resolveUsers` when shared-DB restored / Auth RPC lands (not a T11 blocker). |
+| GAP T11-#3    | `test:unit` glob collects `*.integration.test.ts` → `make check` now needs Docker; global `test-setup.ts` harness is a stub. | T11 · `package.json:25` / TESTING §5 | **open — foundation/Slot A** (escalated PARENT §3b) | Non-blocking (self-contained testcontainers, 0 `.skip`). Fix: Slot A adds `testPathIgnorePatterns:['\\.integration\\.test\\.ts$']` to `test:unit`. |
+| GAP T11-#1    | `make check` has no `prisma-generate` prereq + `prisma-client.ts` `{}` stub → fresh-checkout CI breaks on generated-client import. | T11 | **open — foundation/Slot A** (escalated PARENT §3b) | Affects all B/C Prisma tasks. Interim: executors + PM run `pnpm prisma:generate` before gates. |
 
 ---
 
@@ -352,6 +420,9 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Run | Touched files | `any` | console.log | `throw new Error(` | forbidden imports | default export (di luar entry) | `.skip` | hardcoded URL | webhook tanpa HMAC | wrap-Prisma interface |
 | --- | ------------- | ----- | ----------- | ------------------ | ----------------- | ------------------------------ | ------- | ------------- | ------------------ | --------------------- |
 | H0 baseline | (no src/ touched) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| H12 (T11 SUBMIT) | src/modules/tickets/* (10 files) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (n/a read-only) | 0 |
+
+> H12 note: 2 `.skip` exist in `_template/*` (reference-module placeholders, pre-existing, out of slot-B scope) — T11 branch itself 0 `.skip`. PM verified via `grep -rn .skip src/modules/tickets` → 0.
 
 > PM B jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot B's touched files.
 

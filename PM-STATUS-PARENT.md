@@ -41,9 +41,9 @@
 | T08 | Multipart upload utility (S3 / R2 abstraction)                                   | A    | Nanak   | backlog  | —           | After T01                                          |
 | T09 | CSV import utility (used by menu + knowledge)                                    | A    | Nanak   | backlog  | —           | After T01                                          |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks              | A    | Nanak   | backlog  | —           | After T02                                          |
-| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nathan  | wip      | —           | PLAN ACK'd by PM B 2026-07-01. Coding `feat/tickets-list-detail`; consumes T03 `TenantContext`. Merge-blocked only on T04 preHandler runtime wiring. Q-B-01/Q-B-02 resolved. |
-| T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nathan  | backlog  | —           | After T11 + T06                                    |
-| T13 | Ticket stats + overdue                                                           | B    | Nathan  | backlog  | —           | After T11                                          |
+| T11 | Tickets list + detail (GET endpoints + filters + cursor pagination)              | B    | Nathan  | approved | PM B (Nathan) | ✅ APPROVED attempt 1 (2026-07-01). PM rerun: make check + integration 11 + coverage 96% + drift clean. Code `feat/tickets-list-detail` @ `550e9ef` → **awaiting PO merge**. Runtime gate: T04 preHandler (routes 401 until then). |
+| T12 | Ticket status transition + reroute (state-machine-validated)                     | B    | Nathan  | backlog  | —           | After T11 ✓ + T06 (Slot A, backlog — BLOCKED)      |
+| T13 | Ticket stats + overdue                                                           | B    | Nathan  | assigned | —           | Issued by PM B 2026-07-01. Unblocked by T11 ✓. Extends `tickets` module. Awaiting exec-B PLAN. |
 | T14 | Guests CRUD + preferences                                                        | B    | Nathan  | backlog  | —           | After T02                                          |
 | T15 | Guest messages history                                                           | B    | Nathan  | backlog  | —           | After T14                                          |
 | T16 | Visits list + pending verification flow                                          | B    | Nathan  | backlog  | —           | After T02                                          |
@@ -108,6 +108,7 @@
 > [YYYY-MM-DD H{N}] [PM <SLOT> <NAME>] <T## status — 1 liner>
 > ```
 
+[2026-07-01 H12] [PM B Nathan] **T11 Tickets list+detail APPROVED (attempt 1)** — PM rerun verified: `make check` green, integration 11 pass (testcontainers), coverage 96% lines, drift clean, 0 rejects. Code on `feat/tickets-list-detail` @ `550e9ef` → **awaiting PO merge** (runtime-gated on T04 preHandler; routes 401 until then). GAP T11-#2 approved (approach A). New GAP T11-#3 (test:unit collects integration → make check needs Docker) escalated §3b. **Next: T13 issued.** Slot B 1/10 approved.
 [2026-07-01 H12] [PM B Nathan] T11 PLAN ACK'd → wip (`feat/tickets-list-detail`). Q-B-01 resolved from in-repo spec (`README §2.7`, no PO needed); Q-B-02 resolved (T03 `TenantContext` Slot-A-owned). New: **GAP-T11-1** (prisma-generate⇄`make check` CI gap, foundation) → §3b/§10 for Slot A. T11 merge now gated only on **T04** preHandler wiring.
 [2026-07-01 H12] [PM B Nathan] Online. Last approved: none (slot B first activity). Active: T11 ASSIGNMENT issued (tickets list+detail), awaiting exec-B PLAN. Next-up: T12–T20. Open Qs: 2 (Q-B-01 contract envelope escalated §3a; Q-B-02 session-context shape §3c). ⚠ T11 merge-blocked on Slot A T03/T04 seam — see PARENT §10.
 [2026-07-01 H0] [PM A Nanak] T03 tenant-guard APPROVED (attempt 1) — 3 files (tenant-guard.ts + .types.ts + test 14 pass) + bonus jest config alias+.js fix. Pure fn approach; wire as Fastify preHandler when JWT plugin lands. ⚠ Nathan flag T11 merge-blocked on this + T04 (see §10) — plan T04 next.
@@ -137,6 +138,7 @@
 | ID            | Question | Raised by | Source         | Status | Resolution |
 | ------------- | -------- | --------- | -------------- | ------ | ---------- |
 | GAP-T11-1     | `make check` (`Makefile:148`) has no `prisma-generate` prereq; `core/prisma/prisma-client.ts:29` is a `{}` stub. Once any B/C module imports the generated `PrismaClient`, CI `make check` fails typecheck on fresh checkout unless generate runs first. **Affects every task that touches Prisma (B + C).** | PM B (Nathan) | T11 | **open — foundation/Slot A** | Proposed fix: Slot A adds `prisma-generate` as prereq of `check` (or CI runs `make install` before `make check`). Not a T11-scope edit. See §10. Interim: exec-B runs `pnpm prisma:generate` locally; PM B does same before verifying. |
+| GAP-T11-3     | `package.json` `test:unit` glob `__tests__/.*\.test\.ts` also collects `*.integration.test.ts` (subset) → `make check` now spins Docker/testcontainers. Global `test-setup.ts` harness still a stub. **Affects every slot's `make check` as integration tests land.** | PM B (Nathan) | T11 | **open — foundation/Slot A** | Non-blocking (self-contained testcontainers, 0 `.skip`). Proposed fix: Slot A adds `testPathIgnorePatterns:['\\.integration\\.test\\.ts$']` to `test:unit` (or implements `test-setup.ts`) so `make check` stays fast/Docker-free. |
 
 ### 3c. Architecture / planning questions
 
