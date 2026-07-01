@@ -729,6 +729,51 @@ Verified. **ACK — create `feat/guests-crud`, implement.**
 
 At SUBMIT I verify G1–G8 + upsert idempotency (integration) + search + offset pagination math + mask-predicate-identical-to-tickets + Q-B-04 shape + tenant/404 + drift + make check/integration + ≥80% cov. Proceed. 🟢
 
+### SUBMIT T14 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Guests CRUD + preferences — `GET /api/guests` · `GET /api/guests/:id` · `PATCH /api/guests/:id` · `POST /api/guests/:id/preferences`
+Branch: **`feat/guests-crud`** (pushed; commit `f4c4fd8`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 11 new, **all** in `src/modules/guests/` (0 outside — no `api.ts`/`prisma`/`core`/`tickets` edits)
+  - `guests.types.ts` (wire DTOs incl. Q-B-05 VisitWire + Q-B-04 OffsetPageInfo), `guests.schema.ts` (zod: offset query + `.strict()` PATCH + preference), `guests.serializer.ts` (PII masking + snake_case + embedded visit), `guests.repository.ts` (Prisma direct — findManyAndCount/detail/update/upsert-in-tx), `guests.service.ts` (scope + list/detail/update/addPreference), `guests.routes.ts` (4 routes), `index.ts` (barrel + buildGuestsService)
+  - `__tests__/`: `guests.service.test.ts` (22 unit), `guests.routes.test.ts` (6 component via inject), `guests.repository.integration.test.ts` (10 integration)
+
+DoD self-check
+- [x] **G1** — `GET /guests` list + `q` search (name + wa_phone), **offset** page/pageSize pagination (NOT cursor); envelope = ratified **Q-B-04** `{ data, pageInfo: { page, pageSize, total, hasMore } }`; `hasMore = page*pageSize < total`. Integration-verified (5 guests, pageSize 2 → 3 pages).
+- [x] **G2** — `GET /guests/:id` returns profile + `preferences[]` (createdAt asc) + `visits[]` (checkIn desc); embedded visits use the **module-local** serializer producing the ratified **Q-B-05** shape (no import of T16's serializer). Missing → `NotFoundError` 404.
+- [x] **G3** — `PATCH /guests/:id` zod `.strict()` — only `name`/`email`/`privacy_mode`/`is_vip`/`vip_level`; unknown keys incl. **`wa_phone` rejected** (`ValidationError`); enums validated. Returns updated guest. Integration-verified persistence.
+- [x] **G4** — `POST /guests/:id/preferences` **upserts by `preference_type`** (Prisma `upsert` on `@@unique([guestId, preferenceType])`) inside a `$transaction` with the refetch; returns the guest's full `preferences[]`. Integration: 2× same type → 1 row, value updated (idempotent).
+- [x] **G5** — tenant guard: list scoped `WHERE hotelId=ctx.hotelId` (explicit super_admin bypass, no dept filter — gm_admin-only); detail/update/preferences load then `assertHotelOwnership` (T03) → cross-tenant 404. `hotel_id` never from URL/body. RBAC role-gate left to T04 preHandler (N3).
+- [x] **G6** — PII masking at serializer layer; predicate `privacy_mode='vvip' && !(gm_admin||super_admin)`. **`maskName` + `shouldMaskPii` body byte-identical to `tickets.serializer`** (the only delta is the `shouldMaskPii` param annotation: tickets' local `GuestFields` alias vs guests' structural `{ privacyMode: string }` — the latter is the clean shared signature, so **T-CLEAN-01 stays a pure move**). Kept module-local this PR per ACK.
+- [x] **G7** — `AppError` only; `req.log` + correlationId; MODULE_TEMPLATE layout; barrel hides repo/serializer; reads `visits` table via Prisma (allowed) — no visits-module import.
+- [x] **G8** — unit (search/where, offset math, upsert, mask predicate, strict-PATCH) + integration vs real PG (search, offset, upsert idempotency, tenant isolation, 404). **Changed-file line coverage 97.87%** (repo 100 / routes 97.14 / schema 97.36 / serializer 100 / service 97.43 / types 100). `make check` + `make test-integration` green.
+
+Quality gate
+- `make check`: **PASS** (lint + format + typecheck + test-unit = **131 passed, 2 skipped** template placeholders; tickets suites green → no regression, guests didn't touch tickets)
+- `make test-integration`: **PASS** (guests **10** + tickets 17 = 27 via testcontainers)
+- ⚠ CI ordering unchanged: `make prisma-generate` before `make check`/tests on fresh checkout (GAP T11-#1 / T-INFRA-01).
+
+Drift scans (src/modules/guests): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Tenant scope on every query (G5); cross-tenant masked as 404 (§7). PII masking at serializer (G6). `wa_phone` immutable in PATCH. No secrets; no PII in logs. Read-only-ish; no webhook/crypto.
+
+Test evidence
+- Unit/component: **28** (service 22 + routes 6). Integration: **10**. Total **38**. Files listed above.
+- Sample list envelope (ratified Q-B-04):
+  ```json
+  { "data": [ { "id": "…", "name": "Budi Santoso", "wa_phone": "+6281234567890",
+      "email": "budi@example.com", "privacy_mode": "standard", "is_vip": false,
+      "vip_level": null, "total_stays": 0, "created_at": "…", "updated_at": "…" } ],
+    "pageInfo": { "page": 1, "pageSize": 20, "total": 5, "hasMore": false } }
+  ```
+
+Notes / open items
+- Same merge posture as T11/T13: buildable + fully testable now; live once `api.ts` bootstrap wires `configureTenantGuardHooks` + `register(guestsRoutes)` (DEP-4, foundation — untouched).
+- **T-CLEAN-01** obligation preserved: masking helpers ready for a clean promote-to-`@shared` move (bodies identical; guests already uses the general signature).
+- Guest `/messages` (T15) is a separate cursor-paginated task — not in this PR.
+
+Requesting PM B VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
