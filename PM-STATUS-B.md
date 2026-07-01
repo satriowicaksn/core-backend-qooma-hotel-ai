@@ -588,6 +588,62 @@ Awaiting exec-B PLAN for T16.
 
 Awaiting Slot-A `TenantContext.userId` (DEP-5) before impl; exec-B may PLAN now.
 
+---
+
+### ASSIGNMENT T14 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/guests-crud` (exec-B creates on ACK; code stays on branch, PO merges)
+- Routed from: PARENT §1 T14 (Slot B) = MVP-HOTEL-CORE-FIRST §1.2 B4
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below. (Taking T14 solo this loop — not fanning out T16 concurrently, so the Q-B-05 Visit shape can't drift mid-flight.)
+
+#### PLAN T14 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+New greenfield module `src/modules/guests/` (do NOT touch `tickets`). Four `gm_admin`-only endpoints: `GET /api/guests` (q-search name+wa_phone, **offset** pagination), `GET /api/guests/:id` (profile + `preferences[]` + `visits[]`), `PATCH /api/guests/:id` (profile/privacy/VIP), `POST /api/guests/:id/preferences` (upsert by `preference_type`). Reuse the tickets *patterns* (scope arms, serializer masking, AppError, correlationId logging) without importing the tickets *module*.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.3` (guests endpoints + roles) + §2.3 DDL (`guests` + `guest_preferences` + `visits`) + §6 RBAC; envelope `README §2.7`; PII floor MVP §4.5; Q-B-05 ratified Visit shape (§2 above)
+- Dependency: T02 ✓ (tables exist); T04 **merged** (`req.tenant` live). Greenfield module — no `tickets` edits.
+- `pnpm typecheck` clean ✓ ; `pnpm lint` clean ✓ (on `main`, node_modules + prisma client already generated this session)
+- Scaffolder risk: **none** (no new deps; `prisma generate` already run; no `pnpm create`).
+
+**Files to create** (all in `src/modules/guests/`)
+```
+guests.routes.ts        4 routes (Fastify plugin via options, same seam as ticketsRoutes)
+guests.service.ts       guestScopeWhere(ctx) + list(offset)/detail/update/upsertPreference
+guests.repository.ts    Prisma direct — findManyAndCount, findDetailById (incl prefs+visits), updateGuest, upsertPreference
+guests.schema.ts        zod — list query (q,page,pageSize), :id param, patch body (.strict()), preference body
+guests.serializer.ts    guest wire (snake_case) + PII masking + preference wire + embedded visit summary (Q-B-05 shape)
+guests.types.ts         wire DTOs + domain
+index.ts                barrel — guestsRoutes + buildGuestsService
+__tests__/guests.service.test.ts               unit (search build, offset math, upsert logic, mask predicate)
+__tests__/guests.repository.integration.test.ts  integration (search, upsert idempotency, tenant isolation, 404)
+```
+
+**Files to modify**: none outside the new module (no `api.ts`/`prisma`/`core`/`tickets`).
+
+**Approach**
+- **Scope (G5)**: local `guestScopeWhere(ctx)` mirroring the tickets pattern — `hotelId: ctx.hotelId` unless `ctx.isSuperAdmin` (explicit bypass). No dept filter (guests are gm_admin-only; the "who may hit this route" gate is T04's RBAC preHandler — N3, I don't hand-roll role checks). Detail/PATCH/preferences load the guest by id then `assertHotelOwnership(ctx, row.hotelId, 'Guest')` (T03 helper → cross-tenant 404).
+- **List (G1)**: **offset** pagination — `page` (default 1, ≥1), `pageSize` (default 20, ≤100); `skip=(page-1)*pageSize`, `take=pageSize`; `q` → Prisma `OR [{ name: contains insensitive }, { waPhone: contains insensitive }]` in its own AND arm; `findManyAndCount` (findMany + count in a `$transaction`) → `total`. **Do NOT reuse the tickets cursor codec.**
+- **Detail (G2)**: `findUnique` include `preferences` (order `createdAt asc`) + `visits` (order `checkIn desc`); serialize embedded visits to the **ratified Q-B-05 shape** (module-local serializer, full shape incl. `special_request`/`satisfaction_score` — no rename/retype). Missing → `NotFoundError('Guest', id)`.
+- **PATCH (G3)**: zod `.strict()` body, all-optional: `name`, `email` (nullable), `privacy_mode` (enum `standard|vvip`), `is_vip` (bool), `vip_level` (enum `silver|gold|platinum`|null). Unknown/immutable keys → `ValidationError`. **`wa_phone` intentionally immutable** in PATCH (it's the WA identity + `(hotel_id,wa_phone)` unique) — flagging; add later if FE needs it. Returns updated guest.
+- **Preferences (G4)**: load+assert guest first (404 if cross-tenant), then Prisma `upsert` on `@@unique([guestId, preferenceType])` (`create` carries `hotelId=ctx.hotelId`); wrap upsert+refetch-preferences in `$transaction` for a consistent return. Returns the guest's full `preferences[]`.
+- **PII masking (G6)**: serializer-layer, same predicate as tickets — mask `wa_phone`/`name`/`email` when `privacy_mode==='vvip' && !(ctx.role==='gm_admin' || ctx.isSuperAdmin)`. (Rarely fires since endpoints are gm_admin-only, but implemented for defense.)
+- **Errors/logging (G7)**: `AppError` only; `req.log` + correlationId (`x-correlation-id` ?? `req.id`); MODULE_TEMPLATE layout; barrel hides repo/serializer.
+
+**Open questions / decisions (for PM B ACK)**
+- **Q-B-04 — offset list envelope (propose).** §2.7's `{data, pageInfo:{nextCursor,hasMore}}` is cursor-shaped; guests are page-based and need a `total` (FE renders page counts). **Proposing** (keeps the `data`/`pageInfo` wrapper consistent with tickets so FE has one list-envelope model, offset fields inside):
+  ```json
+  { "data": [ /* guest */ ], "pageInfo": { "page": 1, "pageSize": 20, "total": 137, "hasMore": true } }
+  ```
+  Alternative if FE MSW is flat: `{ data, page, pageSize, total }`. **My intent: the pageInfo-wrapped form** (one shared answer for T14 + T16 per your note). Confirm before I lock the serializer; FE MSW is the tiebreaker (serializer-isolated → one-file change).
+- **Q-B-05 — already RESOLVED by you.** Consuming the ratified Visit shape for embedded `visits[]` (full shape, module-local serializer). No action needed; noting I'm aligned. If I later fan out T16, it owns the canonical `visits.serializer.ts` producing the same shape.
+- **G6 mask-predicate duplication (flag, per your invite).** The predicate + `maskName` now exist in `tickets.serializer` and will duplicate in `guests.serializer`. **My intent: keep it module-local in guests for now** (keeps this PR self-contained, zero edits to merged `tickets`/`@shared`), and raise a small follow-up to promote `maskName` + `shouldMaskPii(privacyMode, ctx)` to `@shared/utils/masking.ts` (additive; both modules import) as a separate refactor. Redirect me if you'd rather I promote-to-`@shared` inside this PR (it would then touch merged `tickets.serializer` + shared).
+
+**Merge posture**: same as T11/T13 — buildable + fully testable now (inject `TenantContext`); live once `api.ts` bootstrap wires `configureTenantGuardHooks` + `register(guestsRoutes)` (DEP-4, foundation — not touched). `make prisma-generate` before CI (GAP T11-#1 / T-INFRA-01).
+
+Awaiting PM B ACK (PLAN + Q-B-04 envelope + G6 masking-dedup decision + wa_phone-immutable confirm). Not coding before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
