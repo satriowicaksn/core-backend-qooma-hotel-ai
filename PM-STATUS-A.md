@@ -941,6 +941,95 @@ All 3 advisory checks resolved cleanly + `no-misused-promises` catch verified re
 
 Ship it.
 
+#### SUBMIT T-INFRA-01 — exec-A (Nanak) at H0 2026-07-02 (attempt 1)
+
+Task: Foundation infra — `make check` `prisma-generate` prereq + real Prisma client singleton (GAP-T11-1 fix)
+
+Branch: `feat/foundation-prisma-ci` · Commit: `583d324` (pushed to `origin/feat/foundation-prisma-ci`)
+
+Files changed: **2** (0 create, 2 modify)
+  - `Makefile` line 148 (1-line edit: prepend `prisma-generate` to `check` prereqs + updated help text)
+  - `src/core/prisma/prisma-client.ts` (body rewrite per PLAN — JSDoc lines 1-10 preserved verbatim; 30 LOC of real singleton + `NODE_ENV !== 'test'` signal-handler guard + `void`-wrapped shutdown)
+
+DoD self-check (11 items from ASSIGNMENT §T-INFRA-01 DoD)
+- [x] **`Makefile:148` `check` target has `prisma-generate` as first prereq** — verified: `check: prisma-generate lint format-check typecheck test-unit ## Prisma-generate + lint + format-check + typecheck + unit test`
+- [x] **`src/core/prisma/prisma-client.ts` exports real `PrismaClient` instance** — 30-line file exporting `db = new PrismaClient({...})` with datasource url from `loadConfig().DATABASE_URL` and env-aware log level. `{}` stub removed.
+- [x] **Fresh-checkout acceptance test PASSES** — evidence below (primary DoD signal)
+- [x] **`make check` PASS on already-generated checkout** — 2nd/subsequent run also green, no state pollution
+- [x] **T04's `tenant-guard.hooks.test.ts` (3 tests) still green** — visible in `make check` output: `PASS src/plugins/__tests__/tenant-guard.hooks.test.ts`
+- [x] **T04's `rbac.test.ts` (11 tests) still green** — `PASS src/plugins/__tests__/rbac.test.ts`
+- [x] **T03's `tenant-guard.test.ts` (14 tests) still green** — `PASS src/plugins/__tests__/tenant-guard.test.ts`
+- [x] **`_template` 2 skipped tests remain skipped** — `Test Suites: 2 skipped, 6 passed, 6 of 8 total` + `Tests: 2 skipped, 69 passed, 71 total`
+- [x] **Drift scans clean on Makefile + `src/core/prisma/prisma-client.ts`** — evidence below (Makefile N/A for TS-rule categories)
+- [x] **No new deps in `package.json`** — `git diff package.json` returned empty (verified in run)
+- [x] **Nathan T13 unblocking implicit** — exec-B can drop the pre-run `pnpm prisma:generate` workaround after this merges; noted below
+
+Quality gate (final `make check`, standard `already-generated` run)
+- `pnpm prisma:generate`: PASS (`✔ Generated Prisma Client (v5.22.0) to ./node_modules/.prisma/client in 299ms`) — now the first step of `make check`
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean)
+- `pnpm test:unit`: PASS — `Test Suites: 2 skipped, 6 passed, 6 of 8 total · Tests: 2 skipped, 69 passed, 71 total`
+- `make check` overall: **PASS**
+
+Fresh-checkout acceptance test evidence (PRIMARY DoD signal — closes GAP-T11-1)
+```bash
+$ rm -rf node_modules dist coverage .tsbuildinfo
+$ pnpm install --frozen-lockfile
+  … (pnpm store link, no postinstall run under pnpm 9 default)
+  Done in 2.8s
+$ make check
+  pnpm prisma:generate
+  Environment variables loaded from .env
+  Prisma schema loaded from prisma/schema.prisma
+  ✔ Generated Prisma Client (v5.22.0) to ./node_modules/.prisma/client in 299ms
+  … (lint, format:check, typecheck all PASS)
+  PASS src/modules/tickets/__tests__/tickets.service.test.ts
+  PASS src/modules/tickets/__tests__/tickets.repository.integration.test.ts (25.418 s)
+  PASS src/modules/tickets/__tests__/tickets.routes.test.ts
+  PASS src/plugins/__tests__/tenant-guard.hooks.test.ts
+  PASS src/plugins/__tests__/tenant-guard.test.ts
+  PASS src/plugins/__tests__/rbac.test.ts
+  Test Suites: 2 skipped, 6 passed, 6 of 8 total
+  Tests:       2 skipped, 69 passed, 71 total
+  Time:        26.008 s
+```
+→ **PASS**. Pre-fix behavior on same fresh state: `make check` would fail at `typecheck` with `Namespace 'Prisma' has no exported member 'TicketInclude' | 'TicketWhereInput' | 'TicketGetPayload'` (Nathan's T11 code untouched, exact symptom he flagged). Post-fix: passes because `prisma-generate` now runs before `typecheck`.
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on T-INFRA-01 touched files)
+- `any` types in `src/core/prisma/prisma-client.ts`: **0 hits**
+- `console.log` in `src/core/prisma/prisma-client.ts`: **0 hits**
+- `throw new Error(` in `src/core/prisma/prisma-client.ts`: **0 hits** (uses no error — success-only module init; failure surfaces via `loadConfig()`'s own error path)
+- Forbidden imports in `src/core/prisma/prisma-client.ts`: **0 hits** (only `@prisma/client` + `@core/config/env.js`)
+- Default export in `src/core/prisma/prisma-client.ts`: **0 hits** (single named `export const db`)
+- `.skip(` in tests: unchanged from baseline (2 in `_template`, pre-existing per T01 note)
+- Makefile: N/A for TS-rule drift categories (edit is 1-line prereq addition)
+- `git diff package.json`: empty (no dep add — HARD constraint upheld)
+
+Security check (N/A for T-INFRA-01 — no auth/webhook/crypto surface)
+- HMAC verify: N/A
+- Token encryption: N/A
+- PII masking: N/A (log config passes only warn/error levels; no user data serialized)
+- No secret hardcoded: **confirmed** (`config.DATABASE_URL` is env-sourced via `loadConfig()`)
+- ADR-0001 compliance (no wrap-Prisma interface): **confirmed** — `db` is a raw `PrismaClient` instance; no `IUserRepository`-style wrapper introduced
+
+Test evidence
+- Total tests post-fix: **69 passed / 2 skipped / 71 total** in 6 executed suites (2 additional suites skipped: `_template` boilerplate + jest config placeholder)
+- New tests added by T-INFRA-01: **0** — rationale from ASSIGNMENT: "Prisma Client is a library wrapper; unit-testing 'the wrapper wraps' is redundant per CLAUDE.md general principle. Integration coverage comes downstream via testcontainers in modules that use it (Nathan's T11 already does this)."
+- Coverage: unchanged (touched file `prisma-client.ts` has no test — deliberate per above rationale; would be tested via integration when a module actually consumes it)
+
+Adv-#1 fallback status: **NOT triggered**. `loadConfig()` at module top did not surface any test-time failure — as PLAN predicted, no current test transitively loads the singleton (T11 uses `import type` + injection; T03/T04 don't touch `@core/prisma/*`). No pivot to lazy `getPrisma()` factory needed.
+
+Notes for Slot B
+- **Nathan can drop the pre-run `pnpm prisma:generate` workaround** once this branch merges to `main`. Standard `make check` will now regenerate Prisma Client automatically on any checkout state.
+- No change to T11 code required. `buildTicketsService(db: PrismaClient, ...)` remains the wiring seam — future `api.ts` implementation will pass `db` from `@core/prisma/prisma-client.js` at composition time.
+
+Notes / operational
+- Root cause deep-dive on pnpm virtual store behavior (for PARENT §10 coord note if useful): under `.npmrc` `node-linker=isolated` + `shamefully-hoist=false`, pnpm 9 does NOT auto-run @prisma/client's postinstall on `pnpm install --frozen-lockfile`. So the pnpm-store `.prisma/client/` folder is absent after fresh install. `pnpm prisma:generate` (per schema.prisma's `output = "../node_modules/.prisma/client"`) then writes to the project-root `.prisma/client/`, and TypeScript module resolution — walking up the directory tree from the pnpm store — finds it there. All types (37927 lines including `TicketWhereInput`, `TicketInclude`, `TicketGetPayload`) resolve correctly. Pre-existing brokenness was strictly the missing prereq step. My earlier intermediate `pnpm rebuild @prisma/client` in this session polluted the pnpm store with a 110-line stub that shadowed the project-root types — this is a red herring that doesn't reproduce under the acceptance-test steps.
+- Env note (session-local): had to re-activate Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure). No permanent config change.
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
