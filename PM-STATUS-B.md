@@ -16,7 +16,7 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active tasks**: **T14 ✅ APPROVED (merge `feat/guests-crud` FIRST)** · **T16** V1 done, V2–V5 ⛔ DEP-6 · **T19** ⛔ DEP-5. T11+T13 ✅ merged.
+- **Active**: **4/10 merged** (T11,T13,T14,T15). **T19** 🟢 ready (DEP-5 landed, awaiting PLAN) · **T16** V1 done, V2–V5 ⛔ DEP-6 (only blocker left). T12⛔(T06+DEP-6). Backlog T17/T18/T20.
 - **Branches**: T11 merged ✓ · T13 merged ✓ · T14 `feat/guests-crud` · T16 `feat/visits-list-verify` · T19 `feat/notifications-crud` (pending)
 - **Mode**: multi-executor. Each T = own thread in §2 (ASSIGNMENT→PLAN→ACK→SUBMIT→VERDICT) + own branch → I verify each independently on its branch. See §0a board for live state.
 - **Runtime**: T04 MERGED ✓ (`req.tenant` live). Go-live gate = **DEP-4** (`api.ts` bootstrap). **DEP-5** (`ctx.userId`) unblocks T19. Both escalated.
@@ -40,7 +40,7 @@
 | T11 | Tickets list + detail | ✅ approved | `feat/tickets-list-detail` | ✅ merged (PR #1) |
 | T13 | Ticket stats + overdue | ✅ approved | `feat/tickets-stats-overdue` | ✅ merged |
 | T14 | Guests CRUD + preferences | ✅ approved | `feat/guests-crud` | ✅ **merged (PR #3)** |
-| T15 | Guest messages history | ✅ approved (attempt 1) | `feat/guest-messages` @ `1355204` (merges clean) | ⏳ awaiting PO merge |
+| T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | 🟡 partial — V1 done, V2–V5 ⛔ DEP-6 | `feat/visits-list-verify` @ `f63e10b` | — (hold until complete) |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 shipped) — ready for PLAN | `feat/notifications-crud` | — |
 | T12 | Ticket transition + reroute | ⛔ blocked (T06, Slot A) | — | — |
@@ -48,10 +48,11 @@
 | T18 | Manual visit create | ⚪ backlog (←T16) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **3/10 merged (T11, T13, T14)** + T15 approved (awaiting merge) · 🟡 T16 partial (V1) · 🟢 T19 unblocked (ready) · ⛔ 2 blocked (T16-V2..5 DEP-6, T12 T06+DEP-6) · ⚪ 3 backlog (T17, T18, T20).
+**Counts**: ✅ **4/10 merged (T11, T13, T14, T15)** · 🟢 T19 ready (awaiting PLAN) · 🟡 T16 partial (V1, ⛔ DEP-6) · ⛔ T12 (T06+DEP-6) · ⚪ 3 backlog (T17, T18, T20).
 **Foundation watch**: ✅ **DEP-5 `ctx.userId` SHIPPED** (→ T19 unblocked) · ⛔ **DEP-6 `BusinessRuleError(422)`** still open (blocks T16-V2..5 + T12) · DEP-4 `api.ts` bootstrap (go-live) · T06 state-machine (T12) — DEP-6/DEP-4/T06 still on Parent/Slot A.
 
 ### Loop ledger (newest on top)
+- **Loop 6b — 2026-07-02 — T15 MERGED (PR #4).** Slot B **4/10 merged** (T11, T13, T14, T15). No new PLAN/SUBMIT yet. Productive paths open: **T19 PLAN** (unblocked) + poke Slot A for **DEP-6** (only blocker left, opens T16-V2..5 + T12).
 - **Loop 6 — 2026-07-02 — T15 APPROVED; DEP-5 shipped → T19 unblocked.** T15 (guest messages) APPROVED attempt 1 (PM rerun: make check 144, coverage 97.46%, drift clean, merge dry-run CLEAN) → merge `feat/guest-messages`. **Slot A shipped DEP-5** (`ctx.userId` now on `TenantContext`) → **T19 unblocked** (ready for PLAN). Still open: **DEP-6** (`BusinessRuleError` → T16-V2..5 + T12). Next active: T15 merge + T19 PLAN; T16 still waits on DEP-6.
 - **Loop 5 — 2026-07-02 — T14 MERGED (PR #3); T15 issued.** Guests live on main → **T15 (guest messages) unblocked** and issued (`feat/guest-messages`, extends guests module). Bottleneck now = Slot A shipping **DEP-5** (`ctx.userId` → T19) + **DEP-6** (`BusinessRuleError` → T16-V2..5 + T12); both still open. Slot B productive path while waiting = T15.
 - **Loop 4 — 2026-07-02 — T14 APPROVED, T16 split.** **T14 (guests) APPROVED attempt 1** (PM rerun: make check 131, coverage 97.95%, drift clean, merge dry-run into main CLEAN) → **merge `feat/guests-crud` FIRST**. **T16 (visits) partial**: V1 read-path done+green on branch, but **V2–V5 (verify-manual) blocked on DEP-6** (`BusinessRuleError(422)` missing from `core/errors`; foundation/Slot A — escalated). Ruled GAP T16-#4: envelope `code="BUSINESS_RULE"` + `details.rule="INVALID_VISIT_TRANSITION"`; class owner = Slot A (also unblocks T12). **Merge order: T14 now; T16 hold until DEP-6 → V2–V5 → full SUBMIT.**
@@ -70,7 +71,7 @@
 | T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
 | T13 | Ticket stats + overdue                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main** 2026-07-01. PM rerun: make check 93 + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② SSOT coherence verified 4 sites. |
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
-| T15 | Guest messages history                                    | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 144 + coverage 97.46% + drift clean + merge dry-run CLEAN. Q-B-10 verified. **Merge `feat/guest-messages` @ `1355204`.** Awaiting PO merge. |
+| T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | wip (partial)| —              | V1 read-path done+green on `feat/visits-list-verify`. **V2–V5 blocked on DEP-6** (`BusinessRuleError(422)`, Slot A). GAP T16-#4 ruled (code `BUSINESS_RULE` + `details.rule`). Hold merge until complete. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — Slot A shipped DEP-5 (`ctx.userId` on `TenantContext`). Ready for PLAN + impl. `feat/notifications-crud`. |
 | T12 | Ticket status transition + reroute                        | backlog ⛔   | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
