@@ -921,6 +921,48 @@ Clean PLAN, fully consistent with the assignment + schema (`TicketMessage.ticket
 
 Proceed. 🟢
 
+### SUBMIT T15 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Guest messages history — `GET /api/guests/:id/messages` (cursor-paginated, aggregated `ticket_messages`)
+Branch: **`feat/guest-messages`** (pushed; commit `1355204`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 10 modified, **all** in `src/modules/guests/` (extended the module; 0 outside — no tickets-module import, no `api.ts`/`prisma`/`core` edits)
+  - `guests.types.ts` (+`MessageWire`/`MessageCursor`/`MessageListQuery`/`GuestMessagesResponse`/`TicketMessageRow`), `guests.schema.ts` (+`parseMessagesQuery` + module-local cursor codec), `guests.serializer.ts` (+`serializeMessage`), `guests.repository.ts` (+`findGuestMessages`), `guests.service.ts` (+`buildGuestMessagesWhere` + `messages()`), `guests.routes.ts` (+`GET /guests/:id/messages`), `index.ts` (exports)
+  - `__tests__/`: service (+8 unit), routes (+1 component), integration (+4 + seed tickets/messages)
+
+DoD self-check
+- [x] **M1** — endpoint returns the guest's `ticket_messages` history, cursor-paginated; keyset on `(sent_at, id)` via a **module-local** codec (N1 OR-decomposition, `id` tiebreaker per advisory). Envelope `{ data, pageInfo: { nextCursor, hasMore } }`. Invalid cursor → 400.
+- [x] **M2** — message wire conforms to tickets §1.2 `messages[]` (snake_case: `{id, ticket_id, sender, sender_user_id, body, media, conversation_id, sent_at, delivered_at, read_at}`). Ordering = **newest-first** (`sent_at DESC, id DESC`) per ratified Q-B-10. Integration asserts `['a2-new','a1-mid','a1-old']`.
+- [x] **M3** — tenant + guest-ownership guard: guest loaded first + `assertHotelOwnership` → cross-tenant guest = `NotFoundError` 404. Message query scoped `hotelId = ctx.hotelId AND ticket.guestId = :id` (explicit super_admin bypass). gm_admin-only gate = T04 preHandler (N3). Integration: cross-tenant 404 + other-guest/other-hotel messages excluded.
+- [x] **M4** — **no PII masking on message bodies** (confirmed with PM); §4.5 governs identity fields, not conversation content; gm_admin-only. `serializeMessage` emits body verbatim.
+- [x] **M5** — unit (cursor codec round-trip + invalid, `buildGuestMessagesWhere` scope/keyset, service pagination/404) + integration (seed guest + 2 tickets + 3 messages across them + decoy other-guest/other-hotel messages; aggregation, ordering, cursor pagination across 2 pages, tenant/guest isolation, 404, empty-history).
+- [x] **M6** — layout consistent (extended module, no new files); **no cross-module import** (reads `ticket_messages` via Prisma, tickets module untouched); drift 0; **changed-file line coverage 97.38%** (repo 100 / routes 97.56 / schema 94.91 / serializer 100 / service 98.3 / types 100); `make check` + `make test-integration` green.
+
+Quality gate
+- `make check`: **PASS** (**144 passed, 2 skipped** template placeholders; tickets + guests-CRUD suites green → no regression)
+- `make test-integration`: **PASS** (guests **14** [10 CRUD + 4 messages] + tickets 17 via testcontainers)
+- ⚠ CI ordering unchanged: `make prisma-generate` before `make check`/tests (T-INFRA-01).
+
+Drift scans (src/modules/guests): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Tenant + guest-ownership scope on every message query (M3); cross-tenant masked 404 (§7). No body masking by design (M4, gm_admin-only). No secrets/PII in logs.
+
+Test evidence
+- Unit/component: **46** (service 39 + routes 7). Integration: **14**. Total **60** in the module.
+- Sample messages envelope (Q-B-10, newest-first):
+  ```json
+  { "data": [ { "id": "…", "ticket_id": "…", "sender": "staff", "sender_user_id": null,
+      "body": "a2-new", "media": null, "conversation_id": null,
+      "sent_at": "2026-06-11T09:00:00.000Z", "delivered_at": null, "read_at": null } ],
+    "pageInfo": { "nextCursor": "eyJzZW50QXQiOiIuLi4ifQ", "hasMore": true } }
+  ```
+
+Notes / open items
+- Same merge posture as T11/T13/T14: buildable + fully testable now; live once `api.ts` bootstrap wires `register(guestsRoutes)` (DEP-4, foundation — untouched).
+- **T-CLEAN-02** obligation preserved: the base64 keyset codec duplicates T11's by design — ready for a `@shared` promote later, not this PR.
+
+Requesting PM B VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
