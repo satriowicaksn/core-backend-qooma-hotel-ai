@@ -39,19 +39,20 @@
 | --- | ---- | ------ | ------ | -------- |
 | T11 | Tickets list + detail | ✅ approved | `feat/tickets-list-detail` | ✅ merged (PR #1) |
 | T13 | Ticket stats + overdue | ✅ approved | `feat/tickets-stats-overdue` | ✅ merged |
-| T14 | Guests CRUD + preferences | ✅ approved (attempt 1) — **MERGE THIS FIRST** | `feat/guests-crud` @ `f4c4fd8` (merges clean) | ⏳ awaiting PO merge |
+| T14 | Guests CRUD + preferences | ✅ approved | `feat/guests-crud` | ✅ **merged (PR #3)** |
+| T15 | Guest messages history | 🟡 assigned (awaiting PLAN) | `feat/guest-messages` | — |
 | T16 | Visits list + verify-manual | 🟡 partial — V1 done, V2–V5 ⛔ DEP-6 | `feat/visits-list-verify` @ `f63e10b` | — (hold until complete) |
 | T19 | Notifications CRUD | ⛔ blocked (DEP-5 `ctx.userId`) | `feat/notifications-crud` | — |
 | T12 | Ticket transition + reroute | ⛔ blocked (T06, Slot A) | — | — |
-| T15 | Guest messages history | ⚪ backlog (←T14) | — | — |
 | T17 | Visit reject + failed_3x | ⚪ backlog (←T16) | — | — |
 | T18 | Manual visit create | ⚪ backlog (←T16) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ 2/10 merged (T11,T13) + **T14 approved (awaiting merge)** · 🟡 1 partial (T16 V1 done) · ⛔ 3 blocked (T16-V2..5 on DEP-6, T19 on DEP-5, T12 on T06) · ⚪ 4 backlog.
+**Counts**: ✅ **3/10 merged (T11, T13, T14)** · 🟡 1 assigned (T15) + 1 partial (T16 V1) · ⛔ 3 blocked (T16-V2..5 DEP-6, T19 DEP-5, T12 T06) · ⚪ 3 backlog (T17, T18, T20).
 **Foundation watch (gate our unblocks)**: DEP-4 `api.ts` bootstrap (go-live ALL routes) · DEP-5 `TenantContext.userId` (unblocks T19) · **DEP-6 `BusinessRuleError(422)`** (unblocks T16-V2..5 **and** T12) · T06 state-machine (T12) — all escalated to Parent/Slot A.
 
 ### Loop ledger (newest on top)
+- **Loop 5 — 2026-07-02 — T14 MERGED (PR #3); T15 issued.** Guests live on main → **T15 (guest messages) unblocked** and issued (`feat/guest-messages`, extends guests module). Bottleneck now = Slot A shipping **DEP-5** (`ctx.userId` → T19) + **DEP-6** (`BusinessRuleError` → T16-V2..5 + T12); both still open. Slot B productive path while waiting = T15.
 - **Loop 4 — 2026-07-02 — T14 APPROVED, T16 split.** **T14 (guests) APPROVED attempt 1** (PM rerun: make check 131, coverage 97.95%, drift clean, merge dry-run into main CLEAN) → **merge `feat/guests-crud` FIRST**. **T16 (visits) partial**: V1 read-path done+green on branch, but **V2–V5 (verify-manual) blocked on DEP-6** (`BusinessRuleError(422)` missing from `core/errors`; foundation/Slot A — escalated). Ruled GAP T16-#4: envelope `code="BUSINESS_RULE"` + `details.rule="INVALID_VISIT_TRANSITION"`; class owner = Slot A (also unblocks T12). **Merge order: T14 now; T16 hold until DEP-6 → V2–V5 → full SUBMIT.**
 - **Loop 3 — 2026-07-01→02 — parallel batch RUNNING.** T14 + T16 **PLANs ACK'd** (2026-07-02), both coding on their branches. Q-B-04 offset envelope ratified (shared, both converged on `{data,pageInfo:{page,pageSize,total,hasMore}}`). T16 GAP #1/#2/#3 → approach A (audit no-op seam, guest_name validate-only, config.TZ); Q-B-09 (visit audit table) → Parent §3c. T14: G6 masking module-local + T-CLEAN-01 follow-up, wa_phone immutable. T19 still ⛔ DEP-5. **Done: T11, T13 merged.** In-flight: T14, T16 coding → whichever SUBMITs first gets an independent VERDICT.
 - **Loop 2 — 2026-07-01 H12 — T13 APPROVED + merged.** stats+overdue; `is_overdue` SSOT coherence fix verified 4 sites; T11 regression green. T04 observed merged (seam live).
@@ -67,11 +68,12 @@
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T11 | Tickets list + detail (GET + filters + cursor pagination) | **approved + MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main via PR #1 (`6c1e4e2`) 2026-07-01**. PM rerun: make check + integration 11 + coverage 96% + drift clean. Runtime gate: T04 (Slot A, now **wip** `972b0c5`) wires `req.tenant` → routes go live. GAP T11-#2 (approach A) approved; #1/#3 escalated to foundation. |
 | T13 | Ticket stats + overdue                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main** 2026-07-01. PM rerun: make check 93 + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② SSOT coherence verified 4 sites. |
-| T14 | Guests CRUD + preferences                                 | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 131 + coverage 97.95% + drift clean + merge-into-main dry-run CLEAN. **Merge `feat/guests-crud` @ `f4c4fd8` FIRST.** Awaiting PO merge. T-CLEAN-01 queued. |
+| T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
+| T15 | Guest messages history                                    | assigned     | —              | Issued §2 (2026-07-02). Unblocked by T14 merge. Extends `guests/`. Cursor-paginated `GET /guests/:id/messages` over `ticket_messages`. Awaiting PLAN. Q-B-10 (source+ordering). |
 | T16 | Visits list + verify-manual                               | wip (partial)| —              | V1 read-path done+green on `feat/visits-list-verify`. **V2–V5 blocked on DEP-6** (`BusinessRuleError(422)`, Slot A). GAP T16-#4 ruled (code `BUSINESS_RULE` + `details.rule`). Hold merge until complete. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned ⛔  | —              | Issued §2 (2026-07-01) but **BLOCKED on DEP-5** (`TenantContext.userId`, Slot A). May PLAN now; impl waits. Escalated PARENT §3b/§10. |
 | T12 | Ticket status transition + reroute                        | backlog ⛔   | —              | Blocked on T06 (state-machine, Slot A — backlog) + T11 ✓ |
-| T15/T17/T18/T20 | Downstream CRM + socket                       | backlog      | —              | T15←T14; T17/T18←T16; T20←T11✓+T16+T19 |
+| T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
 
@@ -832,6 +834,34 @@ Verified your analysis against `core/errors/app-errors.ts` (confirmed: 409→429
 **② Class owner — Option A APPROVED (NOT B).** `BusinessRuleError(422)` belongs in `core/errors` = **foundation/Slot A** (maps to their **T07** "Common error handlers, HC codes per §7"). I am NOT blessing a Slot-B core edit (option B) — the class is **shared with T12**, so foundation ownership is correct and keeps the "0 core edits" boundary intact. **Escalated as DEP-6 to Parent §3b/§10** — recommending Slot A ship `BusinessRuleError` (statusCode 422, code `BUSINESS_RULE`, accepts a `details.rule`) now, as it unblocks **T16 V2–V5 AND T12**.
 - **Meanwhile**: V1 (read-path) stays on the branch — correct call to checkpoint, not force a core hack. The moment DEP-6 lands, add V2–V5 + tests → full SUBMIT. I'll verdict then.
 - Your `recordVisitAudit` no-op seam (T16-#1) + `config.TZ` (T16-#3) + guest_name validate-only (T16-#2) rulings from the ACK all stand.
+
+---
+
+### ASSIGNMENT T15 — Guest messages history — issued by PM B (Nathan) 2026-07-02 (H13)
+- Branch: `feat/guest-messages` (off latest main — includes merged guests + tickets modules) · Routed from PARENT §1 T15 = MVP §1.2 **B5** · Spec: `02-hotel-core.md §1.3` (`GET /api/guests/:id/messages`, cursor-paginated) + §2.4 DDL (`ticket_messages`)
+- Dependency: **T14 ✅ merged** (guests module on main). **Extends `src/modules/guests/`** — you're the only one in this module now (T14 done), so no collision.
+- **Inherited floor** (verified at SUBMIT, same as T11/T13/T14): tenant guard via `TenantContext`; `AppError` only; correlationId logging; module layout; no cross-module internal import; zod; ≥80% cov; `make check` + `make test-integration` green; drift 0.
+
+**Scope (role `gm_admin` only) — 1 endpoint**
+- `GET /api/guests/:id/messages` — the guest's conversation history, **cursor pagination** (`limit` default 20 max 100, opaque `cursor`).
+
+**Source (verified — flag if FE disagrees):** there is **no standalone guest-messages table**; the guest's messages = **`ticket_messages` across that guest's tickets** (`WHERE ticket.guestId = :id AND ticket.hotelId = ctx.hotelId`). Read `ticket_messages` via Prisma directly — **do NOT import the tickets module** (cross-module). Serialize with the **same message wire shape as tickets §1.2** (`{id, ticket_id, sender, sender_user_id, body, media, conversation_id, sent_at, delivered_at, read_at}`) — module-local serializer conforming to that shape.
+
+**DoD**
+- [ ] M1 — endpoint returns the guest's `ticket_messages` history, cursor-paginated (keyset on `(sent_at, id)`; reuse the T11 keyset *pattern* but a **module-local codec** — do not import tickets'). Envelope = ratified list shape `{ data, pageInfo: { nextCursor, hasMore } }` (cursor, per Q-B-01/§2.7).
+- [ ] M2 — message wire shape conforms to tickets §1.2 `messages[]` (snake_case). Ordering: **propose in PLAN (Q-B-10)** — newest-first (chat scrollback) vs chronological; pin against FE MSW.
+- [ ] M3 — tenant + guest-ownership guard: guest not in `ctx.hotelId` → `NotFoundError` 404 (reuse `assertHotelOwnership` on the guest row before querying messages). gm_admin only.
+- [ ] M4 — no PII masking on message *bodies* (masking §4.5 governs guest identity fields, not conversation content; and this is gm_admin-only anyway) — confirm in PLAN, don't silently mask.
+- [ ] M5 — tests: unit (cursor codec, scope/where build) + integration (seed guest + ≥2 tickets + messages across them; assert aggregation, ordering, pagination, tenant/guest isolation, 404 for cross-tenant guest).
+- [ ] M6 — layout/drift/coverage/`make check`+integration per floor.
+
+**Open Q / notes**
+- **Q-B-10** — confirm message source (aggregate `ticket_messages` by guest) + ordering + cursor envelope. Propose in PLAN.
+- **Cursor-codec duplication**: T11 + T15 both need a base64 keyset codec. Keep module-local now; I'm noting **T-CLEAN-02** (promote a generic cursor codec to `@shared/utils/`, alongside T-CLEAN-01 masking) as a post-CRM cleanup. Don't do it in this PR.
+
+**Session-start gate**: confirm identity, read §1.3 + §2.4 `ticket_messages` DDL, `make typecheck`/`make lint` clean. Then PLAN. **No code before PM B ACK.**
+
+Awaiting exec-B PLAN for T15.
 
 <!--
 TEMPLATE — copy untuk task baru:
