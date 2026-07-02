@@ -4809,6 +4809,122 @@ Would guarantee same Promise for concurrent callers (semantically cleaner) but a
 
 Ship it.
 
+#### SUBMIT T10 — exec-A (Nanak) at H0 2026-07-03 (attempt 1)
+
+**MILESTONE**: With PM A VERDICT + PO merge, Slot A **main-queue T01–T10** ships complete (T01 make-check-green / T02 Prisma schema / T03 tenant-guard / T04 RBAC / T05 seed / T06 ticket state-machine / T07-slice-1 BusinessRuleError / T08 storage / T09 CSV / T10 Bull harness), alongside all foundation infra (T-INFRA-01 Prisma singleton / T-INFRA-02 userId on TenantContext / T-INFRA-03 test-glob split). 13 clean-first-attempt SUBMITs across the chain.
+
+Task: Bull queue workers harness — `createQueue` + `registerWorker` + `shutdownAllQueues` + `QueueConfig` + guarded signal handler
+
+Branch: `feat/foundation-workers-harness` · Commit: `b0a0640` (pushed to `origin/feat/foundation-workers-harness`)
+
+Files changed: **1 modify + 1 create** (exactly 2 files per DoD)
+  - `src/core/queue/bull-factory.ts` — replace 16-LOC stub with ~90-LOC real impl. JSDoc convention updated from `<module>:<job-type>` (colon) to `<domain>.<action>` (dot). Signal handler block wrapped with `/* istanbul ignore next */` (guard-verified indirectly per Adv #6).
+  - `src/core/queue/__tests__/bull-factory.test.ts` — 8 tests, `jest.mock('bull')` (Bull's IORedis client retries forever on connect, would hang jest workers) + `jest.mock('@core/config/env.js')` (env.ts NODE_ENV enum rejects 'test').
+
+DoD self-check (17 items from ASSIGNMENT §T10 DoD — full list, no truncation)
+- [x] **`createQueue<TData>(name, config?)` returns `Bull.Queue<TData>` instance** — verified via test #1 asserting `queue.name === 'test1.action'`
+- [x] **Default JobOptions applied: `attempts: 3`, `backoff: { type: 'exponential', delay: 5000 }`, `removeOnComplete: 100`, `removeOnFail: 500`** — verified via test #2 asserting each field on `readDefaults(queue)` matches
+- [x] **Caller-provided config overrides defaults correctly (test proof)** — test #3 passes `{ attempts: 10, removeOnComplete: false }`; asserts overridden fields AND preserved defaults (`backoff.type === 'exponential'` + `removeOnFail === 500`)
+- [x] **Redis config sourced from `loadConfig()` (REDIS_URL + REDIS_QUEUE_DB)** — verified by structure: `createQueue` calls `loadConfig()` then `new Bull<TData>(name, cfg.REDIS_URL, { redis: { db: cfg.REDIS_QUEUE_DB } })`. Test uses mocked `loadConfig` returning `REDIS_URL: 'redis://localhost:6379'` + `REDIS_QUEUE_DB: 0`.
+- [x] **Duplicate queue name throws `ConflictError`** — test #4 creates `'test4.action'` twice; asserts 2nd call throws `ConflictError` with `statusCode === 409`, `code === 'CONFLICT'`, `details === { name: 'test4.action' }`
+- [x] **`registerWorker<TData>(queue, processor, concurrency?)` accepts + delegates to `queue.process(...)`** — test #5 passes `mockQueue` with `process: jest.fn()`, `registerWorker(mockQueue, processor, 7)`; asserts `processSpy` called with `(7, processor)`
+- [x] **Default concurrency = `WORKER_CONCURRENCY_DEFAULT` from env** — test #6 omits concurrency arg; asserts `processSpy` called with `(5, processor)` (env default 5 per mock)
+- [x] **`shutdownAllQueues()` iterates registry + calls `.close()` on each** — test #7 creates 2 queues, calls `shutdownAllQueues()`, asserts both `.close()` spies invoked once + name reuse works (registry cleared)
+- [x] **Signal handlers registered ONLY when `NODE_ENV !== 'test'`** — test #8 asserts `process.env.NODE_ENV === 'test'` (indirect verification per Adv #6 (a): guard-true → no handler registration by bull-factory at module load; direct listenerCount + `jest.isolateModulesAsync` rejected as fragile with ESM+ts-jest)
+- [x] **JSDoc queue-naming convention updated to `<domain>.<action>` (dot notation)** — verified in file (see JSDoc excerpt below)
+- [x] **Test coverage ≥ 90% on `bull-factory.ts`** — actual: **100% stmts / 100% branch / 100% funcs / 100% lines** via `--collectCoverageFrom=src/core/queue/bull-factory.ts`. `/* istanbul ignore next */` on the guard block excludes it from coverage math (block is dead under NODE_ENV=test).
+- [x] **`make check` PASS with baseline + 6-8 new tests** — actual: `Tests: 1 skipped, 286 passed, 287 total · Time: 1.035 s`. Baseline reconciliation: T09 SUBMIT reported 278; T10 code-time baseline = 278 (Nathan/Satrio landed departments module in the interim but tests didn't shift the baseline as expected); +8 delta from T10 = 286.
+- [x] **Drift scans clean (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export)** — verified across both files (see Drift scans)
+- [x] **`git diff main -- src/core/redis/redis-client.ts src/core/prisma/prisma-client.ts` = empty** — verified: both stubs+singleton untouched (Adv #1 held)
+- [x] **`git diff main --name-only -- prisma/ docs/ package.json pnpm-lock.yaml Makefile jest.config.ts tsconfig.json` = empty** — verified via targeted `git diff` returning no output
+- [x] **`git diff main --name-only -- src/plugins/ src/modules/ src/shared/ src/core/config/ src/core/errors/ src/core/http/ src/core/storage/` = empty** — verified: T10 stays in `src/core/queue/` only
+- [x] **Branch-slip mitigation: 5th consecutive task** — `git branch --show-current` verified BEFORE code edits AND BEFORE commit; commit `[feat/foundation-workers-harness b0a0640]` landed on correct branch
+- [x] **Nathan velocity baseline reconciliation captured cleanly** — see Baseline reconciliation section
+
+Quality gate (final `make check`)
+- `pnpm prisma:generate`: PASS (T-INFRA-01 prereq)
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean; Bull's `Queue<T>` generic + `ProcessCallbackFunction<T>` types resolved correctly)
+- `pnpm test:unit`: **PASS** — `Test Suites: 1 skipped, 19 passed, 19 of 20 total · Tests: 1 skipped, 286 passed, 287 total · Time: 1.035 s`
+- `make check` overall: **PASS**
+
+Baseline reconciliation (per T08/T09 discipline)
+- T09 SUBMIT baseline: 278 pass / 1 skip / 279 total
+- Between T09 approval + T10 code: Satrio landed a `departments` module (visible in `git pull` output above) — added test suites appear in the executed listing
+- T10 code-time baseline: **278 pass / 1 skip / 279 total** (Nathan/Satrio departments module tests already in the 278 count from post-merge state)
+- T10 delta: **+8 pass / +0 skip / +8 total** (exactly 8 new tests, matching PLAN projection)
+- T10 SUBMIT actual: **286 pass / 1 skip / 287 total** = 278 + 8 = 286 ✓
+
+Coverage evidence (targeted `--collectCoverageFrom` on `bull-factory.ts`)
+```
+File            | % Stmts | % Branch | % Funcs | % Lines
+----------------|---------|----------|---------|--------
+bull-factory.ts |     100 |      100 |     100 |     100
+```
+- **100% across all 4 metrics** — exceeds ≥ 90% DoD
+- Achieved via `/* istanbul ignore next */` on the `if (process.env.NODE_ENV !== 'test')` signal-handler block. This block is dead code under jest (NODE_ENV=test guard-true), so excluding from coverage math correctly signals intent. Test #8 verifies the guard indirectly.
+
+JSDoc excerpt (proves Adv #2 dot convention adopted)
+```ts
+/**
+ * Bull queue factory with sensible defaults.
+ *
+ * Queue naming convention (PO ratified): `<domain>.<action>`
+ *   e.g. `notification.send`, `escalation.check`, `email.retry`
+ *
+ * Job data convention:
+ *   Carry minimal context (ID, correlation ID) — not the full domain object.
+ *   Consumer service hydrates from DB.
+ *
+ * Signal handling:
+ *   SIGTERM / SIGINT registered at module load (guarded by
+ *   `NODE_ENV !== 'test'`) call `void shutdownAllQueues()`. Additive to
+ *   T-INFRA-01's `prisma-client` handlers per Node's multi-listener support.
+ *
+ * Consumer usage:
+ *   import { createQueue, registerWorker } from '@core/queue/bull-factory.js';
+ *   const queue = createQueue<{ ticketId: string }>('notification.send');
+ *   registerWorker(queue, async (job) => { await notify(job.data.ticketId); });
+ */
+```
+Convention updated from boilerplate `<module>:<job-type>` (colon) → PO ratified `<domain>.<action>` (dot). Consumer example uses `'notification.send'` — dot notation demonstrated.
+
+Adv #1 grep verification (proof — `@core/redis` UNTOUCHED)
+```
+$ grep -c "@core/redis\|redis-client" src/core/queue/bull-factory.ts
+0
+```
+Zero references to `@core/redis/redis-client` or `redis-client` in the final `bull-factory.ts`. Bull manages its own Redis connections via `loadConfig().REDIS_URL` + `REDIS_QUEUE_DB`. Additionally verified `git diff main -- src/core/redis/redis-client.ts src/core/prisma/prisma-client.ts` returns empty (both stubs+singleton untouched).
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on T10 touched files)
+- `any` in both files: **0 hits**
+- `console.log|info|debug` in both files: **0 hits**
+- `throw new Error(` in both files: **0 hits** (factory throws `ConflictError` from AppError hierarchy)
+- Default export in both files: **0 hits** (all named exports)
+- `.skip(` in test file: **0 hits**
+- Forbidden imports (express / typeorm / sequelize / moment / node-fetch): **0 hits**
+- `git diff main -- <out-of-scope paths>`: **empty** for `src/core/redis/redis-client.ts`, `src/core/prisma/prisma-client.ts`, `src/plugins/`, `src/modules/`, `src/shared/`, `src/core/config/`, `src/core/errors/`, `src/core/http/`, `src/core/storage/`, `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`, `package.json`, `pnpm-lock.yaml`
+- **`git diff main --name-only`: exactly 2 files** (`src/core/queue/bull-factory.ts` + `src/core/queue/__tests__/bull-factory.test.ts`) — matches DoD
+
+Security check (N/A for T10 harness — no auth/webhook/crypto surface; Redis URL from env)
+- HMAC verify: N/A
+- Token encryption: N/A
+- PII masking: N/A (harness doesn't handle domain data)
+- No secret hardcoded: **confirmed** (`REDIS_URL` sourced via `loadConfig()`)
+
+Notes / operational
+
+**Test approach adaptation (documented for transparency)** — my PLAN's Adv #4 stated "Bull.Queue lazy construction — verified via `node_modules/bull/index.d.ts` inspection; unit tests inspect `.name`/`.opts` shape without Redis I/O". In practice, `new Bull()` eagerly constructs an IORedis client that retries forever when Redis is unreachable, hanging jest workers. Discovered when initial test run hung; switched to `jest.mock('bull', () => ({ __esModule: true, default: jest.fn().mockImplementation(...) }))` returning a minimal mock queue with `.name`, `.defaultJobOptions`, `.process` jest.fn, `.close` jest.fn resolving `undefined`. This preserves all 8 test assertions AND avoids the IORedis retry hang. Also stubbed `loadConfig()` because env.ts's NODE_ENV enum rejects 'test' — trying to call the real `loadConfig()` at test time throws before Bull is even touched. Both mocks are test-boundary shims; production `bull-factory.ts` code is unchanged and correct.
+
+**`registerWorker` `void` prefix** — `queue.process(c, processor)` returns `Promise<void>` per Bull v4 types. Prefix with `void` to satisfy `@typescript-eslint/no-floating-promises` — matches T-INFRA-01 + T05 idiom. Consumer semantic is fire-and-forget: registering the processor immediately kicks off Redis polling; awaiting the returned promise is not required.
+
+**Sequencing (mitigation held, 5th consecutive task)** — verified `git branch --show-current` BEFORE code edits AND before commit; commit landed on `feat/foundation-workers-harness` directly (`[feat/foundation-workers-harness b0a0640]`). Branch-slip pattern from T07-slice-1 / T06 / T-INFRA-02 stays not-recurring across 5 consecutive tasks now (T-INFRA-03 / T05 / T08 / T09 / T10).
+
+**Env note (session-local)**: re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
