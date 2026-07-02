@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { ValidationError } from '@core/errors/app-errors.js';
 
 import {
+  BOOKING_SOURCES,
   VISIT_STATUSES,
   type ApproveManualInput,
+  type BookingSource,
+  type CreateVisitInput,
   type VerifyManualInput,
   type VisitListQuery,
   type VisitStatus,
@@ -136,5 +139,35 @@ export function parseApproveManual(rawBody: unknown): ApproveManualInput {
     guestName: result.data.guest_name,
     roomNumber: result.data.room_number,
     ...(result.data.nights !== undefined ? { nights: result.data.nights } : {}),
+  };
+}
+
+// Manual visit create (T18 / Q-B-13). hotel_id/status never accepted from body
+// (.strict()). nights range 1–30 (DDL CHECK). check_out is set at verify, not here.
+const MAX_NIGHTS_CREATE = 30;
+const CreateVisitSchema = z
+  .object({
+    guest_id: z.string().uuid('guest_id must be a valid uuid'),
+    check_in: z.string().datetime({ offset: true }),
+    nights: z.number().int().min(MIN_NIGHTS).max(MAX_NIGHTS_CREATE).optional(),
+    room_number: z.string().trim().min(1).max(16).optional(),
+    booking_source: z.enum(BOOKING_SOURCES as [BookingSource, ...BookingSource[]]).optional(),
+    special_request: z.string().trim().min(1).max(2000).optional(),
+  })
+  .strict();
+
+export function parseCreateVisit(rawBody: unknown): CreateVisitInput {
+  const result = CreateVisitSchema.safeParse(rawBody ?? {});
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  const b = result.data;
+  return {
+    guestId: b.guest_id,
+    checkIn: new Date(b.check_in),
+    ...(b.nights !== undefined ? { nights: b.nights } : {}),
+    ...(b.room_number !== undefined ? { roomNumber: b.room_number } : {}),
+    ...(b.booking_source !== undefined ? { bookingSource: b.booking_source } : {}),
+    ...(b.special_request !== undefined ? { specialRequest: b.special_request } : {}),
   };
 }

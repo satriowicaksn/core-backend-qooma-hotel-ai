@@ -6,7 +6,12 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { deriveCheckout } from '../visits.checkout.js';
 import type { VisitsRepository } from '../visits.repository.js';
-import { parseApproveManual, parseListQuery, parseVerifyManual } from '../visits.schema.js';
+import {
+  parseApproveManual,
+  parseCreateVisit,
+  parseListQuery,
+  parseVerifyManual,
+} from '../visits.schema.js';
 import { serializeVisit } from '../visits.serializer.js';
 import {
   assertVisitTransition,
@@ -426,5 +431,132 @@ describe('VisitsService.reject + approveManual', () => {
     await expect(service.reject(ctx({ hotelId: 'hotel-1' }), 'visit-1')).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+});
+
+describe('parseCreateVisit', () => {
+  it('should map body fields (guest_id + check_in required, rest optional)', () => {
+    expect(
+      parseCreateVisit({
+        guest_id: '11111111-1111-4111-8111-111111111111',
+        check_in: '2026-06-11T06:00:00.000Z',
+        nights: 3,
+        room_number: '1204',
+        booking_source: 'direct',
+        special_request: 'late checkout',
+      }),
+    ).toEqual({
+      guestId: '11111111-1111-4111-8111-111111111111',
+      checkIn: new Date('2026-06-11T06:00:00.000Z'),
+      nights: 3,
+      roomNumber: '1204',
+      bookingSource: 'direct',
+      specialRequest: 'late checkout',
+    });
+  });
+
+  it('should accept just guest_id + check_in', () => {
+    const out = parseCreateVisit({
+      guest_id: '11111111-1111-4111-8111-111111111111',
+      check_in: '2026-06-11T06:00:00.000Z',
+    });
+    expect(out.nights).toBeUndefined();
+    expect(out.roomNumber).toBeUndefined();
+  });
+
+  it('should reject a body-supplied hotel_id or status (.strict)', () => {
+    expect(() =>
+      parseCreateVisit({
+        guest_id: '11111111-1111-4111-8111-111111111111',
+        check_in: '2026-06-11T06:00:00.000Z',
+        hotel_id: 'x',
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it('should reject nights out of the 1..30 DDL range and a bad booking_source', () => {
+    const base = {
+      guest_id: '11111111-1111-4111-8111-111111111111',
+      check_in: '2026-06-11T06:00:00.000Z',
+    };
+    expect(() => parseCreateVisit({ ...base, nights: 31 })).toThrow(ValidationError);
+    expect(() => parseCreateVisit({ ...base, booking_source: 'carrier-pigeon' })).toThrow(
+      ValidationError,
+    );
+  });
+
+  it('should reject a missing guest_id or check_in', () => {
+    expect(() => parseCreateVisit({ check_in: '2026-06-11T06:00:00.000Z' })).toThrow(
+      ValidationError,
+    );
+    expect(() => parseCreateVisit({ guest_id: '11111111-1111-4111-8111-111111111111' })).toThrow(
+      ValidationError,
+    );
+  });
+});
+
+describe('VisitsService.create', () => {
+  const GUEST_ID = '11111111-1111-4111-8111-111111111111';
+
+  function repo(overrides: Partial<VisitsRepository>): VisitsRepository {
+    return {
+      findGuestById: () => Promise.resolve({ id: GUEST_ID, hotelId: 'hotel-1' }),
+      createVisit: (data: { hotelId: string; guestId: string; checkIn: Date }) =>
+        Promise.resolve(
+          makeRow({
+            hotelId: data.hotelId,
+            guestId: data.guestId,
+            checkIn: data.checkIn,
+            status: 'pending_verification',
+          }),
+        ),
+      ...overrides,
+    } as unknown as VisitsRepository;
+  }
+
+  it('should create a pending_verification visit for an own-tenant guest', async () => {
+    const captured: { hotelId?: string } = {};
+    const service = new VisitsService(
+      repo({
+        createVisit: (data: { hotelId: string; guestId: string; checkIn: Date }) => {
+          captured.hotelId = data.hotelId;
+          return Promise.resolve(makeRow({ status: 'pending_verification' }));
+        },
+      }),
+    );
+    const res = await service.create(ctx(), {
+      guest_id: GUEST_ID,
+      check_in: '2026-06-11T06:00:00.000Z',
+    });
+    expect(res.data.status).toBe('pending_verification');
+    expect(captured.hotelId).toBe('hotel-1'); // ctx.hotelId, never body
+  });
+
+  it('should fire the verification:pending seam', async () => {
+    const events: unknown[] = [];
+    const service = new VisitsService(repo({}), {
+      onVerificationPending: (e) => events.push(e),
+    });
+    await service.create(ctx(), { guest_id: GUEST_ID, check_in: '2026-06-11T06:00:00.000Z' });
+    expect(events).toHaveLength(1);
+  });
+
+  it('should 404 when the guest does not exist', async () => {
+    const service = new VisitsService(repo({ findGuestById: () => Promise.resolve(null) }));
+    await expect(
+      service.create(ctx(), { guest_id: GUEST_ID, check_in: '2026-06-11T06:00:00.000Z' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should 404 a cross-tenant guest (anti-enumeration)', async () => {
+    const service = new VisitsService(
+      repo({ findGuestById: () => Promise.resolve({ id: GUEST_ID, hotelId: 'other-hotel' }) }),
+    );
+    await expect(
+      service.create(ctx({ hotelId: 'hotel-1' }), {
+        guest_id: GUEST_ID,
+        check_in: '2026-06-11T06:00:00.000Z',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

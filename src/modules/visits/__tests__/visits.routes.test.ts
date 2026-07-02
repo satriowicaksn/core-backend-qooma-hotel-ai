@@ -39,6 +39,8 @@ interface Recorder {
   rejectId?: string;
   approveId?: string;
   approveBody?: unknown;
+  createCtx?: TenantContext;
+  createBody?: unknown;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -47,6 +49,11 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
       recorder.listCtx = ctx;
       recorder.listQuery = rawQuery;
       return Promise.resolve(LIST_RESULT);
+    },
+    create: (ctx: TenantContext, body: unknown): Promise<VisitDetailResponse> => {
+      recorder.createCtx = ctx;
+      recorder.createBody = body;
+      return Promise.resolve(DETAIL_RESULT);
     },
     verifyManual: (
       _ctx: TenantContext,
@@ -173,5 +180,26 @@ describe('visitsRoutes', () => {
     const res = await app.inject({ method: 'PATCH', url: `/visits/${VALID_ID}/reject` });
     expect(res.statusCode).toBe(401);
     expect(recorder.rejectId).toBeUndefined();
+  });
+
+  it('should create a manual visit with 201 and forward the tenant + body', async () => {
+    app = buildApp(GM, recorder);
+    const body = { guest_id: VALID_ID, check_in: '2026-06-11T06:00:00.000Z' };
+    const res = await app.inject({ method: 'POST', url: '/visits', payload: body });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual(DETAIL_RESULT);
+    expect(recorder.createCtx).toEqual(GM);
+    expect(recorder.createBody).toEqual(body);
+  });
+
+  it('should 401 on create without a tenant context', async () => {
+    app = buildApp(undefined, recorder);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/visits',
+      payload: { guest_id: VALID_ID, check_in: '2026-06-11T06:00:00.000Z' },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(recorder.createCtx).toBeUndefined();
   });
 });

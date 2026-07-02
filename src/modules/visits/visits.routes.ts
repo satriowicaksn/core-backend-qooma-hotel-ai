@@ -44,6 +44,16 @@ export const visitsRoutes: FastifyPluginCallback<VisitsRoutesOptions> = (fastify
     return reply.send(result);
   });
 
+  fastify.post('/visits', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    req.log.info(
+      { module: 'visits', action: 'create', correlationId: correlationIdOf(req) },
+      'create manual visit',
+    );
+    const result = await service.create(ctx, req.body);
+    return reply.code(201).send(result);
+  });
+
   fastify.patch('/visits/:id/verify-manual', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     const id = parseVisitId(req.params);
