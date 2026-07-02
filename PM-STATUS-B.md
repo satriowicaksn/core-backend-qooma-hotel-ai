@@ -46,9 +46,9 @@
 | T19 | Notifications CRUD | ✅ approved | `feat/notifications-crud` | ✅ **merged (PR #9)** |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
-| T20 | Socket emitters | ✅ approved (attempt 1) 🏁 | `feat/socket-emitters` @ `47aabbd` (merges clean) | ⏳ awaiting PO merge |
+| T20 | Socket emitters | ✅ approved 🏁 | `feat/socket-emitters` | ✅ **merged (PR #10)** |
 
-**Counts**: ✅ **9/10 merged + T20 approved (awaiting merge) = 10/10 done** 🏁. **Slot B core CRM + socket layer COMPLETE.** Foundation-only remainder for go-live: **DEP-4** (`api.ts` bootstrap) + **DEP-7** (live Socket.io server) — flip everything from built→live.
+**Counts**: ✅ **10/10 MERGED** 🏁 (T11–T20). **Slot B core CRM + socket layer COMPLETE on main.** Zero TODOs/stubs in Slot-B modules. Go-live remainder is **foundation-only**: **DEP-4** (`api.ts` bootstrap) + **DEP-7** (live Socket.io server). Slot-B has no queued work.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
