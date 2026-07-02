@@ -1631,6 +1631,108 @@ Rationale:
 
 Awaiting **PLAN T06** from exec-A.
 
+#### PLAN T06 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Create `src/shared/utils/ticket-state-machine.ts` with 4 named exports (`TicketStatus` union, `TICKET_TRANSITIONS` readonly map, `isValidTicketTransition`, `assertValidTicketTransition`) encoding spec §5's 8-state / 13-transition matrix + terminal-state rule. Create fresh `src/shared/utils/__tests__/ticket-state-machine.test.ts` — first test file for this dir (precedent-setting per T07-slice-1). Consumer will be Nathan's T12 via `import { assertValidTicketTransition } from '@shared/utils/ticket-state-machine.js'`. Pure functions, no side effects, `BusinessRuleError` thrown on invalid via T07-slice-1's class.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md §5` lines 50-75 — full state machine (verified transition list matches PM A's shape exactly: 13 transitions across 6 non-terminal states + 2 terminal) + line 74 `rule: 'INVALID_TICKET_TRANSITION'` ratified value ✓
+- Parent docs spot-read: `src/core/errors/app-errors.ts:104` (`BusinessRuleError` present — Adv #2 grep verified 1 hit); `src/modules/tickets/tickets.types.ts:3-11` (Nathan's `TicketStatus` — Adv #1 confirmed structurally identical to PM A's spec; 8 states in same order); `src/shared/utils/` (3 existing files: `crypto.ts` / `masking.ts` / `test-setup.ts`; no `__tests__/` dir — will create); `jest.config.ts` (`testMatch: ['**/__tests__/**/*.test.ts']` + `roots: ['<rootDir>/src', ...]` — auto-discovers new path per T07-slice-1 precedent); `tsconfig.json` (`noUncheckedIndexedAccess: true` — makes `Record<K,V>` indexed access return `V | undefined`; nullish-coalesce in Adv #6 is required at TYPE level, not just runtime) ✓
+- Dependencies: T07-slice-1 ✓ merged (`BusinessRuleError` shipped `b214743` → merged as `8ebdb9a`); T-INFRA-01 ✓ (foundation healthy)
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T07-slice-1 merge)
+- Scaffolder risk: **none** — 2 new files, zero generator
+
+**Files to create** (2, both new; 0 modify)
+- `src/shared/utils/ticket-state-machine.ts` (~50 LOC incl. JSDoc) — 4 named exports
+- `src/shared/utils/__tests__/ticket-state-machine.test.ts` (~120 LOC) — first test file for this dir
+
+**Files NOT touched** (per HARD constraints)
+- `src/modules/tickets/*` (Nathan's territory — T11/T13/T14/T15)
+- `src/core/errors/app-errors.ts` (T07-slice-1 — reuse as-is)
+- `src/plugins/*` (T03/T04)
+- `src/shared/utils/{crypto,masking,test-setup}.ts` (unrelated helpers)
+- `package.json` (no dep add)
+
+**Approach**
+
+*(1) `ticket-state-machine.ts` — final shape:*
+```ts
+import { BusinessRuleError } from '@core/errors/app-errors.js';
+
+export type TicketStatus =
+  | 'open' | 'in_progress' | 'awaiting_late_reason' | 'done_pending'
+  | 'closed' | 'high_alert' | 'escalated' | 'cancelled';
+
+export const TICKET_TRANSITIONS: Readonly<Record<TicketStatus, readonly TicketStatus[]>> = {
+  open: ['in_progress', 'cancelled'],
+  in_progress: ['awaiting_late_reason', 'done_pending', 'escalated', 'cancelled'],
+  awaiting_late_reason: ['done_pending'],
+  done_pending: ['closed', 'high_alert', 'cancelled'],
+  high_alert: ['in_progress'],
+  escalated: ['in_progress', 'cancelled'],
+  closed: [],       // terminal
+  cancelled: [],    // terminal
+} as const;
+
+export function isValidTicketTransition(from: TicketStatus, to: TicketStatus): boolean {
+  return (TICKET_TRANSITIONS[from] ?? []).includes(to);
+}
+
+export function assertValidTicketTransition(from: TicketStatus, to: TicketStatus): void {
+  if (!isValidTicketTransition(from, to)) {
+    throw new BusinessRuleError(`Invalid ticket transition: ${from} → ${to}`, {
+      rule: 'INVALID_TICKET_TRANSITION',
+      from,
+      to,
+    });
+  }
+}
+```
+File-level JSDoc will document: (a) authoritative spec source `docs/spec/02-hotel-core.md §5`, (b) terminal states, (c) consumer usage example (T12 pattern), (d) runtime-defense rationale (nullish coalesce for `as`-cast / DB-drift `from` values).
+
+*(2) `__tests__/ticket-state-machine.test.ts` — structure (~42 tests total; matches PM A's hybrid recommendation):*
+- Constants: `VALID_TRANSITIONS: ReadonlyArray<[TicketStatus, TicketStatus]>` (13 tuples per spec §5) + `TERMINAL_OUTBOUND_ATTEMPTS` (16 tuples: 8 targets × 2 terminal sources).
+- `describe('TICKET_TRANSITIONS terminal states')` — 2 tests: `closed` = `[]`, `cancelled` = `[]` (Adv #5 explicit).
+- `describe('isValidTicketTransition')`:
+  - `it.each(VALID_TRANSITIONS)` — 13 tests: each spec-defined valid transition returns `true`.
+  - `it.each(TERMINAL_OUTBOUND_ATTEMPTS)` — 16 tests: every outbound from terminal state returns `false`.
+  - 3 individual `it`: illegal double-jump (`open → done_pending`), wrong-direction (`in_progress → open`), self-loop (`open → open`) all return `false`.
+  - 1 Adv #6 boundary: `isValidTicketTransition('bogus_state' as TicketStatus, 'open')` returns `false` (does not throw `TypeError`).
+- `describe('assertValidTicketTransition')`:
+  - 1 no-throw on valid (`open → in_progress`).
+  - 1 exact-shape assertion on invalid (`open → closed`): `BusinessRuleError`, `statusCode = 422`, `code = 'BUSINESS_RULE'`, `message === 'Invalid ticket transition: open → closed'`, `details = { rule: 'INVALID_TICKET_TRANSITION', from: 'open', to: 'closed' }`.
+  - 2 additional throw-cases (terminal outbound `closed → open`; illegal double-jump `open → done_pending`) using `.toThrow(BusinessRuleError)`.
+  - 1 Adv #6 boundary: `assertValidTicketTransition('bogus_state' as TicketStatus, 'open')` throws `BusinessRuleError` (NOT `TypeError`); `details.from === 'bogus_state'`.
+- Test naming: `it('should <expected> when <condition>')` per CLAUDE.md.
+
+Test structure: `it.each` (single describe, many rows) preferred over `describe.each` (many describes) — cleaner jest output listing, less noise. Table-driven arrays kept top-of-file for reviewability.
+
+**Explicit resolution of PM A's 6 advisory checks (including Adv #6 extension)**
+
+- **Adv #1 — `TicketStatus` duplication awareness**: acknowledged as spec-driven duplicate. Both Slot A (this file) and Nathan (`src/modules/tickets/tickets.types.ts:3-11`) mirror spec §5. Verified via `sed -n '1,15p'` on Nathan's file — 8 states in the same order (`open` / `in_progress` / `awaiting_late_reason` / `done_pending` / `closed` / `high_alert` / `escalated` / `cancelled`). TypeScript unifies structurally at type level; no runtime friction; Nathan can consolidate as future T-CLEAN by importing Slot A's canonical + removing his local declaration. No rebuttal to PM A's design decision — will ship duplicate.
+
+- **Adv #2 — `BusinessRuleError` availability**: **VERIFIED**. `grep 'export class BusinessRuleError' src/core/errors/app-errors.ts` → 1 hit at line 104. Import path `@core/errors/app-errors.js` (post-`.js` alias per jest moduleNameMapper + ESM convention) confirmed working from T07-slice-1's own test.
+
+- **Adv #3 — First test file in `src/shared/utils/__tests__/`**: precedent-setting. jest config already globs `**/__tests__/**/*.test.ts` under `roots: ['<rootDir>/src', ...]` — no config change needed (identical to T07-slice-1 case where jest picked up `src/core/errors/__tests__/` on first run). Will confirm in SUBMIT via `PASS src/shared/utils/__tests__/ticket-state-machine.test.ts` line in jest output.
+
+- **Adv #4 — Exhaustive transition matrix coverage**: **hybrid chosen** (PM A recommendation). Breakdown: 13 `it.each` for all valid transitions (positive) + 16 `it.each` for all terminal outbound (Adv #5 explicit) + 3 individual invalid (illegal jump / wrong direction / self-loop) + 4 `assertValidTicketTransition` behavior tests (no-throw on valid, exact-shape on invalid, 2 additional throw-cases) + 2 Adv #6 boundary tests (isValid returns false / assert throws BRE) + 2 terminal state map assertions. Total **~40 tests**. Rationale for hybrid over fully exhaustive 64-pair table: full 8×8 asserts a lot of noise (redundant with the 13 positive + explicit terminal + representative negatives) without adding useful coverage — the state machine is a lookup table, so each `from` state's outbound list IS the specification. 100% coverage on the file achieved.
+
+- **Adv #5 — Terminal states verification**: `TICKET_TRANSITIONS.closed = []` and `TICKET_TRANSITIONS.cancelled = []` encoded as-const. Two isolated `describe('TICKET_TRANSITIONS terminal states')` tests directly assert `expect(TICKET_TRANSITIONS.closed).toEqual([])` + `expect(TICKET_TRANSITIONS.cancelled).toEqual([])`. Plus 16 terminal-outbound `isValidTicketTransition` test rows verify the runtime consequence (every attempt returns `false`).
+
+- **Adv #6 — Runtime input handling (PM A recommendation adopted with extension)**:
+  - **Nullish coalesce** applied in `isValidTicketTransition`: `(TICKET_TRANSITIONS[from] ?? []).includes(to)`. Required at TYPE level too — `noUncheckedIndexedAccess: true` in `tsconfig.json` makes `TICKET_TRANSITIONS[from]` return `readonly TicketStatus[] | undefined`, so `.includes` on it doesn't compile without the fallback. Runtime insurance + typecheck-clean in one 4-char idiom.
+  - **`assertValidTicketTransition` on unknown `from` throws `BusinessRuleError` (NOT `TypeError`)**: implicitly guaranteed by delegating to `isValidTicketTransition` which returns `false` for unknown `from` (empty-array fallback → no `.includes` match). The subsequent `BusinessRuleError` throw carries `details.from = 'bogus_state'` (the caller's actual raw value) — useful for observability at the error-handler layer.
+  - **Boundary test cases included** (2, per PM A extension):
+    1. `isValidTicketTransition('bogus_state' as TicketStatus, 'open')` → returns `false`.
+    2. `assertValidTicketTransition('bogus_state' as TicketStatus, 'open')` → throws `BusinessRuleError` (asserted via `toBeInstanceOf(BusinessRuleError)` + `not.toBeInstanceOf(TypeError)` + `details.from === 'bogus_state'`).
+
+**GAPs / questions**: none.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
