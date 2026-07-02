@@ -1290,6 +1290,37 @@ Accepting PM B's ratified envelope design (envelope-generic `BUSINESS_RULE` + sp
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T07-slice-1 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+All 6 advisories resolved with concrete evidence. Design accepts PM B's ratified envelope without divergence. Test plan proportionate.
+
+**Verified in PLAN**:
+- **Adv #1 (jest globbing)** ✓ — read `jest.config.ts`: `testMatch: ['**/__tests__/**/*.test.ts']` + `roots: ['<rootDir>/src', '<rootDir>/scripts']` catches the new path. No config change needed.
+- **Adv #2 (abstract AppError)** ✓ — tests use `BusinessRuleError` instance; `instanceof AppError` is prototype-chain check (legal on abstract classes).
+- **Adv #3 (captureStackTrace)** ✓ — asserts `err.stack` non-empty string (universal, engine-agnostic), not fragile shape. Node 20 supports capture natively; optional-chain in base gracefully no-ops on non-V8.
+- **Adv #4 (consumer grep)** ✓ — `grep -rn "BusinessRuleError" src/ docs/` = 0 hits. Free hand on shape; PM B's ratified envelope is what T12/T16 will use.
+- **Adv #5 (HTTP status ordering)** ✓ — Option (a) append-at-end chosen. Rationale solid: (1) preserves HARD "no modify existing" both semantically AND structurally (zero lines inserted between existing classes); (2) reduces merge-conflict window with any unmerged B/C branches touching this file; (3) existing tail is already jumbled (502→500→402) — reordering is a separate PR's job, not smuggled into a slice-1 add. Append-only pattern is what slice-2+ will follow.
+- **Adv #6 (readonly + subclass)** ✓ — 8 existing subclasses prove the pattern; TS satisfies parent's abstract signature.
+
+**Envelope design accepted as PM B ratified** ✓ — envelope-generic `BUSINESS_RULE` + specific rule in `details.rule`. Spec §7's 5 specific 422 codes become `details.rule` values (`INVALID_TICKET_TRANSITION`, `MIN_AGENTS_VIOLATION`, `FEATURE_FLAG_DEPENDENCY_VIOLATION`, `WA_TEMPLATE_LOCKED`, `TIER_GATE`). Consumers `catch (BusinessRuleError)` + discriminate on `err.details.rule`. Clean.
+
+**Scope match** ✓ — 1 modify (`app-errors.ts` append) + 1 create (fresh test file). Zero touch to existing error classes, plugins, modules, config, prisma. No dep add. HARD constraints all upheld.
+
+**Test plan proportionate** ✓ — 4 core `BusinessRuleError` tests (construction + status/code/name + toJson envelope + instanceof chain) + 2 bonus sanity (AuthError + NotFoundError). Test naming per CLAUDE.md. Establishes coverage precedent for slice-2+ additions without over-testing library-wrapper behavior.
+
+**Proceed to implementation on branch `feat/foundation-business-rule-error`.**
+
+**SUBMIT expectations (reminders)**:
+- `make check` PASS (lint + format:check + typecheck + test:unit) — expect ~146+ tests post-slice-1 (144 baseline + ~6 new)
+- New test suite `src/core/errors/__tests__/app-errors.test.ts` appears in jest output (Adv #1 confirmation signal)
+- T03/T04/T-INFRA-01/T11/T13/T14/T15 all preserved green
+- Drift scans clean on both files (0 `any`, 0 `console.log`, 0 `throw new Error(`, 0 default export)
+- `git diff package.json` empty
+- Full class + JSDoc + test file diff in SUBMIT for spot-check
+- If Nathan pushes a new Slot B branch mid-implementation that references `BusinessRuleError`, note in SUBMIT — verify shape compat but no rework needed (Adv #4 confirmed free hand)
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
