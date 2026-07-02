@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T10 workers harness (LAST main-queue T01-T10 task) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T09 merged (PO commit `1822568`). PO direct direction (no triage cycle).
-- **Branch (current active task)**: `feat/foundation-workers-harness` (per PO branch-per-task policy)
-- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08, T09 (all merged to main)
+- **Active task**: **🎯 T10 APPROVED — MAIN-QUEUE T01-T10 COMPLETE** (`feat/foundation-workers-harness` @ `b0a0640`, awaiting PO merge). PM A pauses + awaits PO milestone celebration + next-direction decision.
+- **Branch (last active task)**: `feat/foundation-workers-harness` @ `b0a0640` — awaiting PO merge.
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08, T09 (all merged to main) · **T10** (approved 2026-07-03 H0, awaiting merge) → **13 approved, MAIN-QUEUE T01-T10 COMPLETE**
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · T09 ✅ · **T10 workers (assigned, active — LAST main-queue)** · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 api.ts bootstrap (per PO gate — now unblocked post-T10), docs/TESTING.md (planning), T07-slice-2+ (deferred on demand), redis-client.ts stub (deferred to future cache task).
+- **My queue (post-milestone electives + escalations, PO to prioritize)**: T01-T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · T09 ✅ · **T10 ✅** · **Post-milestone candidates**: Satrio Q-T25-#5 (foundation gap, PO priority), T-INFRA-04 (CI PO decision), DEP-4 api.ts bootstrap (unblocked), T07-slice-2+ (on consumer demand), docs/TESTING.md (planning), redis-client.ts stub cleanup (future cache task).
 
 ---
 
@@ -39,7 +39,7 @@
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-multipart-upload` @ `50ec906` — **awaiting PO merge**. 5 new files under `src/core/storage/` (port + S3Adapter + InMemoryAdapter + 2 tests) + env.ts additive + `@aws-sdk/client-s3` dep. `make check` **212/1/213** (Nathan baseline shift 160→205 caught cleanly by exec-A). InMemoryAdapter 100% coverage; S3Adapter fail-lazy paths only per hexagonal principle. Modular imports verified (3 named). Drift 0 (2 false positives verified). Branch-slip mitigation held 3rd consecutive. |
 | T09 | CSV import utility (used by menu + knowledge)              | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-csv-import` @ `814a5f5` — **awaiting PO merge**. 2 new files (csv-parser.ts 196 LOC + test 178 LOC, 15 tests). csv-parser.ts **97.18% coverage** (exceeds ≥ 90% DoD). `make check` **278/1/279** (baseline 263 + 15 new — Nathan +51 delta since T08 caught cleanly by exec-A). Test #15 Adv #4 UX edge case: exact `errors[0].line === 5` + `rowIndex === 1` assertion. Uncovered lines 126-127 verified as defensive QuoteInQuoted lenient-recovery (NOT silent bug). Drift 0. Branch-slip mitigation 4th consecutive not-recurring. |
-| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | assigned | — | LAST main-queue T01-T10 task. Implements existing `bull-factory.ts` stub. Slice-1: createQueue + registerWorker + shutdownAllQueues + SIGTERM/SIGINT handler (T-INFRA-01 pattern). No new deps. PO ratified naming `<domain>.<action>`. `redis-client.ts` stub untouched (future concern). Port+adapter deferred to slice-2. |
+| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/foundation-workers-harness` @ `b0a0640` — **awaiting PO merge** (🎯 MILESTONE: LAST main-queue T01-T10 task). 2 files (bull-factory.ts stub → 86-LOC real impl + fresh test file, 8 tests). **100% coverage** on bull-factory.ts (istanbul-ignore on dead-under-test guard block, legitimate). `make check` 286/1/287 on branch. **Simulated post-merge state 320/1/321 zero regressions** (verified independently). Merge dry-run CLEAN. Test-approach adaptation transparent (Bull eager IORedis + loadConfig NODE_ENV rejection discovered at runtime, jest.mock + stub adopted with clear rationale in comments). Branch-slip mitigation 5th consecutive not-recurring — pattern durably confirmed. |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
 | T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-business-rule-error` @ `b214743` — **awaiting PO merge**. 2 files (app-errors.ts append + fresh test file, 6 new tests). 150 tests pass on branch (+6 vs 144 baseline). Drift clean. 9 existing classes untouched (verified via git diff = pure `+`). Cherry-pick transparency clean (origin/main never touched by code). PARENT §10 DEP-6 resolved. |
 
@@ -4924,6 +4924,132 @@ Notes / operational
 **Env note (session-local)**: re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
 
 Requesting PM A VERDICT.
+
+##### VERDICT T10 — APPROVED (H0 2026-07-03, attempt 1) by PM A (Nanak) — **🎯 MILESTONE: MAIN-QUEUE T01-T10 COMPLETE**
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-workers-harness` @ commit `b0a0640`. All 17 DoD items verified with file:line refs. **Simulated post-merge state** independently validated. All gates green.
+
+**Transparency verification**
+- `git log ae76b4a..origin/main --oneline` (since ACK) → 1 exec-A SUBMIT docs commit (`889062e`). No T10 source leaked. ✓
+- `git log origin/main -- src/core/queue/` → 1 commit (`5ce7f86` initial boilerplate). No T10 code on main. ✓
+- **Mitigation held 5th consecutive task** — pattern is now empirically durable across 5 tasks (T-INFRA-03 / T05 / T08 / T09 / T10). `feedback_git_slip_transparency.md` mitigation adoption confirmed as durable behavior change.
+
+**Simulated post-merge state — strongest possible validation**
+Beyond validating the branch alone (286 tests), I applied T10 code to main state (which has Nathan+Satrio's +34 tests since T09 merge) and reran make check:
+```bash
+git checkout main
+git checkout feat/foundation-workers-harness -- src/core/queue/bull-factory.ts src/core/queue/__tests__/bull-factory.test.ts
+make check
+```
+Result: **320 pass / 1 skip / 321 total** (main 312 + T10 delta 8 = 320). **Zero test regressions on the combined post-merge state.** Merge dry-run also clean (no conflict markers). T10 will merge cleanly and post-merge main state is verified working.
+
+**DoD verification (17 items)** — all ✓
+- `createQueue<TData>(name, config?)` returns Bull.Queue with correct config — verified `bull-factory.ts:43-54` ✓
+- Default JobOptions merged: attempts=3, backoff exponential 5000ms, removeOnComplete=100, removeOnFail=500 — verified `:34-39` + test #2 assertions match line-by-line ✓
+- Caller config override — verified `:49` `{ ...DEFAULT_JOB_OPTIONS, ...config }` spread order + test #3 partial override proof ✓
+- Redis config sourced from `loadConfig()` — verified `:47` `const cfg = loadConfig()` + `:48-50` (`cfg.REDIS_URL` + `cfg.REDIS_QUEUE_DB`) ✓
+- Duplicate queue name → `ConflictError` — verified `:44-46` + test #4 asserts statusCode=409, code='CONFLICT', details.name='test4.action' ✓
+- `registerWorker` delegates to `queue.process(concurrency, processor)` — verified `:56-67` + test #5 spy asserts call with `(7, processor)` ✓
+- Default concurrency = `WORKER_CONCURRENCY_DEFAULT` — verified `:62` `concurrency ?? cfg.WORKER_CONCURRENCY_DEFAULT` + test #6 spy asserts call with `(5, processor)` (env default) ✓
+- `shutdownAllQueues()` snapshot-then-clear-then-await — verified `:69-73` (Array.from snapshot BEFORE .clear() BEFORE await Promise.all) + test #7 verifies both `.close()` called + registry cleared (re-creation doesn't throw) ✓
+- Signal handlers guarded by `NODE_ENV !== 'test'` — verified `:76` + test #8 asserts guard evaluates true at test time ✓
+- `void shutdownAllQueues()` in sync arrow (T-INFRA-01 idiom) — verified `:78, :81` ✓
+- JSDoc queue-naming convention updated to `<domain>.<action>` — verified `:4-5` ✓
+- **Test coverage 100% stmts/branches/funcs/lines** on `bull-factory.ts` — independently reproduced via targeted `--collectCoverageFrom` rerun ✓
+- `make check` PASS with baseline + 8 delta = 286 verified independently ✓
+- Drift scans clean on both files (0/5 categories) ✓
+- `git diff main -- src/core/redis/redis-client.ts src/core/prisma/prisma-client.ts` = empty ✓ (stubs+singleton untouched)
+- All out-of-scope paths clean (no touch to plugins/modules/shared/other-core/prisma/docs/config/deps) ✓
+- Branch-slip mitigation held 5th consecutive task ✓
+
+**Baseline reconciliation math independently verified**
+- **Main-only (independent rerun)**: **312/1/313** (Nathan+Satrio's Slot B/C activity landed +34 since T09 baseline 278; Satrio T21 was largest chunk)
+- **T10 branch**: **286/1/287** (T10 branch cut when main was at 278; +8 T10 tests = 286)
+- **Simulated post-merge**: **320/1/321** (main 312 + T10 delta 8 = 320) ✓
+- Exec-A's SUBMIT note about "baseline shifted +7" was slightly imprecise — actual T10 branch cut baseline was 278 (T09-time), not 278+7. SUBMIT math is correct in the delta (286-278=8), just imprecise in describing the intermediate state. Not a validation issue; noted for future SUBMIT precision. Nathan/Satrio's actual +34 delta since T09 merge captured cleanly in main-only rerun.
+
+**Coverage — 100% claim independently verified**
+```
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+bull-factory.ts  |     100 |      100 |     100 |     100 |
+```
+Achieved via `/* istanbul ignore next */` at `bull-factory.ts:75` on the signal-handler guard block. **Verified legitimate dead-under-test, NOT silent gap**:
+- The comment at `:75` explicitly cross-references test file's `signal handler guard` describe block for indirect verification.
+- Test #8 (`bull-factory.test.ts:167-178`) asserts `process.env.NODE_ENV === 'test'`, proving the guard evaluates as `false` at test time → the block is genuinely unreachable in jest.
+- The behavior of what would execute (queue close on signal) IS tested via test #7's direct `shutdownAllQueues()` call.
+- Both criteria met: guard verified + behavior verified. Istanbul-ignore is standard practice for this case, not a coverage hide.
+
+**Design decisions independently verified in code line-by-line**
+- **Module-level `Map<string, Queue<unknown>>` registry** at `:41` — clean, standard pattern ✓
+- **Cast on `queues.set`** at `:52` — `Queue<TData>` → `Queue<unknown>` widening; safe (registry used only for `.close()`) ✓
+- **Bull 3-arg constructor** `new Bull<TData>(name, cfg.REDIS_URL, {...})` at `:48-51` — cleanest form; `opts.redis.db` override sets Redis DB per env ✓
+- **`shutdownAllQueues` snapshot-clear-await pattern** at `:69-73` — sync snapshot + sync clear + async await. Concurrent-call analysis clean (JS single-threaded + Bull v4 `.close()` idempotent) ✓
+- **`NODE_ENV !== 'test'` guard + `void shutdownAllQueues()` in sync arrow** at `:75-83` — matches T-INFRA-01/T05/T09's `void` pattern verbatim. Cross-task consistency (5th task using this idiom) ✓
+- **`void queue.process(c, processor)` in registerWorker** at `:66` with explanatory comment at `:63-65` — nice defensive addition (Bull v4's `.process()` returns Promise<void>). Consistent with `void` pattern.
+
+**Test approach adaptation — transparent and legitimate**
+Exec-A discovered TWO PLAN assumptions were wrong at runtime, adapted transparently:
+
+1. **Bull.Queue "lazy construction" assumption WRONG at runtime**: PLAN Adv #4 verified via `node_modules/bull/index.d.ts` inspection that Bull.Queue construction is lazy. In practice, `new Bull()` eagerly creates an IORedis client that retries forever, hanging jest workers without Redis running. Test-file comment at `:6-11` explains discovery. Adapted via `jest.mock('bull', () => ({ __esModule: true, default: jest.fn().mockImplementation(...) }))` at `:12-24` — minimal MockQueue mirroring `.name`, `.defaultJobOptions`, `.process`, `.close`.
+
+2. **`loadConfig()` rejects `NODE_ENV=test`**: `env.ts:16` zod enum accepts `['development', 'staging', 'production']` only. Test-file comment at `:26-29` explains: "The real loadConfig() rejects NODE_ENV=test... Test-boundary shim, not scope creep." Adapted via `jest.mock('@core/config/env.js', ...)` at `:30-40` — stub returns needed fields (`REDIS_URL`, `REDIS_QUEUE_DB`, `WORKER_CONCURRENCY_DEFAULT`).
+
+Both adaptations are:
+- **Transparent**: clear comment blocks explaining runtime discovery + rationale
+- **Test-boundary only**: production code unchanged
+- **Minimal surface**: mock only what tests exercise
+- **Not scope creep**: no production behavior added, just enables unit testing
+
+This is exemplary transparent adaptation — the alternative (silently changing test strategy without explanation) would erode trust; the alternative (blocking on real Redis integration test) would miss the hexagonal test principle. Exec-A took the "test the harness config-building without I/O" middle path with clear explanation. **Same discipline family as `feedback_verify_before_act.md`** — knowing when your assumption fails and adapting transparently instead of hiding.
+
+**JSDoc verification**
+- **Queue naming convention**: `:4-5` shows `<domain>.<action>` dot notation with examples (`notification.send`, `escalation.check`, `email.retry`) — matches PO ratification ✓
+- **Signal handling documentation**: `:11-14` describes the guard + `void` wrap + T-INFRA-01 cross-reference — good multi-task narrative ✓
+- **Consumer usage example**: `:16-20` — nice addition (not in PLAN but consistent with T09's JSDoc discipline of showing consumer patterns) ✓
+
+**Cross-team pace awareness — continued discipline signal**
+Exec-A noted baseline shift (though imprecise on "+7" claim vs actual +34 from Satrio). PM A independently reproduced via checkout+rerun main. Same pattern as T08 (160→205) and T09 (212→263). Cross-team pace is now routinely tracked at both executor and PM level.
+
+**Two durable-pattern mitigations both held under continued load — MILESTONE**
+1. **Branch-slip mitigation: 5th consecutive task NOT recurring** (T-INFRA-03/T05/T08/T09/T10). Pattern is empirically durable across broader scope diversity (config, seed script, adapter+port, CSV parser, queue harness). `feedback_git_slip_transparency.md` mitigation adoption is now proven durable behavior change over 5 tasks. Memory update planned.
+2. **Verify-before-act: 9th consecutive PLAN with clean ACK** (T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03, T05, T08, T09, T10). Zero REJECT-PLAN cycle across the arc. Pattern is empirically stable and PO-ratified as "routine" at T09 ASSIGNMENT stage.
+
+**New pattern instance #1 — test-approach adaptation transparency** (per PO ask)
+Exec-A discovered PLAN assumptions failing at runtime (Bull eager IORedis + loadConfig NODE_ENV rejection), adapted transparently with clear comment blocks explaining rationale. Production code unchanged. Test-boundary shims only. **Instance #1 of "test-approach adaptation transparency"** — tracked mentally for ≥2 emergence rule. If a future SUBMIT similarly adapts test strategy transparently when PLAN's assumption fails at runtime, memorialize to `feedback_test_approach_adaptation_transparency.md`.
+
+**Follow-ups actioned in same commit**
+- → §1 T10 → approved
+- → §0 Active task refreshed → **MILESTONE: main-queue T01-T10 COMPLETE** + await PO next-direction (T-INFRA-04 CI decision / DEP-4 api.ts unblocked / T07-slice-2+ / docs/TESTING.md / redis-client.ts stub cleanup / Satrio's Q-T25-#5 escalation to Slot A/foundation)
+- → PARENT §1 T10 → approved (row mirrored)
+- → PARENT §2 short roll-up with **MILESTONE** flag (LAST main-queue task, 12 clean-first-attempt SUBMITs, 5-consecutive branch-slip mitigation, 9-consecutive verify-before-act clean PLANs)
+- → Memory update: `feedback_git_slip_transparency.md` extended with 5-consecutive-task efficacy datapoint (proven durable behavior change)
+
+**PO action item — branch merge (MILESTONE)**
+`feat/foundation-workers-harness` @ `b0a0640` on `origin`; PM A verified:
+- `make check` on branch: 286/1/287 ✓
+- **Simulated post-merge state on main+T10**: 320/1/321 zero regressions ✓
+- Coverage 100% independently reproduced ✓
+- All 17 DoD items with file:line refs ✓
+- Test-approach adaptation transparent + legitimate ✓
+- Merge dry-run clean (no conflict markers) ✓
+- Both `redis-client.ts` + `prisma-client.ts` stubs+singleton untouched ✓
+- Branch-slip + verify-before-act mitigations both continue holding ✓
+
+Per CLAUDE.md §12, **please merge `feat/foundation-workers-harness` → `main`**. Post-merge: **🎯 MAIN-QUEUE T01-T10 CHAIN COMPLETE** — Nathan/Satrio/future workers have Bull harness ready. Consumer wiring: `createQueue<{ ticketId: string }>('notification.send')` + `registerWorker(queue, processorFn, concurrency?)` + optional explicit `shutdownAllQueues()` for graceful stop (signal handlers auto-fire in prod).
+
+**Slot A ledger post-merge**: **13 approved** — T01, T02, T03, T04, T05, T06, T07-slice-1, T-INFRA-01, T-INFRA-02, T-INFRA-03, T08, T09, **T10**. **🎯 Main-queue T01-T10 chain COMPLETE.** Focus now shifts to electives + escalations:
+
+**Next Slot A queue (post-milestone)**
+1. **Satrio Q-T25-#5** — foundation gap (missing `wa_templates_hotel_name_unique` UNIQUE constraint from T02 migration) escalated to Slot A. PO decision needed on priority (blocker vs backlog) — likely small migration slice.
+2. **T-INFRA-04** — CI integration test strategy (option a/b/c pick from earlier PARENT §10 coord note). PO decision needed.
+3. **DEP-4 api.ts bootstrap** — go-live gate, unblocked per PO's earlier "defer until T10 done" directive. Large scope.
+4. **T07-slice-2+** — additional spec §7 error codes on consumer demand.
+5. **docs/TESTING.md** — planning territory, needs PARENT/Planning session.
+6. **`redis-client.ts` stub cleanup** — future cache/rate-limit consumer task.
+
+PM A pauses + awaits PO milestone celebration + direction on which of the 6 next-up candidates to prioritize.
+
+Ship it. 🎯
 
 <!--
 TEMPLATE — copy untuk task baru:
