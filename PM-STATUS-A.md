@@ -1321,6 +1321,87 @@ All 6 advisories resolved with concrete evidence. Design accepts PM B's ratified
 
 Ship it.
 
+#### SUBMIT T07-slice-1 — exec-A (Nanak) at H0 2026-07-02 (attempt 1)
+
+Task: `BusinessRuleError` (HTTP 422, `code = 'BUSINESS_RULE'`) foundation error class — DEP-6 fix, unblocks Slot B T12 + T16-V2..V5
+
+Branch: `feat/foundation-business-rule-error` · Commit: `b214743` (pushed to `origin/feat/foundation-business-rule-error`)
+
+Files changed: **2** (1 modify, 1 create)
+  - `src/core/errors/app-errors.ts` (modify — append 20 LOC: JSDoc + 4-line class body after `BillingRequiredError`; 9 existing classes untouched)
+  - `src/core/errors/__tests__/app-errors.test.ts` (create — 77 LOC, 6 tests, first test file for this module)
+
+DoD self-check (10 items from ASSIGNMENT §T07-slice-1 DoD)
+- [x] **`BusinessRuleError` exported from `@core/errors/app-errors.js`** — verified via test's named import
+- [x] **`statusCode === 422` (readonly)** — verified via test `should expose statusCode 422, code BUSINESS_RULE, and name BusinessRuleError`
+- [x] **`code === 'BUSINESS_RULE'` (readonly)** — same test above
+- [x] **`extends AppError`** — verified via test `should be an instance of BusinessRuleError, AppError, and Error` (`instanceof AppError` true)
+- [x] **JSDoc documents Nathan's `details.rule` convention with consumer example** — full block appended above class per ASSIGNMENT template verbatim; references PARENT §10 DEP-6, includes 5-line consumer code sample
+- [x] **`toJson()` returns `{ code: 'BUSINESS_RULE', message, details }`** — verified via test `should serialize via toJson to Nathan envelope shape`
+- [x] **Unit test suite covers (a)/(b)/(c)/(d)** — 4 `BusinessRuleError` tests present, all pass
+- [x] **Bonus: 1-2 sanity tests for existing classes** — 2 tests: `AuthError` (statusCode/code) + `NotFoundError` (resource-only and resource+id constructor shapes)
+- [x] **`make check` PASS** — see Quality gate below
+- [x] **T03/T04/T-INFRA-01/T11/T13/T14/T15 tests all still green** — full suite runs to 150 passing / 2 skipped / 152 total across 11 executed suites (T04 rbac + T04 tenant-guard.hooks + T03 tenant-guard + T11 tickets service/routes/integration + T13 tickets.stats + guests service/routes/integration + new app-errors — visible in `make check` output). Baseline 144 → new 150 = +6 new tests exactly (4 BRE + 2 sanity).
+- [x] **Drift scans clean on both files** — see Drift scans below (0 hits on any / console.log / throw new Error / forbidden imports / default export / .skip)
+- [x] **`git diff package.json` empty** — verified in run (no output); no dep add
+
+Quality gate (final `make check`)
+- `pnpm prisma:generate`: PASS (first prereq from T-INFRA-01)
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean)
+- `pnpm test:unit`: **PASS** — `Test Suites: 2 skipped, 11 passed, 11 of 13 total · Tests: 2 skipped, 150 passed, 152 total`
+- `make check` overall: **PASS**
+
+Adv #1 confirmation (jest discovery of new test-dir precedent)
+Jest output shows the new suite listed among the 11 executed:
+```
+PASS src/core/errors/__tests__/app-errors.test.ts
+PASS src/modules/tickets/__tests__/tickets.stats.test.ts
+PASS src/modules/guests/__tests__/guests.service.test.ts
+PASS src/plugins/__tests__/tenant-guard.test.ts
+PASS src/modules/tickets/__tests__/tickets.service.test.ts
+PASS src/plugins/__tests__/rbac.test.ts
+PASS src/plugins/__tests__/tenant-guard.hooks.test.ts
+PASS src/modules/tickets/__tests__/tickets.routes.test.ts
+PASS src/modules/guests/__tests__/guests.routes.test.ts
+PASS src/modules/guests/__tests__/guests.repository.integration.test.ts (8.568 s)
+PASS src/modules/tickets/__tests__/tickets.repository.integration.test.ts (8.786 s)
+```
+→ jest's `testMatch: ['**/__tests__/**/*.test.ts']` picks up `src/core/errors/__tests__/` as predicted in PLAN. No config change needed.
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on T07-slice-1 touched files)
+- `any` types in `src/core/errors/app-errors.ts` + `src/core/errors/__tests__/app-errors.test.ts`: **0 hits**
+- `console.log`: **0 hits** in both files
+- `throw new Error(`: **0 hits** in both files (test uses `expect(...).toBe(...)` / `toEqual(...)` / `toBeInstanceOf(...)` assertions only)
+- Forbidden imports (express / typeorm / sequelize / moment / node-fetch): **0 hits** in both files
+- Default export: **0 hits** in both files (all named exports)
+- `.skip(` in tests: **0 hits** in new file
+- `git diff package.json`: empty (no dep add — HARD constraint upheld)
+
+Security check (N/A for T07-slice-1 — error class, no auth/webhook/crypto surface)
+- HMAC verify: N/A
+- Token encryption: N/A
+- PII masking: N/A (error `details` shape is caller's responsibility; the class does not log)
+- No secret hardcoded: **confirmed**
+
+Test evidence
+- **Total tests post-slice-1: 150 passed / 2 skipped / 152 total** (from prior baseline ~144 + 6 = 150 confirmed)
+- **New tests added by T07-slice-1: 6** (4 `BusinessRuleError` DoD tests + 2 bonus sanity: `AuthError` + `NotFoundError`)
+- Coverage on the `BusinessRuleError` class itself: **100% conceptually** — the class body is `readonly statusCode = 422;` + `readonly code = 'BUSINESS_RULE';`. All observable behavior (construction, statusCode, code, name, toJson envelope, instanceof chain, stack presence) is asserted directly in the 4 dedicated tests. File-level `--coverage` on `app-errors.ts` shows 58.97% because 6 of the 9 pre-existing subclasses were intentionally left uncovered (out of scope; slice-N+ can add more sanity tests). This is DoD-compliant per bonus-optional bullet.
+- Sample test line count: 77 LOC (below common test-file targets — matches Prettier-formatted single-import + 6 well-named `it()` blocks).
+
+Slot B pre-import verification (Adv #4 re-check pre-commit)
+- Ran `git log --all --grep=BusinessRuleError` — hits are ONLY in PM-STATUS + PARENT commits (PM A ASSIGNMENT/ACK, Nathan's GAP T16-#4 escalation) — no code commits.
+- Ran `git grep BusinessRuleError` across all remote refs — hits in PM-STATUS-B.md, PM-STATUS-PARENT.md (docs) + `origin/feat/visits-list-verify:src/modules/visits/__tests__/visits.repository.integration.test.ts`. Inspected that test file: **only a JSDoc header comment** referencing the class name ("verify-manual tx atomicity / tenant-404 coverage lands with V2–V5 once GAP T16-#4 (422 BusinessRuleError) is resolved") — no import statement, no runtime reference. Nathan waiting on the class to ship. **Shape shipped here is authoritative — no compat pressure.**
+- No new Slot B branch pushed mid-implementation (checked `git branch -r` at commit time).
+
+Notes / operational
+- Env note (session-local): re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
+- Sequencing note (transparency for PM A audit): my initial commit landed on local `main` accidentally after a branch-context slip during interactive session; corrected via `cherry-pick 5cb83c8` onto `feat/foundation-business-rule-error` (new hash `b214743` — same tree), then `git reset origin/main` to rewind local `main` (non-destructive default `--mixed`). `origin/main` was never touched with code; PM A + PO see only PLAN/ACK/SUBMIT commits on `main`, all code on the feature branch. Left as end-of-session cleanup with zero side effects to shared state.
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
