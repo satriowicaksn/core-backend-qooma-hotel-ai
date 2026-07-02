@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-02 (DEP-5 fix — `TenantContext.userId`) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T06 merged (PO commit `4f4a5d0`). Triage rationale: Nathan's H13 "observed SHIPPED" for DEP-5 was inaccurate — PM A verified `tenant-guard.ts` unchanged, userId still missing → T19 remains blocked. Fix now (~5 LOC).
-- **Branch (current active task)**: `feat/foundation-userid-tenant-context` (per PO branch-per-task policy)
-- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1, T06 (all merged to main)
+- **Active task**: T-INFRA-02 APPROVED (`feat/foundation-userid-tenant-context` @ `d0a0bcc`, awaiting PO merge). PM A pauses + awaits PO direction. Nathan self-corrected his DEP-5 misclaim in `438664d`, coordination clean.
+- **Branch (last active task)**: `feat/foundation-userid-tenant-context` @ `d0a0bcc` — awaiting PO merge.
+- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1, T06 (all merged to main) · **T-INFRA-02** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · **T-INFRA-02 (assigned, next — DEP-5)** · T-INFRA-03 (GAP-T11-3 test-glob, queued) · T05 seed (Opsi C pending) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · **T-INFRA-02 ✅** · T-INFRA-03 (GAP-T11-3 test-glob, next candidate) · T05 seed (Opsi C — solicit PM B input) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
 
 ---
 
@@ -34,7 +34,7 @@
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
 | T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
-| T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | assigned | — | Addresses PARENT §10 DEP-5. Nathan's "observed SHIPPED" claim was inaccurate — PM A read of `tenant-guard.ts` confirms userId still missing. ~5 LOC change + test fixture updates. Unblocks T19. |
+| T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-userid-tenant-context` @ `d0a0bcc` — **awaiting PO merge**. 10 files (3 Slot A + 7 Slot B test fixtures, PM A GAP-1 Path B scope override, all guardrails verified). 191/193 tests pass on branch (+1 vs 190 baseline). 100% coverage on `tenant-guard.ts`. Drift 0/6 clean. Slot B production untouched. Cherry-pick transparency clean (3rd instance + adopted mitigation). Nathan self-corrected his DEP-5 misclaim in `438664d`. |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -2347,6 +2347,117 @@ Notes / operational
 - Sequencing note (transparency, third occurrence of pattern): initial code edits landed on local `main` (not `feat/foundation-userid-tenant-context`) due to an interactive-session branch-context slip; corrected via `git stash` on main → `git checkout feat/foundation-userid-tenant-context` → `git stash pop` → commit `d0a0bcc` on the correct branch. `origin/main` never received code — only PLAN/ACK/SUBMIT docs commits reach it. Same zero-side-effect resolution as T07-slice-1 + T06. This is the third occurrence — will explicitly `git checkout <branch>` and verify with `git branch --show-current` before every code commit in future tasks. Consider a shell alias / pre-commit hook if pattern persists.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T-INFRA-02 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Cross-slot PR validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-userid-tenant-context` @ commit `d0a0bcc`. All 4 Path B guardrails independently verified. Transparency clean (3rd instance of branch-slip pattern + adopted mitigation).
+
+**Transparency verification (3rd instance)**
+- `git log f358add..origin/main --oneline` (since ACK) → 2 commits: `ba7118f` (exec-A SUBMIT, docs-only) + `438664d` (PM B Nathan self-correction of his DEP-5 misclaim). No source leaked to main. ✓
+- `git log origin/main -- src/plugins/tenant-guard.ts` → 2 commits (T03 `9b55b86` + T04 `df5648b`). No T-INFRA-02 code touched main. ✓
+- **Bonus**: Nathan proactively corrected his own H13 "observed SHIPPED" misclaim in `438664d` — coordination hygiene rippled organically. My correction annotation in `f358add` and Nathan's own follow-up are consistent.
+
+**Path B Guardrail verification (all 4)**
+- **#1 Slot B edits = TEST FILES ONLY** ✓ — `git diff main --name-only -- src/modules/ | grep -v __tests__` returns 0 lines. All 7 Slot B files are under `__tests__/`. Zero production code touched.
+- **#2 Mechanical fixture defaults only** ✓ — sample-check on 3 diffs (tickets.repository.integration.test.ts, guests.repository.integration.test.ts, tickets.stats.test.ts) confirms only `userId: '<value>'` field additions, no test-logic changes, no assertion changes, no restructuring.
+- **#3 Fixture value convention** ✓ — exec-A's commit body enumerates:
+  - `tickets.repository.integration.test.ts`: uses existing `USER_1` constant (spec-compliant reuse) for gmA/gmB/deptHead1/deptHead2
+  - `guests.repository.integration.test.ts`: uses inline `'u-1'` (no USER_X constant in file — followed nearest convention)
+  - Partial<TenantContext> builders (tickets.stats/service, guests.service): added `userId: 'u-1'` default; overrides spread preserved
+  Each site's choice matches nearby SessionUser fixture pattern per file.
+- **#4 Commit body Slot A/B labeling** ✓ — verified via `git show d0a0bcc`: clean `=== Slot A changes (source of truth — foundation, owned by Nanak) ===` and `=== Slot B changes (mechanical fixture defaults — PM A GAP-1 Path B override) ===` sections with full site enumeration and rationale.
+
+**Slot A code verification** (independent file read)
+- `src/plugins/tenant-guard.ts:23`: `userId: string;` added as REQUIRED (non-optional) to `TenantContext` interface ✓
+- `src/plugins/tenant-guard.ts:39`: `userId: user.userId,` copy in `deriveTenantContext` body ✓
+- No signature changes; pure fn preserved; existing `assertHotelOwnership` + `assertDeptOwnership` untouched ✓
+- File JSDoc unchanged (accurate + durable) ✓
+
+**DoD verification (10 items — expanded per GAP-1 Path B)** — all ✓
+- `TenantContext.userId: string` required — verified `tenant-guard.ts:23` ✓
+- `deriveTenantContext` copies it — verified `tenant-guard.ts:39` ✓
+- 14 T03 tenant-guard tests still pass + 1 new (`should copy userId from SessionUser to TenantContext`) = 15 tests ✓
+- 3 T04 tenant-guard.hooks tests still green (GAP-2 Path A: line 44-46 expected shape updated to include `userId: 'u-1'` — verified in diff) ✓
+- 11 T04 rbac tests still green (auto-inherit via `deriveTenantContext`) ✓
+- **Nathan's Slot B tests all green** ✓ — verified in independent `make check` run:
+  - `PASS tickets.service.test.ts`, `tickets.routes.test.ts`, `tickets.stats.test.ts`, `tickets.repository.integration.test.ts`
+  - `PASS guests.service.test.ts`, `guests.routes.test.ts`, `guests.repository.integration.test.ts`
+  - Total 7 Nathan suites, 0 breaks
+- `make check` PASS — independent rerun: **191 pass / 2 skipped / 193 total** (190 baseline + 1 new = 191) ✓
+- Drift scans clean on all 10 files (6 categories) ✓
+- `git diff main -- package.json pnpm-lock.yaml` = 0 lines (empty, no dep add) ✓
+- Slot B production untouched ✓
+
+**Independent `make check` rerun on branch**
+```
+pnpm prisma:generate  → PASS (T-INFRA-01 chain still healthy)
+pnpm lint             → PASS (0 errors, 0 warnings)
+pnpm format:check     → PASS
+pnpm typecheck        → PASS (proves TenantContext.userId required propagates through Slot B tests)
+pnpm test:unit        → PASS
+Test Suites: 2 skipped, 12 passed, 12 of 14 total
+Tests:       2 skipped, 191 passed, 193 total
+Time:        9.137 s
+```
+
+**Drift scans** (per PM-AGENT §3 Step 2, on ADDITIONS in all 10 T-INFRA-02 files)
+- `any`: **0** · `console.log/info/debug`: **0** · `throw new Error(`: **0** · Forbidden imports: **0** · Default export: **0** · `.skip` in tests: **0** ✓
+
+**Coverage on `tenant-guard.ts`** (independent targeted rerun)
+```
+File             | % Stmts | % Branch | % Funcs | % Lines
+tenant-guard.ts  |     100 |      100 |     100 |     100
+```
+18 tests exercise it (15 tenant-guard.test.ts + 3 tenant-guard.hooks.test.ts). ✓
+
+**Cross-slot coordination hygiene — 2 observations worth noting**
+
+1. **Nathan self-corrected his own DEP-5 misclaim** (`438664d` on main between ACK and now). He edited PARENT §2 line 118 with an explicit "CORRECT DEP-5 (still open, T19 stays blocked)". This is model coordination behavior — proactive correction of one's own inaccurate roll-up when new information surfaces. Aligns with the transparency discipline.
+
+2. **PM B post-hoc ratification path is already primed**. Nathan's `438664d` commit also nudged T16 resume + issued T12 (unblocked) — evidence he's actively reading PARENT §10 coord notes. My scope-override coord note from `f358add` will be seen when he reads next.
+
+**Security floor** — N/A. `userId: string` is a UUID reference to Auth's `users` table; not a secret. No PII, no crypto, no HMAC surface. Not logged raw (winston redact rules for `password|token|secret|authorization` unchanged).
+
+**Transparency pattern — 3rd instance, iterative mitigation adopted**
+This is the 3rd occurrence of the branch-context slip → cherry-pick/reset recovery pattern (1st T07-slice-1, 2nd T06, 3rd T-INFRA-02). Notable evolution: **exec-A has now adopted a personal hygiene guard** (`git branch --show-current` verify before every code commit + consider shell alias / pre-commit hook). This is meta-discipline worth capturing — pattern extension from recovery → proactive prevention. Updating `feedback_git_slip_transparency.md` to reflect 3-emergence datapoint + mitigation adoption pattern.
+
+**Follow-ups actioned in same commit**
+- → §1 T-INFRA-02 → approved
+- → §0 Active task refreshed → next PM A triage (T-INFRA-03 GAP-T11-3 vs T05 seed vs monitor Nathan's T12/T19)
+- → PARENT §1 T-INFRA-02 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §3b DEP-5 → **RESOLVED** (line 156 row)
+- → PARENT §10 T-INFRA-02 scope-override coord note → updated with actual resolution + PM B ratify pending (existing coord note gets a "resolved" annotation)
+- → PARENT §10 DEP-5 row → **RESOLVED** (existing row gets closure annotation)
+- → PARENT §2 line 118 correction annotation reinforced (Nathan self-corrected via `438664d`; my earlier annotation from `f358add` stays as audit trail)
+- → Memory: `feedback_git_slip_transparency.md` updated to reflect 3-emergence + iterative mitigation adoption pattern
+
+**PO action item — branch merge**
+`feat/foundation-userid-tenant-context` @ `d0a0bcc` on `origin`; PM A verified:
+- `make check` PASS on branch (191 tests)
+- All 4 Path B guardrails independently verified
+- Slot B production untouched (0 non-test files)
+- 100% coverage on `tenant-guard.ts`
+- Drift 0/6 on all 10 files
+- Transparency clean (3rd instance verified)
+
+Per CLAUDE.md §12, **please merge `feat/foundation-userid-tenant-context` → `main`**. Post-merge:
+- DEP-5 fully resolved (both the type shape AND Nathan's misclaim reconciled)
+- Nathan can start T19 PLAN with `TenantContext.userId` guaranteed present
+- Nathan's T12 (just issued in `438664d`) proceeds unaffected
+
+**PM B ratification routing**: PM A will not directly DM PM B. The Path B scope override + guardrail decisions are already documented in PARENT §10 (from `f358add` + this VERDICT commit). PM B reads PARENT §10 on his next session start (per protocol). His ratification signal will be either (a) silent — proceed with T19/T12 using the new type shape (implicit ACK), or (b) explicit PARENT §10 annotation. Either is fine. If he flags a fixture value that doesn't match his intent, PM A will coordinate a follow-up fixture-rename PR (zero breakage risk since userId is now required — any string satisfies TS).
+
+**Next Slot A queue**
+1. **T-INFRA-03** — GAP-T11-3 (test-glob split: `jest.config.ts` add `testPathIgnorePatterns` to `test:unit` so `make check` stays Docker-free). Small foundation hygiene fix, ~5 LOC.
+2. **T05** seed scripts (Opsi C twist — worth soliciting PM B input first)
+3. **DEP-4** api.ts bootstrap (big go-live task, gates G1)
+4. **T08/T09/T10** — no imminent consumer
+5. Monitor Nathan's T12 PLAN (just issued in `438664d`) — may surface a new DEP if T06 or T07-slice-1 seams show gaps at consumer-integration time
+
+PM A pauses + awaits PO next-task direction.
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
