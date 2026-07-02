@@ -2645,6 +2645,123 @@ All 6 advisories resolved with concrete pre-PLAN evidence. Two adopted disciplin
 
 Ship it.
 
+#### SUBMIT T-INFRA-03 — exec-A (Nanak) at H0 2026-07-02 (attempt 1)
+
+Task: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free
+
+Branch: `feat/foundation-testglob-split` · Commit: `59b12cd` (pushed to `origin/feat/foundation-testglob-split`)
+
+Files changed: **1 modify** (0 create)
+  - `package.json` line 25 — `test:unit` script gains `--testPathIgnorePatterns='\\.integration\\.test\\.ts$'` flag. Single-line diff.
+
+Diff (verbatim):
+```diff
+-    "test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts",
++    "test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts --testPathIgnorePatterns='\\.integration\\.test\\.ts$'",
+```
+
+DoD self-check (9 items from ASSIGNMENT §T-INFRA-03 DoD)
+- [x] **`package.json:25` `test:unit` includes `--testPathIgnorePatterns`** — verified via `git diff` above
+- [x] **`make check` PASSES without spinning Docker/testcontainers** — verified via full `make check` run (`time make check` below): zero `PASS *.integration.test.ts` lines in output, zero testcontainers "Started PostgreSQL container" messages, zero long-suite-duration marks like `(8.786 s)`. Only 10 unit suites execute + 1 skipped (`_template.service.test.ts`).
+- [x] **Test count on `make check` drops to unit-only** — `Tests: 1 skipped, 160 passed, 161 total` (matches PLAN projection 160/1/161 exactly; T-INFRA-02 baseline 191/2/193 minus integration subset 31/1/32 = 160/1/161 ✓)
+- [x] **`pnpm test:integration` still runs integration tests** — verified: `Tests: 1 skipped, 31 passed, 32 total` in 11.695s (unchanged from PLAN baseline capture)
+- [x] **`pnpm test:coverage` still runs all tests** — verified: `Tests: 2 skipped, 191 passed, 193 total` (matches full T-INFRA-02 baseline; `jest.config.ts testMatch` remains authoritative for the coverage script since it passes no path filter — no accidental inheritance of `test:unit`'s ignore flag)
+- [x] **Zero regression: all pre-fix passing tests still pass on their appropriate runner** — 160 unit + 31 integration = 191 pass, unchanged from baseline
+- [x] **Drift scan clean on `package.json` diff** — `grep -cE 'console\.(log|info|debug)|throw new Error\(|\.skip\(' package.json` returns 0. Sanity check confirmed no accidental editor insertions.
+- [x] **`git diff main -- package.json` = single-line change** — verified via `git diff` above; only line 25 changed (1 removal, 1 addition)
+- [x] **`git diff main -- src/ jest.config.ts Makefile pnpm-lock.yaml` = empty** — verified via `git diff main -- jest.config.ts Makefile src/ pnpm-lock.yaml` returning no output
+
+Quality gate (final `make check`)
+- `pnpm prisma:generate`: PASS (T-INFRA-01 prereq)
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean)
+- `pnpm test:unit` (post-fix): **PASS** — `Test Suites: 1 skipped, 10 passed, 10 of 11 total · Tests: 1 skipped, 160 passed, 161 total · Time: 0.798 s`
+- `make check` overall: **PASS**
+
+Adv #1 confirmation (post-edit `--listTests` matches pre-PLAN empirical result)
+Ran `pnpm test:unit --listTests` after the JSON edit. Output lists exactly **11 unit files**, zero integration files:
+```
+src/core/errors/__tests__/app-errors.test.ts
+src/modules/_template/__tests__/_template.service.test.ts
+src/modules/guests/__tests__/guests.routes.test.ts
+src/modules/guests/__tests__/guests.service.test.ts
+src/modules/tickets/__tests__/tickets.routes.test.ts
+src/modules/tickets/__tests__/tickets.service.test.ts
+src/modules/tickets/__tests__/tickets.stats.test.ts
+src/plugins/__tests__/rbac.test.ts
+src/plugins/__tests__/tenant-guard.hooks.test.ts
+src/plugins/__tests__/tenant-guard.test.ts
+src/shared/utils/__tests__/ticket-state-machine.test.ts
+```
+Identical to the pre-PLAN verification set. Escape form (`\\.integration\\.test\\.ts$` in JSON → `\.integration\.test\.ts$` in shell/jest) works from the package.json script layer. No behavior surprise.
+
+Adv #2 confirmation (test count trio — sum sanity clean)
+- `pnpm test:unit` (post-fix): **160 pass / 1 skip / 161 total** in 0.798s (10 executed + 1 skipped `_template` unit)
+- `pnpm test:integration`: **31 pass / 1 skip / 32 total** in 11.695s (2 executed + 1 skipped `_template` integration; unchanged from PLAN baseline)
+- `pnpm test:coverage`: **191 pass / 2 skip / 193 total** (all 14 files still discovered via `jest.config.ts testMatch`; unchanged from full baseline)
+- Sum sanity: 161 + 32 = 193 total ✓ | 160 + 31 = 191 pass ✓ | 1 + 1 = 2 skip ✓
+
+Adv #3 confirmation (primary DoD — no-Docker signal + timing)
+Full `time make check` output tail:
+```
+PASS src/modules/tickets/__tests__/tickets.stats.test.ts
+PASS src/modules/guests/__tests__/guests.service.test.ts
+PASS src/plugins/__tests__/rbac.test.ts
+PASS src/modules/tickets/__tests__/tickets.service.test.ts
+PASS src/shared/utils/__tests__/ticket-state-machine.test.ts
+PASS src/core/errors/__tests__/app-errors.test.ts
+PASS src/plugins/__tests__/tenant-guard.test.ts
+PASS src/plugins/__tests__/tenant-guard.hooks.test.ts
+PASS src/modules/tickets/__tests__/tickets.routes.test.ts
+PASS src/modules/guests/__tests__/guests.routes.test.ts
+
+Test Suites: 1 skipped, 10 passed, 10 of 11 total
+Tests:       1 skipped, 160 passed, 161 total
+Time:        1.07 s, estimated 2 s
+
+make check 2>&1  17.55s user 2.34s system 203% cpu 9.755 total
+```
+**Evidence of no-Docker**:
+1. **Zero `PASS *.integration.test.ts` lines** in the executed-suite listing (compare: pre-fix run would include `PASS src/modules/tickets/__tests__/tickets.repository.integration.test.ts (10.359 s)` + `PASS src/modules/guests/__tests__/guests.repository.integration.test.ts (10.087 s)`)
+2. **Zero long-suite durations** on any executed test — all 10 unit suites complete in aggregate 1.07s (per-suite ~100ms). Pre-fix: integration suites showed `(8.786 s)` / `(10.359 s)` durations from testcontainers Docker startup.
+3. **`test:unit` portion timing dropped from ~10.98s (pre-fix, PLAN baseline) to 1.07s (post-fix)** — net savings ~10 seconds per `make check` invocation. Full `make check` wall time is 9.755s (includes prisma-generate + lint + format:check + typecheck + test:unit); the test portion is now negligible relative to lint/typecheck compile time.
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on T-INFRA-03 touched files)
+- `package.json`: **0 hits** on `console.log` / `throw new Error(` / `.skip(` (TS-rule categories N/A for JSON config file; sanity check confirmed no accidental non-config content added)
+- `git diff main -- package.json`: single-line change ✓
+- `git diff main -- jest.config.ts Makefile src/ pnpm-lock.yaml`: **empty** — zero unintended changes to other files
+- HARD constraint compliance: `jest.config.ts` unchanged, `Makefile` unchanged, all `src/` + test files unchanged, no dep add, no lock-file diff
+
+Security check (N/A for T-INFRA-03 — script config change, no auth/webhook/crypto surface)
+- HMAC verify: N/A
+- Token encryption: N/A
+- PII masking: N/A
+- No secret hardcoded: **confirmed**
+
+Test evidence
+- **Total suite matrix post-T-INFRA-03**:
+  - `test:unit`: 160 pass / 1 skip / 161 total (10 executed + 1 skipped suites)
+  - `test:integration`: 31 pass / 1 skip / 32 total (2 executed + 1 skipped suites) — unchanged
+  - `test:coverage`: 191 pass / 2 skip / 193 total (12 executed + 2 skipped suites) — unchanged full baseline
+- **Coverage script sanity confirmed** (Adv #4 explicit): `test:coverage` passes 191/193 as expected — the `test:unit` `--testPathIgnorePatterns` flag does NOT leak into other scripts because it's a CLI arg on the `test:unit` script only, not a config-level directive.
+
+Notes / operational
+
+**T-INFRA-04 candidate (Adv #5 follow-up flag for PO / PM A)** — post-merge, `make check` runs unit-only. If CI (GitHub Actions or equivalent) calls `make check` as its primary gate, integration test coverage drops from CI unless something else runs `pnpm test:integration`. Options for PO/PM A to decide separately:
+- (a) Add `make check-full` target that chains `check + test-integration` — for local + CI use
+- (b) Add a separate CI step / job that runs `pnpm test:integration` alongside `make check`
+- (c) Do nothing if CI already handles integration coverage independently
+- Not in T-INFRA-03 scope per PM A single-concern PR pattern. Recommend PARENT §10 or T-INFRA-04 assignment for the CI-strategy call.
+
+**Dev-flow guidance follow-up (Adv #6 flag for docs/TESTING.md)** — contributors touching integration tests need to remember `pnpm test:integration` as an additional local gate (post-merge, `make check` no longer catches integration regressions). Suggest a one-paragraph add to `docs/TESTING.md` §5 or an entry in PARENT §10 dev-flow notes. Out of scope for T-INFRA-03 (docs are planning territory); flagging for PM A / Planning to author.
+
+**Sequencing note (adopted mitigation from T-INFRA-02 feedback)**: this session verified `git branch --show-current` BEFORE the code edit, then committed on `feat/foundation-testglob-split` directly (`[feat/foundation-testglob-split 59b12cd]`). Fourth-time'd-pattern from T07-slice-1 / T06 / T-INFRA-02 (commit slips to `main`) did NOT recur. Mitigation looks durable; will keep verifying `git branch --show-current` pre-commit going forward.
+
+Env note (session-local): re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
