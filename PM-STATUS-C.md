@@ -219,6 +219,107 @@ Structural approach ✓ · Files list ✓ (serializer + routes test additions co
 
 Proceed to coding on `feat/settings-departments-crud`. Awaiting your SUBMIT.
 
+#### SUBMIT T21 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Departments CRUD (escalation tree + operating hours)
+Branch: `feat/settings-departments-crud` @ `55887f0` (pushed to origin)
+Files changed: 11
+  - `src/modules/departments/departments.types.ts` (new — 47 lines)
+  - `src/modules/departments/departments.schema.ts` (new — 119 lines)
+  - `src/modules/departments/departments.serializer.ts` (new — 25 lines)
+  - `src/modules/departments/departments.repository.ts` (new — 55 lines)
+  - `src/modules/departments/departments.service.ts` (new — 181 lines)
+  - `src/modules/departments/departments.routes.ts` (new — 118 lines)
+  - `src/modules/departments/index.ts` (new — 33 lines)
+  - `src/modules/departments/__tests__/departments.service.test.ts` (new — 303 lines, 24 tests)
+  - `src/modules/departments/__tests__/departments.routes.test.ts` (new — 180 lines, 11 tests)
+  - `src/modules/departments/__tests__/departments.repository.integration.test.ts` (new — 302 lines, 13 tests + 1 skipped-by-pattern)
+  - `src/core/config/env.ts` (modified — added `SKIP_CROSS_DB_CHECKS` per Q-C-02, +7 lines)
+Zero touch on `src/entrypoints/api.ts` (per PM Override #1 — barrel-only wiring, DEP-4 will register).
+
+**DoD self-check** (from ASSIGNMENT T21)
+- [x] 4 endpoints wired: GET list / POST create / PATCH update / DELETE — `departments.routes.ts:47,63,81,99`
+- [x] Zod schemas: `CreateDepartmentBodySchema` + `UpdateDepartmentBodySchema.refine(non-empty)` + `OperatingHoursSchema` (Q-C-01 permissive) + `EscalationChainSchema` (l1_sla_minutes REQUIRED, l2/l3 UUID-format optional, `skip_to_l3_categories` bounded per Q-C-03) — `departments.schema.ts:25-33,37-47,49-62`
+- [x] Tenant scope: `hotelId` from `ctx.hotelId` on every write (`service.create` L83, `loadOwned → assertHotelOwnership` on detail/update/delete). Cross-tenant 404 proven — integration test `should 404 on cross-tenant update/delete (leak-safe)` — 4 tests (2 service unit + 2 integration).
+- [x] RBAC: `requireRole(ctx, ['gm_admin'])` in every handler; super_admin bypass via `requireRole`'s implicit all-access; dept_head + staff both 403 — routes tests `should 403 for dept_head` + `should 403 for staff` + `should allow super_admin`.
+- [x] Delete-conflict: 409 CONFLICT `DEPARTMENT_HAS_OPEN_TICKETS` when `countOpenTickets(deptId) > 0`. Users check skipped via Q-C-02 (users stub has no `departmentId` column under Opsi C — see Notes). Envelope `code='CONFLICT'`, `details.reason='DEPARTMENT_HAS_OPEN_TICKETS'`, `details.openTickets: number`.
+- [x] UNIQUE(hotel_id, code) violation → 409 CONFLICT `DEPARTMENT_CODE_TAKEN` via `isPrismaUniqueViolation(err)` catching `P2002` in both create + update paths — `service.ts:102-108,136-146`. Verified by integration test on real Postgres UNIQUE constraint.
+- [x] Zod validation → 400 VALIDATION via `ValidationError` in schema parsers → error-handler translation. Verified by routes test `should 400 on non-uuid id / on invalid code`.
+- [x] Response envelope: list `{data: DomainDepartment[]}` (no cursor — small N per hotel per PM guidance) · single `{data: DomainDepartment}` — matches Q-B-01 canonical.
+- [x] Winston logger scoped to handler via `req.log.info({module: 'departments', action, correlationId})` in each handler.
+- [x] Unit tests (service): branch coverage on delete-conflict (3 paths), P2002 translation (create+update), tenant scope build, super_admin bypass, Q-C-02 startup warn (fires only when prod+flag=true).
+- [x] Integration test (repository): testcontainers real Postgres; migrations deploy; seed CON/HSK/FNB/ENG/FO for HOTEL_A + HSK for HOTEL_B; CRUD + UNIQUE constraint + CHECK code regex + tenant isolation + delete-conflict on open ticket.
+- [x] Line coverage ≥ 80% on new files — **96.07% lines** across `src/modules/departments/**` (repository 100 · serializer 100 · index 100 · routes 97.67 · schema 97.43 · service 92.59).
+- [x] `make check` (unit only, Docker-free) PASS — 312/1/313 tests (baseline 278 + 34 new).
+- [x] `pnpm test:integration` PASS — 83/1/84 tests (baseline 69/1/70 + 14 new departments).
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel `index.ts` exposes public API (`departmentsRoutes` plugin + `DepartmentsService` class + `buildDepartmentsService` factory + wire/domain types); NO service/repo internal leak.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings)
+- `make format-check`: **PASS** (prettier ran; consistent with repo style)
+- `make test-unit`: **PASS** — 312 passed, 1 skipped, 313 total (baseline 278/1/279 + **+34 net**: 24 service + 10 route)
+- `pnpm test:integration`: **PASS** — departments suite 13 passed + all other integration suites (notifications, tickets, visits, guests) unchanged
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/departments/` + `src/core/config/env.ts`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in modules/core (excl tests where used as assertion helpers): **0** (2 hits in `__tests__/` are `throw new Error('expected throw')` as jest assertion helpers — allowed pattern, not a service throw)
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- Hardcoded URL / secret / dept-code enum lock: **0** (permissive per Q-C-01/Q-C-03)
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no webhook in this module)
+- Token encryption via `shared/utils/crypto`: **N/A** (no token storage)
+- PII masking in log: **N/A** (dept metadata is not PII — `telegram_chat_id`/`supervisor_telegram_id` are operational config, not guest data)
+- `hotel_id` NEVER from body/query — sourced from `ctx.hotelId`. Verified by unit test `should sink hotel_id from the tenant, never from body`.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 34 new tests (24 service + 10 routes) — files `src/modules/departments/__tests__/departments.service.test.ts` + `departments.routes.test.ts`
+- Integration: 13 new tests — file `src/modules/departments/__tests__/departments.repository.integration.test.ts`
+- Coverage (departments module scope, ran with `--coverageThreshold='{}'`):
+  ```
+  All files                  | 94.40 stmts | 67.34 branch | 91.42 funcs | 96.07 lines
+   departments.repository.ts | 100         | 100          | 100         | 100
+   departments.routes.ts     | 97.72       | 50           | 100         | 97.67
+   departments.schema.ts     | 95.00       | 58.33        | 87.50       | 97.43
+   departments.serializer.ts | 100         | 100          | 100         | 100
+   departments.service.ts    | 89.65       | 72.72        | 100         | 92.59
+   index.ts                  | 100         | 100          | 33.33       | 100
+  ```
+
+Sample request/reply (unit-injected via Fastify — DEP-4 not landed so no live server):
+```
+POST /settings/departments
+> body {"name":"Housekeeping","code":"HSK"}
+< 201 Created
+< {"data":{"id":"…","hotel_id":"…","code":"HSK",...}}
+
+DELETE /settings/departments/:id (with 1 open ticket)
+< 409 Conflict
+< {"code":"CONFLICT","message":"Department still has open tickets",
+   "details":{"reason":"DEPARTMENT_HAS_OPEN_TICKETS","openTickets":1}}
+```
+
+**Notes / questions for PM C**
+
+1. **Spec vs migration status-set divergence (info, no action)** — ASSIGNMENT DoD wrote `status IN ('pending','assigned','in_progress','escalated')` for open-ticket count. The actual T02 migration CHECK enum is `('open','in_progress','awaiting_late_reason','done_pending','closed','high_alert','escalated','cancelled')`. I implemented as `notIn ['closed','cancelled']` which matches the migration's partial-index guard (line 111) — semantically "any non-terminal ticket blocks delete". This is the safer + spec-faithful interpretation ("tickets open"). Please confirm; if you'd prefer the literal IN-list from DoD, that's a 1-line repo change.
+
+2. **Closed-ticket FK Restrict behavior (info)** — The `Ticket.departmentId` FK is `onDelete: Restrict` at the DB. Business layer's 409 catches OPEN tickets, but closed tickets ALSO block delete at DB with `foreign key constraint violated` — different surface. Under current spec this is a distinct failure mode (raw Prisma error). If PO wants a unified "reassign/archive tickets first" error surface, could add a second catch block translating FK error → different `ConflictError`. Not required by DoD; flagging as future refinement.
+
+3. **Q-C-02 `countAssignedUsers` deferred** — Method **not implemented** in repo (would fail Prisma typecheck since `User` stub has no `departmentId` under Opsi C). Service comment at `service.ts:164-167` documents the deferral path: when Opsi A / multi-schema lands, add `repo.countAssignedUsers(id)` + throw `DEPARTMENT_HAS_USERS` conflict. Startup warn fires when `SKIP_CROSS_DB_CHECKS=true && NODE_ENV=production` (Q-C-02 constraint #2). Verified by unit test.
+
+4. **`api.ts` untouched** (Override #1 held). Barrel `index.ts` exports `departmentsRoutes` + `buildDepartmentsService(db, { skipCrossDbChecks, nodeEnv, logger? })`. DEP-4 wiring will construct at composition root as: `buildDepartmentsService(db, { skipCrossDbChecks: config.SKIP_CROSS_DB_CHECKS, nodeEnv: config.NODE_ENV, logger })`.
+
+5. **Fixture note** — Integration test seeds HOTEL_A with CON/HSK/FNB/ENG/FO (matches T05 seed + Slot B convention). HOTEL_B seeds HSK to prove per-hotel UNIQUE(hotel_id, code) allowance (same code across different hotels).
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
