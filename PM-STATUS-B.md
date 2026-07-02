@@ -16,7 +16,7 @@
 
 - **Day**: H12 (global) / slot-B H1 — PM B (Nathan) online 2026-07-01; T11 ASSIGNMENT issued, awaiting exec-B claim + PLAN
 - **Owner**: Nathan (permanent per PARENT §4 2026-07-01 slot swap; slot B originally Nanak, swapped)
-- **Active**: **4/10 merged** (T11,T13,T14,T15). **T19** 🟢 ready (DEP-5 landed, awaiting PLAN) · **T16** V1 done, V2–V5 ⛔ DEP-6 (only blocker left). T12⛔(T06+DEP-6). Backlog T17/T18/T20.
+- **Active (2026-07-02)**: **7/10 merged** (T11,T13,T14,T15,T12,T16,T17). **T18** 🟡 assigned (manual visit create, extends `visits/`). **T19** 🟢 ready (notifications). **T20** ⚪ (←T19). All foundation impl-blockers cleared (only DEP-4 go-live). See §0a board.
 - **Branches**: T11 merged ✓ · T13 merged ✓ · T14 `feat/guests-crud` · T16 `feat/visits-list-verify` · T19 `feat/notifications-crud` (pending)
 - **Mode**: multi-executor. Each T = own thread in §2 (ASSIGNMENT→PLAN→ACK→SUBMIT→VERDICT) + own branch → I verify each independently on its branch. See §0a board for live state.
 - **Runtime**: T04 MERGED ✓ (`req.tenant` live). Go-live gate = **DEP-4** (`api.ts` bootstrap). **DEP-5** (`ctx.userId`) unblocks T19. Both escalated.
@@ -44,14 +44,15 @@
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
-| T17 | Visit reject + failed_3x | ✅ approved (attempt 1) | `feat/visits-reject-override` @ `cb705f4` (merges clean) | ⏳ awaiting PO merge |
-| T18 | Manual visit create | 🟢 unblocks on T17 merge (extends `visits/`) | — | — |
+| T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
+| T18 | Manual visit create | 🟡 assigned (awaiting PLAN) — extends `visits/` | `feat/visits-manual-create` | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **6/10 merged (T11, T13, T14, T15, T12, T16)** + **T17 approved (awaiting merge)** · 🟢 T18 (unblocks on T17 merge) + T19 (ready) · ⚪ T20 (←T19). **7/10 done pending T17 merge.** Zero foundation blockers (only DEP-4 go-live). Sisa: T18, T19, T20.
+**Counts**: ✅ **7/10 merged (T11, T13, T14, T15, T12, T16, T17)** · 🟡 T18 assigned (visits) · 🟢 T19 ready (notifications) · ⚪ T20 (←T19). Zero foundation blockers (only DEP-4 go-live). **Sisa 3: T18, T19, T20.**
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 11b — 2026-07-02 — T17 MERGED (PR #7); T18 issued.** Slot B **7/10 merged**. Issued **T18** (manual visit create `POST /visits`, extends `visits/` — completes the visits trio). Q-B-13 flagged (body + response shape). Remaining: T18 (wip), T19 (notifications, ready), T20 (←T19).
 - **Loop 11 — 2026-07-02 — T17 APPROVED.** Visit reject + failed_3x approve-manual done (PM rerun: make check 219 no-Docker, coverage 96.48%, drift clean, merge dry-run CLEAN, **T16 regression clean** — visits suite 65 tests all green through generalized R3 transition map). → merge `feat/visits-reject-override`. **7/10 done pending merge. T17 merge unblocks T18** (same visits module). Remaining: T18, T19 (ready), T20 (←T19).
 - **Loop 10b — 2026-07-02 — T16 MERGED (PR #6); T17 issued.** Visits module complete on main → **6/10 merged** (T11,T13,T14,T15,T12,T16). Going one-at-a-time (parallel deferred — worktree setup skipped for now). Issued **T17** (visit reject + approve-manual/failed_3x, extends `visits/`, reuses T16 transition tx + checkout). Remaining: T17 (wip), T18 (visits, after T17 — same module), T19 (notifications, ready anytime), T20 (←T19).
 - **Loop 10 — 2026-07-02 — T16 APPROVED (full V1–V6).** Visits verify-manual done (PM rerun: make check 205 no-Docker, coverage 98.01%, drift clean, merge dry-run CLEAN, tx atomicity + 422/404 no-mutate verified, checkout-TZ seam + module-local transition). Branch rebased cleanly (was 56 behind). → merge `feat/visits-list-verify`. **6/10 done pending merge. T16 merge unblocks T17 + T18.** Remaining: T19 (ready), T17, T18 (←T16), T20 (←T16+T19).
@@ -80,7 +81,8 @@
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
-| T17 | Visit reject + failed_3x override                         | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 219 (no-Docker) + coverage 96.48% + drift clean + merge dry-run CLEAN + T16 regression clean (65 tests). **Merge `feat/visits-reject-override` @ `cb705f4`.** Unblocks T18. Awaiting PO merge. |
+| T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
+| T18 | Manual visit create                                       | assigned     | —              | Issued §2 (2026-07-02, T17 merged). Extends `visits/`, `POST /visits` → pending_verification. Awaiting PLAN. Q-B-13 (body+response shape). |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1370,6 +1372,32 @@ Verified by **my own rerun** on `feat/visits-reject-override` @ `cb705f4`.
 - → §1 tracker updated (approved); PARENT §1 T17 → approved; roll-up PARENT §2.
 
 Clean reuse, T16 preserved. **T17 closed.** 🟢
+
+---
+
+### ASSIGNMENT T18 — Manual visit create — issued by PM B (Nathan) 2026-07-02 (H14)
+- Branch: `feat/visits-manual-create` (off latest main — includes merged T16+T17 visits module) · Routed from PARENT §1 T18 = MVP §1.2 **B8** · Spec: `02-hotel-core.md §1.3` (`POST /api/visits` L98) + §2.3 DDL (`visits`) + MVP §5 AC ("returns Guest with the new visit appended; status `pending_verification`")
+- Dependency: **T16 + T17 ✅ merged.** **Extends `src/modules/visits/`** (you own it, single-task). Reuse the canonical `serializeVisit` + validation patterns — don't fork.
+- **Inherited floor** (verified at SUBMIT): tenant guard (gm_admin-only, `hotelId` from ctx NEVER body); `AppError` only; correlationId; module layout; no cross-module import; zod `.strict()`; ≥80% cov; `make check`+integration green; drift 0.
+
+**Scope (1 endpoint, role `gm_admin`)**
+- `POST /api/visits` — create a manual visit for an **existing** guest → status `pending_verification`.
+
+**DoD**
+- [ ] MV1 — creates a `Visit` with `hotelId = ctx.hotelId` (from session, NOT body), `guest_id` from body, `status='pending_verification'` (default), optional `check_in`/`nights`/`room_number`/`booking_source`. Returns per Q-B-13 shape.
+- [ ] MV2 — **`guest_id` validation**: must exist AND belong to `ctx.hotelId` → else `NotFoundError('Guest')` (cross-tenant guest masked as 404, anti-enumeration). Read the guest via Prisma (no `guests`-module import).
+- [ ] MV3 — body zod `.strict()`: `check_in` (ISO), `nights?` (range per DDL 1–30 — confirm vs the 1–7 verify-flow), `room_number?`, `booking_source?` (enum `ota_email|direct|walk-in|pms`), `special_request?` (Q-CONTRACT-20 "ephemeral" — Q-B-13). No `check_out` on create (set at verify).
+- [ ] MV4 — tenant guard + gm_admin (super_admin bypass); `verification:pending` emit via a no-op seam (T20). No `actor`/`created_by` column on `visits` — audit seam only.
+- [ ] MV5 — tests: unit (body validation, guest-scope) + integration (create for own-tenant guest → pending_verification; **cross-tenant guest → 404 no-create**; invalid body → 422/400; tenant isolation). ≥80% cov. `make check`+integration green. **T16/T17 tests stay green.**
+
+**Open Q (raise in PLAN, don't guess):**
+- **Q-B-13** — (a) **request body** exact fields for `POST /visits` (Q-CONTRACT-20 = "ASSUMED"); (b) **response shape**: MVP §5 AC says "returns **Guest** with the new visit appended" — so does it return the guest (with `visits[]`) or the created `Visit`? Propose against §1.3 + FE MSW; (c) is `special_request` persisted or ephemeral-drop? Propose.
+
+**Session-start gate**: identity, read §1.3 + §2.3 `visits` DDL + MVP §5 AC + the merged `visits/` module, `make typecheck`/`make lint` clean. Then PLAN. **No code before PM B ACK.**
+
+Awaiting exec-B PLAN for T18.
+
+---
 
 <!--
 TEMPLATE — copy untuk task baru:
