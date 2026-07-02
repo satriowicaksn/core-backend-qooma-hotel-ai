@@ -1209,6 +1209,87 @@ Spec `docs/spec/02-hotel-core.md §7` lists 5 specific 422 codes at envelope lev
 
 Awaiting **PLAN T07-slice-1** from exec-A.
 
+#### PLAN T07-slice-1 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Append single `BusinessRuleError extends AppError` (HTTP 422, `code = 'BUSINESS_RULE'`) to `src/core/errors/app-errors.ts` per PM B's ratified envelope (`BUSINESS_RULE` at envelope + specific rule identifier in `details.rule`). Create first test file under `src/core/errors/__tests__/app-errors.test.ts` covering `BusinessRuleError` DoD + 2 sanity tests for existing hierarchy. Unblocks Slot B DEP-6 (T12 + T16-V2..5, 5 tasks).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT block above + `docs/spec/02-hotel-core.md §7` (5 spec 422 codes; envelope-vs-details divergence acknowledged) + `CLAUDE.md §5.4` (AppError subclass mandatory) ✓
+- Parent docs spot-read: `src/core/errors/app-errors.ts` (86 LOC — full existing hierarchy, base `AppError` abstract with `constructor(message, details = {})` + `toJson()` method returning `{code, message, details}`, `Error.captureStackTrace?.(this, this.constructor)` line 19, existing 9 subclasses); `jest.config.ts` (`testMatch: ['**/__tests__/**/*.test.ts', ...]` + `roots: ['<rootDir>/src', '<rootDir>/scripts']` — confirms discovery of new location); `PM-STATUS-A.md` §2 ASSIGNMENT + PARENT §10 DEP-6 context ✓
+- Dependencies: T-INFRA-01 ✓ (merged; foundation healthy — my touch doesn't consume Prisma singleton but working tree is)
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T-INFRA-01 merge)
+- Scaffolder risk: **none** — 1 append + 1 new test file, no CLI generators
+
+**Files to modify** (1) + **create** (1)
+- Modify: `src/core/errors/app-errors.ts` — append `BusinessRuleError` class after `BillingRequiredError` (currently the last class at line 83-86). Zero touch to existing classes → satisfies HARD constraint + zero Slot B merge-conflict risk.
+- Create: `src/core/errors/__tests__/app-errors.test.ts` — first test file for this module (sets precedent). Cover 4-item DoD for `BusinessRuleError` + 2 bonus sanity tests for existing hierarchy (`AuthError` 401, `NotFoundError` 404 constructor with resource+id).
+
+**Files NOT touched** (per HARD constraints + zero-scope-creep)
+- Existing error classes in `app-errors.ts` — untouched.
+- `src/plugins/` (T03/T04), `src/modules/*` (Nathan/Satrio), `src/core/config/`, `src/core/prisma/` (T-INFRA-01) — all out of scope.
+- `package.json` — no dep add.
+- Any error-handler plugin (does not exist yet per DEP-4 stub state; `toJson()` + `statusCode` already give it what it needs when wired later).
+
+**Approach**
+
+*(1) `app-errors.ts` append* — final block appended after existing `BillingRequiredError` (mirrors `ValidationError`/`ConflictError`/`RateLimitError` no-custom-ctor style):
+```ts
+/**
+ * BusinessRuleError — HTTP 422 for domain rule violations (invalid state
+ * transitions, business invariant breaks).
+ *
+ * Wire contract per PARENT §10 DEP-6 (PM B ratified):
+ *   envelope `code = 'BUSINESS_RULE'` (generic category)
+ *   + `details.rule` = specific rule identifier
+ *     (e.g. 'INVALID_TICKET_TRANSITION', 'PENDING_VERIFICATION_ONLY')
+ *
+ * Consumer pattern:
+ *   throw new BusinessRuleError('Cannot transition closed → open', {
+ *     rule: 'INVALID_TICKET_TRANSITION',
+ *     from: 'closed',
+ *     to: 'open',
+ *   });
+ */
+export class BusinessRuleError extends AppError {
+  readonly statusCode = 422;
+  readonly code = 'BUSINESS_RULE';
+}
+```
+
+*(2) `__tests__/app-errors.test.ts` create* — test structure:
+- `describe('BusinessRuleError')` — 4 tests: (a) constructs with message + `details.rule`; (b) `statusCode === 422` / `code === 'BUSINESS_RULE'` / `name === 'BusinessRuleError'`; (c) `toJson()` returns `{ code: 'BUSINESS_RULE', message, details }` (Nathan's envelope shape); (d) `instanceof BusinessRuleError` + `instanceof AppError` + `instanceof Error`.
+- `describe('existing hierarchy sanity')` — 2 bonus tests: (a) `AuthError` has statusCode=401 + code='AUTH_ERROR'; (b) `NotFoundError` constructs correctly with resource-only + resource+id shapes (statusCode=404, code='NOT_FOUND', message includes id when provided, `details.resource`+`details.id` populated). These establish coverage for the hierarchy in the new precedent-setting file per DoD bonus bullet.
+- Test naming: `it('should <expected> when <condition>')` per CLAUDE.md.
+- Import path: `from '../app-errors.js'` (relative — matches T04 test pattern for co-located source).
+
+**Explicit resolution of PM A's 6 advisory checks**
+
+- **Adv #1 — test file location discovery**: **VERIFIED**. `jest.config.ts` shows `roots: ['<rootDir>/src', '<rootDir>/scripts']` + `testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.integration.test.ts']`. The glob `**/__tests__/**/*.test.ts` matches any `__tests__/` directory anywhere under `src/`, so `src/core/errors/__tests__/app-errors.test.ts` will be auto-discovered on first jest run. No config change needed. Will confirm in SUBMIT via test-output listing this new suite.
+
+- **Adv #2 — `AppError` is abstract**: acknowledged. Test uses `BusinessRuleError` instance for all base-class behavior verification (toJson, name, details, captureStackTrace-derived stack). Never directly `new AppError(...)`. The `instanceof AppError` assertion in test (d) is prototype-chain check on the concrete instance — legal on abstract classes.
+
+- **Adv #3 — `Error.captureStackTrace` availability**: acknowledged. Node 20 (this repo's runtime per `package.json` engines + T01 nvm activation) supports it. Base `AppError:19` optional-chains it (`Error.captureStackTrace?.(this, this.constructor)`) which no-ops on non-V8. Test does NOT assert stack-trace shape (fragile + engine-specific) — only verifies `err.stack` is a non-empty string (safe universal check that passes when captureStackTrace runs OR when the native `Error` fills the field).
+
+- **Adv #4 — Consumer verification (Slot B pre-import check)**: **grep confirmed ZERO existing references**. Ran `grep -rn "BusinessRuleError" src/ docs/` → no hits. No Slot B branch on `main` has pre-imported the class. Shape shipped is authoritative — no compat pressure. (If Nathan's next branch surprises with a different shape after ship, that's a T12/T16 PLAN concern, not mine — but PM B's ratified envelope in PARENT §10 DEP-6 is what he'll use.)
+
+- **Adv #5 — HTTP status ordering — choice**: **Option (a) — append at end** after `BillingRequiredError`. Rationale:
+  1. Matches HARD constraint "Do NOT modify existing error classes" both semantically (no class touched) AND structurally (no lines inserted between existing classes). Option (b) would push RateLimitError/ExternalServiceError/TenantError/BillingRequiredError down N lines, expanding the diff surface into their line ranges → git blame noise + increased merge-conflict window with any unmerged Slot B/C branch touching this file.
+  2. Current tail is already jumbled (502→500→402); appending 422 after 402 doesn't make it worse and preserves append-only pattern that future slice-2+ additions will follow.
+  3. Reordering the whole tail (500/502/402/422) semantically is a separate concern — should be its own PR that touches the whole file intentionally (with git blame explanation in commit body), not smuggled into a class-add slice.
+  → append after line 86 `}` of `BillingRequiredError`.
+
+- **Adv #6 — `readonly` + subclass pattern**: acknowledged. Existing 8 subclasses prove the pattern; TypeScript's `readonly statusCode = 422` on `class BusinessRuleError extends AppError` satisfies the parent's `abstract readonly statusCode: number` signature. Same for `code`. Typecheck will validate.
+
+**Envelope design acknowledgment (per ASSIGNMENT WAJIB item)**
+Accepting PM B's ratified envelope design (envelope-generic `BUSINESS_RULE` + specific rule in `details.rule`) as documented in PARENT §10 DEP-6 — no rebuttal. Spec §7's 5 specific 422 codes will become `details.rule` values (`INVALID_TICKET_TRANSITION`, `MIN_AGENTS_VIOLATION`, `FEATURE_FLAG_DEPENDENCY_VIOLATION`, `WA_TEMPLATE_LOCKED`, `TIER_GATE`), preserving spec coverage without proliferating subclasses. Consumers write one `catch (BusinessRuleError)` block and discriminate on `err.details.rule` — cleaner than per-rule subclass hierarchy for downstream error-handler wiring (T07-slice-N or wherever).
+
+**GAPs / questions**: none.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
