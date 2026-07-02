@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/glo
 import { PrismaClient } from '@prisma/client';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-import { NotFoundError } from '@core/errors/app-errors.js';
+import { BusinessRuleError, ForbiddenError, NotFoundError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -26,6 +26,7 @@ const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DEPT_1 = '11111111-dddd-4ddd-8ddd-dddddddddddd';
 const DEPT_2 = '22222222-dddd-4ddd-8ddd-dddddddddddd';
+const DEPT_B = '33333333-dddd-4ddd-8ddd-dddddddddddd';
 const GUEST_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const GUEST_VVIP = 'dddddddd-cccc-4ccc-8ccc-cccccccccccc';
 const USER_1 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
@@ -72,6 +73,7 @@ async function seed(): Promise<void> {
     data: [
       { id: DEPT_1, hotelId: HOTEL_A, name: 'Housekeeping', code: 'HSK' },
       { id: DEPT_2, hotelId: HOTEL_A, name: 'Front Office', code: 'FO' },
+      { id: DEPT_B, hotelId: HOTEL_B, name: 'Other Hotel Dept', code: 'OTH' },
     ],
   });
   await db.guest.createMany({
@@ -346,5 +348,61 @@ describe('TicketsService.overdue (integration)', () => {
     const res = await service.overdue(gmA, { limit: '100' }, NOW);
     const listedIds = res.data.map((t) => t.id).sort();
     expect(listedIds).toEqual(expectedIds);
+  });
+});
+
+describe('TicketsService.updateStatus (integration)', () => {
+  it('should transition status and write an audit row with the actor', async () => {
+    const res = await service.updateStatus(gmA, ticketId(1), {
+      status: 'in_progress',
+      note: 'on it',
+    });
+    expect(res.data.status).toBe('in_progress');
+    const audit = res.data.updates.find((u) => u.type === 'status_change');
+    expect(audit?.to_status).toBe('in_progress');
+    expect(audit?.from_status).toBe('open');
+    expect(audit?.actor_user_id).toBe(USER_1);
+    expect(audit?.note).toBe('on it');
+  });
+
+  it('should reject an invalid transition with 422 and write no audit row', async () => {
+    await expect(
+      service.updateStatus(gmA, ticketId(3), { status: 'closed' }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+    const fresh = await service.detail(gmA, ticketId(3));
+    expect(fresh.data.status).toBe('open');
+    expect(fresh.data.updates).toHaveLength(0);
+  });
+
+  it('should let a dept_head transition an own-dept ticket', async () => {
+    const res = await service.updateStatus(deptHead1, ticketId(1), { status: 'in_progress' });
+    expect(res.data.status).toBe('in_progress');
+  });
+
+  it('should 404 a cross-tenant status update', async () => {
+    await expect(
+      service.updateStatus(gmB, ticketId(1), { status: 'in_progress' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('TicketsService.reroute (integration)', () => {
+  it('should reroute and write a reroute audit row', async () => {
+    const res = await service.reroute(gmA, ticketId(1), { department_id: DEPT_2 });
+    expect(res.data.department_id).toBe(DEPT_2);
+    const audit = res.data.updates.find((u) => u.type === 'reroute');
+    expect(audit?.actor_user_id).toBe(USER_1);
+  });
+
+  it('should 403 when a dept_head attempts a reroute', async () => {
+    await expect(
+      service.reroute(deptHead1, ticketId(1), { department_id: DEPT_2 }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('should 404 when rerouting to a cross-hotel department', async () => {
+    await expect(
+      service.reroute(gmA, ticketId(1), { department_id: DEPT_B }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

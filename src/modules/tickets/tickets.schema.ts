@@ -7,6 +7,8 @@ import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   type ComplaintType,
+  type DepartmentUpdate,
+  type StatusUpdate,
   type TicketCursor,
   type TicketListQuery,
   type TicketPriority,
@@ -160,4 +162,36 @@ export function parseOverdueQuery(rawQuery: unknown): { limit: number } {
     throw toValidationError(result.error);
   }
   return { limit: result.data.limit };
+}
+
+// --- T12 mutation bodies (.strict() → unknown keys rejected) ---
+
+export const StatusUpdateSchema = z
+  .object({
+    status: z.enum(TICKET_STATUSES as [TicketStatus, ...TicketStatus[]]),
+    note: z.string().trim().min(1).max(2000).optional(),
+  })
+  .strict();
+
+export const DepartmentUpdateSchema = z
+  .object({
+    department_id: z.string().uuid('department_id must be a valid uuid'),
+    note: z.string().trim().min(1).max(2000).optional(),
+  })
+  .strict();
+
+export function parseStatusUpdate(rawBody: unknown): StatusUpdate {
+  const result = StatusUpdateSchema.safeParse(rawBody);
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  return { status: result.data.status, note: result.data.note ?? null };
+}
+
+export function parseDepartmentUpdate(rawBody: unknown): DepartmentUpdate {
+  const result = DepartmentUpdateSchema.safeParse(rawBody);
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  return { departmentId: result.data.department_id, note: result.data.note ?? null };
 }
