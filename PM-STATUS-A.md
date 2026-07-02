@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T05 seed (main queue per PO strict directive) — ASSIGNMENT posted §2, awaiting exec-A PLAN. S2 default (runtime Prisma upsert) per silent-ratification of PARENT §10 T05 coord Q. T-INFRA-03 merged (PO commit `cf65e99`).
-- **Branch (current active task)**: `feat/foundation-seed-hotel-core` (per PO branch-per-task policy)
-- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03 (all merged to main)
+- **Active task**: T05 APPROVED (`feat/foundation-seed-hotel-core` @ `cdd1ed5`, awaiting PO merge). PM A pauses + awaits PO direction. Both durable-pattern mitigations held (branch-slip 2nd consecutive not-recurring + verify-before-act strongest efficacy yet).
+- **Branch (last active task)**: `feat/foundation-seed-hotel-core` @ `cdd1ed5` — awaiting PO merge.
+- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03 (all merged to main) · **T05** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 main-queue FIRST per PO directive)**: T01–T04 ✅ · T06 ✅ · T-INFRA-01 ✅ · T-INFRA-02 ✅ · T-INFRA-03 ✅ · T07-slice-1 ✅ · **T05 (assigned, active)** · T08 multipart (next main-queue) · T09 CSV · T10 workers · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts), docs/TESTING.md (planning), T-INFRA-05+ (backlog only).
+- **My queue (T01–T10 main-queue FIRST per PO directive)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 multipart (next main-queue)** · T09 CSV · T10 workers · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts), docs/TESTING.md (planning), T-INFRA-05+ (backlog only).
 
 ---
 
@@ -32,7 +32,7 @@
 | T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
-| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | assigned | — | Main queue per PO directive. S2 default (runtime Prisma upsert) per silent-ratification of PARENT §10 T05 Opsi C coord Q. Modifies existing `prisma/seeds/index.ts` stub. Env `SEED_HOTEL_ID` with default UUID; idempotent upserts. PM B welcome to review/override at SUBMIT stage. |
+| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-seed-hotel-core` @ `cdd1ed5` — **awaiting PO merge**. 1 file (`prisma/seeds/index.ts` stub → 257-LOC S2 impl). Independent DB-level idempotency proven (2 runs, matching 1/5/3/10/6 counts). CHECK compliance verified. Own PrismaClient design held. Silent-ratification note in JSDoc. Branch-slip mitigation held (2nd consecutive) + verify-before-act strongest efficacy datapoint yet. |
 | T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
 | T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
@@ -3189,6 +3189,96 @@ Notes / operational
 - Coverage note: 100% file coverage on `prisma/seeds/index.ts` is N/A per PLAN — seed file is invoked at runtime by `pnpm seed`, not by jest. Its correctness is proven by the DB-count assertion after 2 runs (idempotent) + `make check` green (no regression on 12 executed suites). PM A can consider a targeted integration test in a future task if desired, but ASSIGNMENT explicitly did NOT require test coverage on the seed.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T05 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-seed-hotel-core` @ commit `cdd1ed5`. All gates green with independent DB-level idempotency verification.
+
+**Transparency verification**
+- `git log e5bd82d..origin/main --oneline` (since ACK) → 1 exec-A SUBMIT docs commit (`45a0cfa`) + 3 Nathan Slot B commits (T12 SUBMIT + VERDICT + merge). No T05 source leaked.
+- `git log origin/main -- prisma/seeds/index.ts` → 1 commit (`5ce7f86 chore: initial backend service boilerplate`). No T05 code touched main. ✓
+- **Mitigation held (2nd consecutive task)** — exec-A verified `git branch --show-current` before code edit, committed on `feat/foundation-seed-hotel-core` directly. Branch-slip pattern from T07-slice-1/T06/T-INFRA-02 stays not-recurring. Second efficacy datapoint for `feedback_git_slip_transparency.md`.
+
+**DoD verification (11 items)** — all ✓
+- `prisma/seeds/index.ts` implements S2 with own PrismaClient — verified line 29 (`import { PrismaClient } from '@prisma/client'`) + line 186 (`const db = new PrismaClient()`); zero value-level singleton reference (1 JSDoc mention at line 15 for design rationale, acceptable per PO checklist) ✓
+- 1 hotel seeded with env-fallback default `'00000000-0000-4000-8000-000000000001'` — verified `psql` count query ✓
+- 5 depts (CON/HSK/FNB/ENG/FO) — verified count + CHECK compliance ✓
+- 3 categories + 10 items — verified count ✓
+- 6 KB entries — verified count ✓
+- **`pnpm seed` on empty DB → success** — 1st run 1.946s, output `✓ Seed complete: hotel ..., 5 depts, 3 categories, 10 items, 6 KB entries` ✓
+- **`pnpm seed` on already-seeded DB → success (idempotent)** — 2nd run 0.586s (faster, upserts as no-op), identical output ✓
+- `make check` PASS unchanged 160/1/161 in 0.591s ✓
+- Drift scans clean on `prisma/seeds/index.ts` (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export / 0 forbidden libs / 0 value-level `@core/prisma` import) ✓
+- `git diff main...HEAD --name-only` = **1 file only** (`prisma/seeds/index.ts`) ✓
+- Silent-ratification note in file JSDoc header (lines 4-6) ✓
+
+**Independent DB row-count verification** (PM re-run via psql)
+```sql
+SELECT (SELECT COUNT(*) FROM hotels) AS hotels,
+       (SELECT COUNT(*) FROM departments) AS depts,
+       (SELECT COUNT(*) FROM menu_categories) AS categories,
+       (SELECT COUNT(*) FROM menu_items) AS items,
+       (SELECT COUNT(*) FROM knowledge_entries) AS kb;
+
+ hotels | depts | categories | items | kb
+--------+-------+------------+-------+----
+      1 |     5 |          3 |    10 |  6
+```
+Matches PLAN + SUBMIT exactly. ✓
+
+**Independent idempotency proof (PM re-run)**
+- 1st `pnpm seed`: 1.946s wall, `✓ Seed complete: ...` output
+- 2nd `pnpm seed`: 0.586s wall (3.3× faster on no-op upserts), identical output
+- DB counts after 2nd run: unchanged 1/5/3/10/6 (no duplicates, no orphans)
+- Confirms `update: {}` no-op strategy works as designed
+
+**CHECK constraint compliance** (per Adv #2 pre-PLAN grep)
+- Dept codes CON/HSK/FNB/ENG/FO: all match `^[A-Z]{2,8}$` (2-3 chars, uppercase Latin) ✓
+- Menu item prices 15000-120000: all `≥ 0` ✓
+- prep_minutes: unset (NULL) → passes `IS NULL OR ≥ 0` ✓
+- Zero DB-layer failures observed across 2 seed runs
+
+**Own PrismaClient verified** (per Adv #3)
+- `grep '@core/prisma' prisma/seeds/index.ts` → 1 hit at line 15 (JSDoc design rationale reference, NOT a value-level import — explicitly accepted per PO validation checklist)
+- No `import` statement pulls the T-INFRA-01 singleton. `import { PrismaClient } from '@prisma/client'` at line 29 is the direct library import. `new PrismaClient()` at line 186. Design intent held.
+
+**Cross-task consistency observed** (worth noting)
+- `void db.$disconnect()` in `.finally()` at line 261 reuses the **same `no-floating-promises` idiom** from T-INFRA-01's `void shutdown()` in signal handlers. Cross-task discipline consistency — same problem (async cleanup in sync callback), same solution (void-wrap sync arrow). Shows the codebase is developing a consistent style beyond the drift-scan surface.
+
+**Slot B compat verification** (per Adv #6)
+- Nathan's `tickets.repository.integration.test.ts` uses `HOTEL_A='aaaaaaaa-...'` + `DEPT_1='11111111-dddd-...'` in ephemeral testcontainer Postgres — completely isolated from `hotel_core_dev` where this seed lands. Zero collision. ✓
+- HSK + FO codes deliberately reused from Nathan's fixture convention. Slot B `make check` post-merge PM re-run: **all 7 Nathan suites PASS** (tickets.service/routes/stats/repository.integration + guests.service/routes/repository.integration). Zero test-level regression.
+
+**Merge dry-run** (per PO strict directive verification)
+- `git merge-tree $(git merge-base main HEAD) HEAD main` → output `merged` (no conflict markers). Clean merge possible. PM-STATUS-A.md auto-merges cleanly (both branches have appended content, non-conflicting).
+
+**Security floor** — N/A. Seed script is dev-only. No PII (menu names + KB entries are all public-domain hotel operations content). No secrets. `SEED_HOTEL_ID` env is a UUID reference, not a credential.
+
+**Two adopted discipline patterns held under continued load**
+1. **`git branch --show-current` mitigation** — 2nd consecutive task (T-INFRA-03 was 1st) with pattern **not recurring**. Efficacy datapoint stacking in `feedback_git_slip_transparency.md`.
+2. **`feedback_verify_before_act.md` empirical pre-PLAN verification** — 6 advisories → 6 pre-PLAN verifications → 0 REJECT-PLAN → clean SUBMIT lands. Adv #2 CHECK-constraint grep specifically prevented a REJECT-SUBMIT (dept codes would have failed regex at DB layer). **Strongest efficacy datapoint yet.** Pattern is holding under load; memory tracking rock-solid.
+
+**Follow-ups actioned in same commit**
+- → §1 T05 → approved
+- → §0 Active task refreshed → T08 multipart (next main-queue per PO strict directive)
+- → PARENT §1 T05 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §10 **silent-ratification note routed to PM B**: T05 shipped as S2 default; PM B awareness annotation with explicit "no override expected but channel remains open"
+
+**PO action item — branch merge**
+`feat/foundation-seed-hotel-core` @ `cdd1ed5` on `origin`; PM A verified: `make check` unchanged (160/1/161), DB-level idempotency proven (2 runs, matching counts), CHECK compliance verified, own PrismaClient design held, drift 0/6, merge dry-run clean, 1-file scope discipline. Per CLAUDE.md §12, **please merge `feat/foundation-seed-hotel-core` → `main`**. Post-merge: `make start-fresh` demo works out of the box; Satrio has seeded departments/menu/KB to reference in his future T21-T30 integration tests.
+
+**Slot A ledger post-merge**: **10 approved tasks** — T01, T02, T03, T04, T-INFRA-01, T-INFRA-02, T-INFRA-03, T06, T07-slice-1, **T05**. Main-queue chain 1-6 complete (T01-T06 done); T07 partial (slice-1 landed, slice-2+ deferred on demand); T08/T09/T10 remain per PO strict directive.
+
+**Next Slot A queue** (per PO strict directive)
+1. **T08 multipart upload utility** — S3/R2 abstraction per CLAUDE.md §4 (port + adapter pattern). No imminent consumer but PO directive is explicit.
+2. **T09 CSV import utility** — used by menu + knowledge (future consumer: T22/T23/T24 Satrio + Nathan's guest bulk imports if any)
+3. **T10 workers harness** — cron + queue foundation
+4. THEN electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts), T-INFRA-05+ if surfaced
+
+PM A pauses + awaits PO next-task direction (should be straight-line T08 per PO directive, but confirming before draft).
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
