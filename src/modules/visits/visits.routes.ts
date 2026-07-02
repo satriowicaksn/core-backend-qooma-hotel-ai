@@ -60,5 +60,32 @@ export const visitsRoutes: FastifyPluginCallback<VisitsRoutesOptions> = (fastify
     return reply.send(result);
   });
 
+  fastify.patch('/visits/:id/reject', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    const id = parseVisitId(req.params);
+    req.log.info(
+      { module: 'visits', action: 'reject', visitId: id, correlationId: correlationIdOf(req) },
+      'reject visit',
+    );
+    const result = await service.reject(ctx, id);
+    return reply.send(result);
+  });
+
+  fastify.patch('/visits/:id/approve-manual', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    const id = parseVisitId(req.params);
+    req.log.info(
+      {
+        module: 'visits',
+        action: 'approve-manual',
+        visitId: id,
+        correlationId: correlationIdOf(req),
+      },
+      'approve visit (failed_3x override)',
+    );
+    const result = await service.approveManual(ctx, id, req.body);
+    return reply.send(result);
+  });
+
   done();
 };

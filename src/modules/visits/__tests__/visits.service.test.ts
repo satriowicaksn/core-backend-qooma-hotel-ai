@@ -6,9 +6,14 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { deriveCheckout } from '../visits.checkout.js';
 import type { VisitsRepository } from '../visits.repository.js';
-import { parseListQuery, parseVerifyManual } from '../visits.schema.js';
+import { parseApproveManual, parseListQuery, parseVerifyManual } from '../visits.schema.js';
 import { serializeVisit } from '../visits.serializer.js';
-import { buildVisitWhere, VisitsService, type VisitsServiceDeps } from '../visits.service.js';
+import {
+  assertVisitTransition,
+  buildVisitWhere,
+  VisitsService,
+  type VisitsServiceDeps,
+} from '../visits.service.js';
 import type { VisitRow } from '../visits.types.js';
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
@@ -306,5 +311,120 @@ describe('VisitsService.verifyManual', () => {
       { visitId: 'visit-1', from: 'pending_verification', to: 'rejected', actorUserId: 'user-9' },
     ]);
     expect(socket).toEqual([{ visitId: 'visit-1', status: 'rejected' }]);
+  });
+});
+
+describe('assertVisitTransition (R3 map)', () => {
+  it('should allow pending_verification → checked_in and → rejected', () => {
+    expect(() => assertVisitTransition('pending_verification', 'checked_in')).not.toThrow();
+    expect(() => assertVisitTransition('pending_verification', 'rejected')).not.toThrow();
+  });
+
+  it('should allow failed_verification → checked_in', () => {
+    expect(() => assertVisitTransition('failed_verification', 'checked_in')).not.toThrow();
+  });
+
+  it('should reject an out-of-map source with rule=INVALID_VISIT_TRANSITION', () => {
+    expect(() => assertVisitTransition('checked_out', 'rejected')).toThrow(BusinessRuleError);
+    try {
+      assertVisitTransition('cancelled', 'checked_in');
+    } catch (e) {
+      expect(e).toMatchObject({
+        code: 'BUSINESS_RULE',
+        statusCode: 422,
+        details: { rule: 'INVALID_VISIT_TRANSITION', from: 'cancelled', to: 'checked_in' },
+      });
+    }
+  });
+});
+
+describe('parseApproveManual', () => {
+  it('should accept guest_name + room_number with optional nights', () => {
+    expect(parseApproveManual({ guest_name: 'Budi', room_number: '1204', nights: 3 })).toEqual({
+      guestName: 'Budi',
+      roomNumber: '1204',
+      nights: 3,
+    });
+    expect(parseApproveManual({ guest_name: 'Budi', room_number: '1204' })).toEqual({
+      guestName: 'Budi',
+      roomNumber: '1204',
+    });
+  });
+
+  it('should reject missing required fields and out-of-range nights', () => {
+    expect(() => parseApproveManual({ room_number: '1204' })).toThrow(ValidationError);
+    expect(() =>
+      parseApproveManual({ guest_name: 'Budi', room_number: '1204', nights: 8 }),
+    ).toThrow(ValidationError);
+  });
+});
+
+describe('VisitsService.reject + approveManual', () => {
+  function repoWith(row: VisitRow | null, count = 1, afterRow?: VisitRow): VisitsRepository {
+    let calls = 0;
+    return {
+      findById: () => {
+        calls += 1;
+        return Promise.resolve(calls === 1 ? row : (afterRow ?? row));
+      },
+      verifyManualTx: () => Promise.resolve(count),
+    } as unknown as VisitsRepository;
+  }
+
+  it('should reject a pending_verification visit → rejected', async () => {
+    const service = new VisitsService(
+      repoWith(makeRow({ status: 'pending_verification' }), 1, makeRow({ status: 'rejected' })),
+    );
+    const res = await service.reject(ctx(), 'visit-1');
+    expect(res.data.status).toBe('rejected');
+  });
+
+  it('should 422 rejecting a non-pending visit before writing', async () => {
+    const service = new VisitsService(repoWith(makeRow({ status: 'checked_in' })));
+    await expect(service.reject(ctx(), 'visit-1')).rejects.toBeInstanceOf(BusinessRuleError);
+  });
+
+  it('should approve-manual a failed_verification visit → checked_in with derived checkout', async () => {
+    const failed = makeRow({ status: 'failed_verification' });
+    const approved = makeRow({
+      status: 'checked_in',
+      roomNumber: '1210',
+      nights: 2,
+      checkOut: new Date('2026-06-13T11:00:00.000Z'),
+    });
+    const service = new VisitsService(repoWith(failed, 1, approved), { timezone: 'UTC' });
+    const res = await service.approveManual(ctx(), 'visit-1', {
+      guest_name: 'Rahmat',
+      room_number: '1210',
+      nights: 2,
+    });
+    expect(res.data.status).toBe('checked_in');
+    expect(res.data.check_out).toBe('2026-06-13T11:00:00.000Z');
+  });
+
+  it('should approve-manual without nights (checkout stays null)', async () => {
+    const failed = makeRow({ status: 'failed_verification' });
+    const approved = makeRow({ status: 'checked_in', roomNumber: '1210' });
+    const service = new VisitsService(repoWith(failed, 1, approved));
+    const res = await service.approveManual(ctx(), 'visit-1', {
+      guest_name: 'Rahmat',
+      room_number: '1210',
+    });
+    expect(res.data.status).toBe('checked_in');
+    expect(res.data.check_out).toBeNull();
+  });
+
+  it('should 422 approve-manual on a non-failed source before writing', async () => {
+    const service = new VisitsService(repoWith(makeRow({ status: 'checked_out' })));
+    await expect(
+      service.approveManual(ctx(), 'visit-1', { guest_name: 'R', room_number: '1' }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+  });
+
+  it('should 404 a cross-tenant reject (anti-enumeration)', async () => {
+    const service = new VisitsService(repoWith(makeRow({ hotelId: 'other-hotel' })));
+    await expect(service.reject(ctx({ hotelId: 'hotel-1' }), 'visit-1')).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 });

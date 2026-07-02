@@ -4,6 +4,7 @@ import { ValidationError } from '@core/errors/app-errors.js';
 
 import {
   VISIT_STATUSES,
+  type ApproveManualInput,
   type VerifyManualInput,
   type VisitListQuery,
   type VisitStatus,
@@ -113,5 +114,27 @@ export function parseVerifyManual(rawBody: unknown): VerifyManualInput {
     guestName: result.data.guest_name,
     roomNumber: result.data.room_number,
     nights: result.data.nights,
+  };
+}
+
+// approve-manual (failed_3x override). nights OPTIONAL (Q-B-12); range matches
+// verify-manual (1–7). guest_name/room_number required per §1.3.
+const ApproveManualSchema = z
+  .object({
+    guest_name: z.string().trim().min(1).max(120),
+    room_number: z.string().trim().min(1).max(16),
+    nights: z.number().int().min(MIN_NIGHTS).max(MAX_NIGHTS).optional(),
+  })
+  .strict();
+
+export function parseApproveManual(rawBody: unknown): ApproveManualInput {
+  const result = ApproveManualSchema.safeParse(rawBody ?? {});
+  if (!result.success) {
+    throw toValidationError(result.error);
+  }
+  return {
+    guestName: result.data.guest_name,
+    roomNumber: result.data.room_number,
+    ...(result.data.nights !== undefined ? { nights: result.data.nights } : {}),
   };
 }

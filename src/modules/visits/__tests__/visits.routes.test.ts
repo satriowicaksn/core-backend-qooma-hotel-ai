@@ -36,6 +36,9 @@ interface Recorder {
   listQuery?: unknown;
   verifyId?: string;
   verifyBody?: unknown;
+  rejectId?: string;
+  approveId?: string;
+  approveBody?: unknown;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -52,6 +55,19 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     ): Promise<VisitDetailResponse> => {
       recorder.verifyId = id;
       recorder.verifyBody = body;
+      return Promise.resolve(DETAIL_RESULT);
+    },
+    reject: (_ctx: TenantContext, id: string): Promise<VisitDetailResponse> => {
+      recorder.rejectId = id;
+      return Promise.resolve(DETAIL_RESULT);
+    },
+    approveManual: (
+      _ctx: TenantContext,
+      id: string,
+      body: unknown,
+    ): Promise<VisitDetailResponse> => {
+      recorder.approveId = id;
+      recorder.approveBody = body;
       return Promise.resolve(DETAIL_RESULT);
     },
   } as unknown as VisitsService;
@@ -131,5 +147,31 @@ describe('visitsRoutes', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(recorder.verifyId).toBeUndefined();
+  });
+
+  it('should route /visits/:id/reject to the reject handler (no body)', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({ method: 'PATCH', url: `/visits/${VALID_ID}/reject` });
+    expect(res.statusCode).toBe(200);
+    expect(recorder.rejectId).toBe(VALID_ID);
+  });
+
+  it('should route /visits/:id/approve-manual and forward the body', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/visits/${VALID_ID}/approve-manual`,
+      payload: { guest_name: 'Rahmat', room_number: '1210', nights: 2 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(recorder.approveId).toBe(VALID_ID);
+    expect(recorder.approveBody).toEqual({ guest_name: 'Rahmat', room_number: '1210', nights: 2 });
+  });
+
+  it('should 401 on reject without a tenant context', async () => {
+    app = buildApp(undefined, recorder);
+    const res = await app.inject({ method: 'PATCH', url: `/visits/${VALID_ID}/reject` });
+    expect(res.statusCode).toBe(401);
+    expect(recorder.rejectId).toBeUndefined();
   });
 });
