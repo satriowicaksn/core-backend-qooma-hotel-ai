@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T08 APPROVED (`feat/foundation-multipart-upload` @ `50ec906`, awaiting PO merge). PM A pauses + awaits PO direction. Branch-slip mitigation 3rd consecutive not-recurring — pattern now empirically durable.
-- **Branch (last active task)**: `feat/foundation-multipart-upload` @ `50ec906` — awaiting PO merge.
-- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03 (all merged to main) · **T08** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T09 CSV import utility — ASSIGNMENT posted §2, awaiting exec-A PLAN. T08 merged (PO commit `cfcb695`). PO direct straight-line direction (no triage cycle).
+- **Branch (current active task)**: `feat/foundation-csv-import` (per PO branch-per-task policy)
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 ✅** · T09 CSV (next main-queue) · T10 workers · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
+- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · **T09 CSV (assigned, active)** · T10 workers (next main-queue) · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
 
 ---
 
@@ -38,7 +38,7 @@
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-multipart-upload` @ `50ec906` — **awaiting PO merge**. 5 new files under `src/core/storage/` (port + S3Adapter + InMemoryAdapter + 2 tests) + env.ts additive + `@aws-sdk/client-s3` dep. `make check` **212/1/213** (Nathan baseline shift 160→205 caught cleanly by exec-A). InMemoryAdapter 100% coverage; S3Adapter fail-lazy paths only per hexagonal principle. Modular imports verified (3 named). Drift 0 (2 false positives verified). Branch-slip mitigation held 3rd consecutive. |
-| T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
+| T09 | CSV import utility (used by menu + knowledge)              | assigned | — | Main-queue continuation per PO direct direction. Ships `parseCsvWithSchema<T>` at `src/shared/utils/csv-parser.ts` (mirrors T06 pattern). Hand-rolled parser (no new deps), zod schema-driven per-row validation, batched error surface. Streaming deferred to slice-2. |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
 | T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-business-rule-error` @ `b214743` — **awaiting PO merge**. 2 files (app-errors.ts append + fresh test file, 6 new tests). 150 tests pass on branch (+6 vs 144 baseline). Drift clean. 9 existing classes untouched (verified via git diff = pure `+`). Cherry-pick transparency clean (origin/main never touched by code). PARENT §10 DEP-6 resolved. |
@@ -3870,6 +3870,147 @@ Exec-A noted the baseline shift **160 → 205** correctly at code-time: Nathan's
 PM A pauses + awaits PO next-task direction. Straight-line **T09 CSV** expected per numeric queue order.
 
 Ship it.
+
+### ASSIGNMENT T09 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-csv-import` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T09 (PO direct straight-line direction post-T08 merge, no triage cycle needed)
+- Depends on: foundation healthy (T01-T08 + T-INFRA-01/02/03 all merged)
+- Downstream consumer: Satrio **T23** (menu bulk CSV import) + **T24** (KB CSV import) — no imminent, but T09 shape sets contract
+- Spec / reference (WAJIB read before PLAN):
+  - `CLAUDE.md §3` — folder structure (`src/shared/utils/` = pure helper fns; T06 `ticket-state-machine.ts` precedent for single-file utility here)
+  - `CLAUDE.md §5` — TypeScript strict + zod usage patterns
+  - `src/shared/utils/ticket-state-machine.ts` — T06 file structure precedent (JSDoc + pure exports + no default export)
+  - `src/core/config/env.ts:14-61` — zod schema pattern consumers will follow (`z.object({...})` with `.string()`, `.coerce.number()`, `.enum()`, etc.)
+  - `docs/spec/02-hotel-core.md §2.4/§2.6` — menu + KB bulk import consumer flows
+
+#### PM A notes untuk exec-A
+
+**Scope — T09 slice-1 (in-memory parse + validate; streaming deferred to slice-2)**
+
+Ship a single pure-fn CSV utility for consumer modules to bulk-import via a zod-typed row schema:
+
+```ts
+// src/shared/utils/csv-parser.ts
+
+export interface CsvRowError {
+  readonly rowIndex: number;      // 0-based data row index (excludes header)
+  readonly line: number;          // 1-based file line number (for human UX)
+  readonly issues: readonly string[]; // zod issue path+message strings
+  readonly raw: readonly string[];    // original row cell values
+}
+
+export interface CsvParseResult<T> {
+  readonly valid: readonly T[];
+  readonly errors: readonly CsvRowError[];
+}
+
+export interface CsvParseOptions {
+  /** Column names in order — required, defines mapping into the zod schema shape. */
+  readonly columns: readonly string[];
+  /** If true, the first data row is treated as header + skipped from validation. */
+  readonly hasHeader?: boolean;
+}
+
+/**
+ * Parse CSV text + validate each row against a zod schema.
+ * Errors are ACCUMULATED (not thrown) so consumers can render partial
+ * success + row-level error report.
+ */
+export function parseCsvWithSchema<T>(
+  input: string,
+  schema: z.ZodType<T>,
+  opts: CsvParseOptions,
+): CsvParseResult<T>;
+```
+
+**Parser must handle "practical CSV" subset** (what Excel/Google Sheets emit):
+- Quoted fields with embedded commas: `"Doe, John",30,admin`
+- Escaped quotes inside quoted fields: `"He said ""hello"""`
+- Line endings: LF (`\n`), CRLF (`\r\n`), CR (`\r`) — normalize
+- UTF-8 BOM at start of input: detect + strip (Excel emits this)
+- Empty rows (whitespace-only lines): silently skip, do NOT report as errors
+- Blank cells within a row: valid (become empty strings)
+- Trailing blank line: skip
+- Column count mismatch (row has fewer/more cells than `opts.columns`): report as `CsvRowError` with clear message
+
+**Design decisions ratified (per PO preemptive input)**
+
+- **No new dep** — hand-rolled parser sufficient for menu/KB MVP scope. Full RFC 4180 (multi-line quoted values, some edge Unicode) deferred to slice-2 if consumer needs.
+- **Streaming deferred to slice-2** — in-memory only for MVP. Menu CSV ~100 rows, KB CSV ~500 rows. Streaming variant can add when file sizes justify complexity.
+- **Zod schema-driven validation** — consumer defines `z.object({...})` shape with `z.coerce.number()`, `z.string().min(1)`, etc. Parser builds `Record<string, string>` from row + `opts.columns`, then `schema.safeParse()`.
+- **Batched error surface (no throw-on-first)** — consumers can render partial import UX (import valid rows, show error list for invalid rows). Per PO input.
+- **`columns` required (no auto-detect from header)** — consumer knows their expected shape statically. `hasHeader: true` skips the first row but does NOT use it as `columns`. Simpler predictable API vs auto-detect trickiness.
+- **Row index / line number distinction** — `rowIndex` is 0-based DATA row (post-header-skip); `line` is 1-based FILE line number. Human error messages want line number; programmatic access wants row index. Include both.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — hand-rolled parser; zod already available; Node built-in only otherwise
+- **No `any`** — use `z.ZodType<T>` generic parameter; internal parser types explicit
+- **No `console.log/info/debug`** — silent pure fn (no logging)
+- **No `throw new Error(`** — errors ACCUMULATED in `CsvParseResult.errors`, never thrown. Parser is total (all inputs produce a result, even empty/malformed).
+- **No default export** — named exports only
+- **Pure fn** — no I/O, no globals, no side effects. Same input → same output (deterministic).
+- **Explicit return type** on `parseCsvWithSchema`
+- **Do NOT touch other files** in `src/shared/utils/` (crypto.ts / masking.ts / ticket-state-machine.ts / test-setup.ts all untouched)
+- **Do NOT touch `src/core/`, `src/plugins/`, `src/modules/`, `src/shared/types/`, `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`, `package.json`, `pnpm-lock.yaml`** — pure T09-scope changes only
+
+**Files to create** (2, 0 modify)
+- `src/shared/utils/csv-parser.ts` — parser + validator + result types (~120-150 LOC + JSDoc)
+- `src/shared/utils/__tests__/csv-parser.test.ts` — comprehensive test suite (~200 LOC, 12-15 test cases)
+
+**T09 DoD**
+- [ ] `parseCsvWithSchema<T>` exported from `@shared/utils/csv-parser.js` with the signature above
+- [ ] Handles quoted fields with embedded commas — test proof
+- [ ] Handles escaped quotes `""` inside quoted fields — test proof
+- [ ] Handles LF, CRLF, and CR line endings (mixed input tolerated) — test proof
+- [ ] Strips UTF-8 BOM if present at input start — test proof
+- [ ] `hasHeader: true` skips first row from validation — test proof
+- [ ] Empty/whitespace-only rows silently skipped (NOT reported as errors) — test proof
+- [ ] Column count mismatch reported as `CsvRowError` with descriptive message — test proof
+- [ ] Zod validation happy path (all rows valid → `errors: []`) — test proof
+- [ ] Zod validation error path (some rows invalid → both `valid` + `errors` populated) — test proof
+- [ ] All-rows-invalid case (empty `valid`, populated `errors`) — test proof
+- [ ] Empty input (both result arrays empty) — test proof
+- [ ] Test coverage ≥ 90% on `csv-parser.ts`
+- [ ] `make check` PASS with baseline+12-15 unit tests added
+- [ ] Drift scans clean on both files (0 `any`, 0 `console.log/info/debug`, 0 `throw new Error(`, 0 default export)
+- [ ] `git diff main -- src/shared/utils/{crypto,masking,test-setup,ticket-state-machine}.ts` = **empty** (other utils untouched)
+- [ ] `git diff main --name-only -- prisma/ docs/ package.json pnpm-lock.yaml Makefile jest.config.ts tsconfig.json` = **empty** (no dep, no schema, no config changes)
+- [ ] `git diff main --name-only -- src/core/ src/plugins/ src/modules/ src/shared/types/` = **empty**
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **Hand-rolled parser vs library — no new dep confirmed default**. PLAN should acknowledge the trade-off: (i) hand-rolled covers Excel/Sheets output (quoted fields, escaped quotes, BOM, mixed line endings) — the "practical CSV" subset. (ii) Full RFC 4180 (multi-line quoted values with embedded newlines) NOT supported in slice-1. (iii) If Satrio's real CSVs surface edge cases (e.g., KB entries with multi-line content stored as quoted multi-line CSV cells), slice-2 can swap to `csv-parse` (~50KB, battle-tested, RFC-compliant) with PO ratification. Note limitations in file JSDoc.
+
+2. **RFC 4180 subset — documented boundary**. PLAN + code JSDoc should list what's supported vs deferred. Consumers reading the JSDoc should know when their CSV might need slice-2.
+
+3. **Zod schema-driven pattern — mirror env.ts convention**. PLAN should show an example consumer usage:
+   ```ts
+   const MenuRowSchema = z.object({
+     name: z.string().min(1).max(120),
+     price_idr: z.coerce.number().int().nonnegative(),
+     category: z.string().min(1),
+   });
+   const result = parseCsvWithSchema(csvText, MenuRowSchema, {
+     columns: ['name', 'price_idr', 'category'],
+     hasHeader: true,
+   });
+   ```
+   Confirms API is ergonomic + type inference works (`result.valid` is `readonly MenuRow[]`).
+
+4. **Row index vs line number distinction**. `rowIndex` = 0-based data row (skip header) for programmatic access. `line` = 1-based FILE line number (include header + skipped blanks) for human error messages. Verify test cases cover both correctly (e.g., row 0 of a headered CSV with skipped blank at line 2 = file line 4 not line 1).
+
+5. **State-machine complexity check for quote handling**. The parser's quoted-field state machine is the trickiest part — verify test cases exercise: (a) unquoted field, (b) quoted field with plain content, (c) quoted field with comma inside, (d) quoted field with escaped `""`, (e) quoted field with LF inside → in slice-1 this ends the row (NOT part of the cell — that's RFC 4180 behavior we're NOT supporting). Document the LF-in-quoted-field behavior in JSDoc so consumers know.
+
+6. **Batched error result shape — API stability**. `CsvParseResult` and `CsvRowError` will be consumer-facing types. PLAN should call out these are load-bearing shapes for T23/T24. Making them `readonly` + `interface` (not `type` alias) allows future non-breaking extensions. Explicit note in JSDoc that consumers may deconstruct `{ valid, errors }` at call sites.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T09 → approved
+  - Post roll-up to PARENT §2
+  - Notify PO to merge
+  - Next Slot A queue: T10 workers harness (completes main queue T01-T10)
+
+Awaiting **PLAN T09** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
