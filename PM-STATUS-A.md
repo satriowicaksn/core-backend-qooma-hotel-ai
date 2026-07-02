@@ -3387,6 +3387,210 @@ Modify:
 
 Awaiting **PLAN T08** from exec-A. **PO PRE-RATIFIED `@aws-sdk/client-s3` at ASSIGNMENT ACK** — exec-A authorized to `pnpm add @aws-sdk/client-s3` directly, no ratification gating needed. Modular imports still mandatory per Adv #4.
 
+#### PLAN T08 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Ship object-storage abstraction slice-1: `ObjectStoragePort` interface + `S3Adapter` (real, env-driven, S3/R2/MinIO-compatible via `S3_ENDPOINT`) + `InMemoryAdapter` (Map-based, for tests + local dev). `upload` + `delete` only; signed URLs deferred to slice-2 per spec §2.4/§2.6 (menu images guest-visible / daily brief PDF server-fetched). Fail-lazy env pattern: 5 OPTIONAL zod fields in `env.ts`; `S3Adapter` throws `ExternalServiceError('S3', 'not configured …')` at first `upload`/`delete` call if bucket+region+creds missing — app boots without S3 creds for dev/test/seed workflows. New dep `@aws-sdk/client-s3` PRE-RATIFIED by PO; modular imports (`S3Client`, `PutObjectCommand`, `DeleteObjectCommand` only) per Adv #4.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT T08 (full) + `CLAUDE.md §4` (Hexagonal Disiplin — external IO WAJIB port+adapter) + `docs/decisions/0001-hexagonal-disiplin.md` (ADR-0001) + `docs/spec/02-hotel-core.md §2.4/§2.6` (menu image upload + daily brief PDF confirmed public-bucket-safe; line 317 explicitly says "no redirect to a presigned URL") ✓
+- Parent docs spot-read: `src/core/errors/app-errors.ts:61-72` (`ExternalServiceError` constructor `(service, message, upstream?: {status?, body?})` — perfect match for adapter error translation, see Adv #5); `src/core/config/env.ts` lines 55-61 (commented `S3_BUCKET` hint already present at line 59, will follow that convention); `src/core/http/http-client.ts` (existing external-IO wrapper location — I'll mirror its `src/core/http/` pattern at `src/core/storage/`); `src/core/storage/` — **does not exist** (fresh dir); jest config — auto-discovers `src/core/storage/__tests__/*.test.ts` per T07-slice-1 + T06 precedent ✓
+- Dependencies: T-INFRA-01 ✓, T-INFRA-02 ✓, T05 ✓, T07-slice-1 ✓, T06 ✓, T-INFRA-03 ✓ — all merged, foundation healthy
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T05 merge)
+- Scaffolder risk: **none** — 5 files create + 2 modify (env.ts + package.json via `pnpm add`)
+
+**Files to create** (5, in `src/core/storage/`):
+- `object-storage.port.ts` — port interface (~25 LOC + JSDoc)
+- `s3-adapter.ts` — `S3Adapter implements ObjectStoragePort` (~90 LOC + JSDoc)
+- `in-memory-adapter.ts` — `InMemoryAdapter implements ObjectStoragePort` (~45 LOC)
+- `__tests__/in-memory-adapter.test.ts` — 5 tests (~80 LOC)
+- `__tests__/s3-adapter.test.ts` — 2 tests (~40 LOC — fail-lazy paths only, no SDK mock)
+
+**Files to modify** (2)
+- `src/core/config/env.ts` — under existing `// Service-specific` block (line 55-61), add 5 OPTIONAL zod fields (uncomment the `S3_BUCKET` placeholder + expand to 5 fields, all `.optional()`)
+- `package.json` + `pnpm-lock.yaml` — via `pnpm add @aws-sdk/client-s3` (PRE-RATIFIED)
+
+**Files NOT touched** (per HARD constraints)
+- `src/core/http/http-client.ts` (stub-state hygiene = separate concern)
+- Any file in `src/plugins/`, `src/modules/`, `src/shared/`, `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`, all tests outside `src/core/storage/__tests__/`
+
+**Approach**
+
+*(1) Port* — pure interface, 2 methods:
+```ts
+export interface ObjectStorageUploadInput {
+  key: string;
+  body: Buffer;
+  contentType?: string;
+}
+export interface ObjectStorageUploadResult {
+  url: string;
+  key: string;
+}
+export interface ObjectStoragePort {
+  upload(input: ObjectStorageUploadInput): Promise<ObjectStorageUploadResult>;
+  delete(key: string): Promise<void>;
+}
+```
+
+*(2) `S3Adapter`* — constructor takes 5 config fields, all optional (fail-lazy). Lazy `S3Client` instantiation on first authenticated call.
+```ts
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { ExternalServiceError } from '@core/errors/app-errors.js';
+import type {
+  ObjectStoragePort,
+  ObjectStorageUploadInput,
+  ObjectStorageUploadResult,
+} from './object-storage.port.js';
+
+export interface S3AdapterConfig {
+  endpoint?: string;
+  region?: string;
+  bucket?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+}
+
+export class S3Adapter implements ObjectStoragePort {
+  private client: S3Client | null = null;
+  constructor(private readonly config: S3AdapterConfig) {}
+
+  async upload(input: ObjectStorageUploadInput): Promise<ObjectStorageUploadResult> {
+    const { bucket } = this.requireConfig();
+    const client = this.ensureClient();
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: input.key,
+          Body: input.body,
+          ContentType: input.contentType,
+        }),
+      );
+      return { url: this.buildUrl(input.key), key: input.key };
+    } catch (err) {
+      throw this.wrap(err);
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    const { bucket } = this.requireConfig();
+    const client = this.ensureClient();
+    try {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    } catch (err) {
+      throw this.wrap(err);
+    }
+  }
+
+  private requireConfig(): { bucket: string; region: string; accessKeyId: string; secretAccessKey: string } {
+    const { bucket, region, accessKeyId, secretAccessKey } = this.config;
+    if (!bucket || !region || !accessKeyId || !secretAccessKey) {
+      throw new ExternalServiceError(
+        'S3',
+        'not configured — set S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY',
+      );
+    }
+    return { bucket, region, accessKeyId, secretAccessKey };
+  }
+
+  private ensureClient(): S3Client { … lazy new S3Client({ region, endpoint, credentials, forcePathStyle: !!endpoint }) … }
+  private buildUrl(key: string): string { … endpoint-aware URL … }
+  private wrap(err: unknown): ExternalServiceError { … err instanceof Error ? err.message : 'unknown SDK error' … }
+}
+```
+- **`forcePathStyle: !!endpoint`** — required for R2/MinIO (they use path-style vs AWS's virtual-hosted style). Documented in JSDoc.
+- **URL shape**: if `endpoint` set → `${endpoint}/${bucket}/${key}` (R2/MinIO); else → standard AWS `https://${bucket}.s3.${region}.amazonaws.com/${key}`.
+- **Error wrap**: `err instanceof Error` narrow → propagate `.message` + full `err` in `upstream.body` for Sentry (per Adv #5). No `any`; no manual `throw new Error(`.
+
+*(3) `InMemoryAdapter`* — Map<string, { body, contentType? }>. Non-async (returns `Promise.resolve(...)`) to satisfy `require-await` without token-await.
+```ts
+interface InMemoryStoredObject { body: Buffer; contentType: string | undefined; }
+export class InMemoryAdapter implements ObjectStoragePort {
+  private readonly storage = new Map<string, InMemoryStoredObject>();
+
+  upload(input: ObjectStorageUploadInput): Promise<ObjectStorageUploadResult> {
+    this.storage.set(input.key, { body: input.body, contentType: input.contentType });
+    return Promise.resolve({ url: `memory://${input.key}`, key: input.key });
+  }
+
+  delete(key: string): Promise<void> {
+    this.storage.delete(key);   // returns boolean, ignored → idempotent (Adv #6)
+    return Promise.resolve();
+  }
+
+  /** Test-only accessor — inspects stored object shape; NOT on the port. */
+  peek(key: string): InMemoryStoredObject | undefined {
+    return this.storage.get(key);
+  }
+}
+```
+- `peek` intentionally not in the port; only test code uses it. Enables consumer tests to verify contentType propagation without stubbing.
+
+*(4) `env.ts` change* — replace commented `S3_BUCKET` hint (line 59) with 5 real optional fields:
+```ts
+  // Service-specific
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+```
+- All `.optional()` → `loadConfig()` succeeds without them (verified pre-PLAN: 0 existing consumers of `S3_*` in `src/`, so no other test breaks). `AppConfig` type gains 5 `| undefined` fields.
+- Only `S3_ENDPOINT` gets `.url()` validation (if set, must be valid URL); others are permissive strings.
+
+*(5) Tests* — 7 new tests total (5 InMemory + 2 S3):
+
+`in-memory-adapter.test.ts`:
+1. `should upload with generated memory URL and return key`
+2. `should propagate contentType to stored object (verified via peek)`
+3. `should return undefined for peek on unknown key`
+4. `should delete an uploaded key (peek returns undefined after)`
+5. `should not throw when deleting a missing key (idempotent per Adv #6)`
+
+`s3-adapter.test.ts` — no SDK mocking, only fail-lazy config-check paths (SDK's own behavior is well-tested upstream; testing "SDK returns X → adapter wraps" is low-value):
+1. `should throw ExternalServiceError('S3', 'not configured ...') on upload when config missing`
+2. `should throw ExternalServiceError('S3', 'not configured ...') on delete when config missing`
+
+Rationale for skipping S3Adapter happy-path SDK-mocked tests: (a) `S3Client` is complex to mock cleanly + brittle; (b) consumer tests use `InMemoryAdapter` via port injection per hexagonal pattern (that's the whole point); (c) real S3 behavior verified downstream by Satrio T22/T24 integration tests when he onboards. Slice-1 tests focus on adapter-owned logic (config validation + error translation), not SDK behavior.
+
+**Explicit findings + resolution for each of PM A's 6 advisory checks**
+
+- **Adv #1 — New dep PRE-RATIFIED (skip menu, proceed to `pnpm add`)**: acknowledged. Will run `pnpm add @aws-sdk/client-s3` at implementation start; dependency lands in `"dependencies"` (not devDependencies — runtime import). No `pnpm-lock.yaml` conflicts expected on the branch. Modular imports (Adv #4) still MANDATORY.
+
+- **Adv #2 — Signed URLs deferral rationale for slice-2**: **spec verified pre-PLAN**. `docs/spec/02-hotel-core.md §2.6 line 168` lists `/api/settings/menu` as "multipart image upload" (guest-visible → public bucket safe). `§7 line 317` (daily brief PDF) explicitly says "server-side fetch from storage; **no redirect to a presigned URL** — keeps the cookie-auth path". Slice-1's public-bucket assumption is spec-conformant for both known consumers. Signed URLs (`@aws-sdk/s3-request-presigner`) deferred to slice-2 as scope tightening. If a future consumer (T22/T24 or new) surfaces a need for private-object access, PM A can open slice-2 assignment.
+
+- **Adv #3 — Env schema fail-lazy design (verified pre-PLAN)**: `grep -rn "S3_BUCKET|S3_REGION|S3_ENDPOINT|S3_ACCESS_KEY|S3_SECRET" src/` returned **1 hit** — line 59 of `env.ts` itself (the commented placeholder). **Zero external consumers**. Adding 5 `.optional()` fields is safe: `loadConfig()` return type gains 5 `| undefined` fields; no existing test/module reads these vars. Post-fix `pnpm test:unit` should remain 160/1/161 (T-INFRA-03 baseline); post-fix suite adds only the 7 new storage tests → 167/1/168 unit total. Will verify.
+
+- **Adv #4 — AWS SDK v3 modular imports (mandatory)**: final `s3-adapter.ts` imports EXACTLY:
+  ```ts
+  import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+  ```
+  No whole-namespace `import * as`, no aggregated sub-package, no re-exports. Verified by structure. Will grep in SUBMIT to confirm final file has zero broader imports.
+
+- **Adv #5 — `ExternalServiceError` shape (verified pre-PLAN)**: `src/core/errors/app-errors.ts:61-72` — constructor `(service: string, message: string, upstream?: { status?: number; body?: unknown })`. Exact match for adapter needs. Adapter's `wrap()` helper produces:
+  ```ts
+  const message = err instanceof Error ? err.message : 'unknown S3 error';
+  const upstream = { body: err };  // full err object → Sentry gets $metadata, $response, etc.
+  throw new ExternalServiceError('S3', message, upstream);
+  ```
+  Note: I'll skip surfacing `status` (from `err.$metadata?.httpStatusCode`) in slice-1 — the `body: err` object already carries `$metadata`, so Sentry can dig into it. Adding explicit `status` extraction requires a narrow type-guard on `err.$metadata`, which is more code for marginal value. Can add in slice-2 if Sentry dashboards need it more prominently.
+
+- **Adv #6 — InMemoryAdapter idempotent `delete`**: `Map.prototype.delete(key)` returns `true`/`false` (indicating whether the key was present) but never throws. My `InMemoryAdapter.delete` ignores the boolean return → no-op on missing key, matches S3's `DeleteObjectCommand` behavior (204 on non-existent). Explicit test case #5 (`should not throw when deleting a missing key`) proves the property.
+
+**Test count projection** (Adv #3 + Adv #6 + full suite math)
+- Baseline (post-T05 merge): 160 pass / 1 skip / 161 total on `pnpm test:unit`
+- New tests: 5 InMemoryAdapter + 2 S3Adapter = 7
+- Post-fix expected: **167 pass / 1 skip / 168 total** on `pnpm test:unit`
+- `pnpm test:integration`: unchanged 31/1/32
+- `pnpm test:coverage`: 198/2/200 (167 unit + 31 integration + 2 skip = 200 total)
+
+**GAPs / questions**: none. All 6 advisories concretely resolved pre-PLAN via file reads + grep. Spec §2.6+§7 line 317 confirmed public-bucket assumption. Zero consumer breakage risk for env fail-lazy pattern. Modular imports pattern clear. `ExternalServiceError` shape matched. `Map.delete` idempotency confirmed.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
