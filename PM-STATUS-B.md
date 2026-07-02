@@ -1685,6 +1685,58 @@ Clean — per-user isolation properly proven. **T19 closed. 9/10 done pending me
 
 Awaiting exec-B PLAN for T20.
 
+### ASSIGNMENT T20 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/socket-emitters` (off latest main; created on ACK) · Routed from PARENT §1 T20 = MVP §1.2 B10
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below — leading with **Q-B-14 (location)** + **DEP-7 (boundary)** per your instruction.
+
+#### PLAN T20 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+Cross-cutting infra (not a CRUD module): a `SocketEmitterPort` + `SocketIoEmitterAdapter` (hexagonal — socket emit = outbound push, CLAUDE §4), then wire the merged modules' no-op emit-seams to emit the §3 catalog events to room `hotel:${hotelId}`, reusing existing serializers. **No live Socket.io/Fastify server here** (DEP-7).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §3` (event catalog L735-750) + `README §2.5` (gateway, room `hotel:${hotelId}`, server-authoritative join); surveyed the merged seams — `tickets.service` `onTicketUpdated`/`onTicketRerouted`, `visits.service` `onVerificationResolved`/`onVerificationPending`
+- Dependency: T11–T19 ✅ merged (seams exist as no-ops). Last Slot-B task.
+- `pnpm typecheck` + `pnpm lint` clean on `main` ✓. **socket.io is NOT a dependency** (confirmed) → adapter targets a structural interface, **no `pnpm add`** (socket.io install = DEP-7/foundation).
+- Scaffolder risk: **none**.
+
+**★ Q-B-14 — where does `SocketEmitterPort` + adapter live? (need ruling before I code)**
+The port is consumed by **3 modules** (tickets/visits/notifications) → it's genuinely cross-module infra, not one module's private port. Options:
+- **A) `src/shared/socket/` — MY RECOMMENDATION.** New subdir I create + own (Slot B); cross-module home; **avoids the `core/*` foundation gate** → no Parent escalation. Precedent: shared cross-module code already lives under `shared/`.
+- **B) `src/core/socket/`** — infra-purist home (matches `core/http`, `core/queue`), but `core/*` = foundation → **you'd escalate to Parent** (DEP-6-style). More "correct" by the core/ convention, higher coordination cost.
+- **C) `src/plugins/socket-emitter.ts`** — plugins holds cross-cutting Fastify-adjacent code (tenant-guard), but that's Slot-A-flavored + this isn't a Fastify plugin.
+**Intent: A (`shared/socket/`)** — lowest friction, Slot-B-ownable, no core/ escalation. If you prefer B for infra-purity, I'll wait on your Parent escalation before creating the files. Confirm the location.
+
+**★ DEP-7 boundary (foundation, flagged — NOT built here)**
+The live Socket.io `Server` (attached to Fastify + `hotel:${hotelId}` room-join-on-connect from the auth cookie, README §2.5 server-authoritative) is **server bootstrap = DEP-4 family, foundation**. T20 ships: the port, the adapter (constructor-injected `io`), and the seam wiring — **fully testable by mocking the port / a fake `io`**. Live emission works once foundation bootstraps the real `io`. **The adapter targets a structural `SocketServerLike { to(room).emit(event, payload) }`** so the real `io.Server` satisfies it without T20 importing/installing `socket.io`.
+
+**Files to create** (pending Q-B-14 → assuming A)
+```
+src/shared/socket/socket-emitter.port.ts     SocketEmitterPort + SocketEvent union
+src/shared/socket/socket-io-emitter.adapter.ts  SocketIoEmitterAdapter(SocketServerLike) + NoopSocketEmitter
+src/shared/socket/index.ts                    barrel
+src/shared/socket/__tests__/socket-io-emitter.adapter.test.ts  adapter unit (emits to hotel:${id} room)
+```
+
+**Files to modify** (wire seams — all Slot-B modules I own; T11–T19 behavior unchanged when emitter is no-op/mock)
+- `tickets.service.ts` + `tickets/index.ts` — inject optional `emitter?: SocketEmitterPort` (consolidating the `onTicketUpdated`/`onTicketRerouted` no-op deps); emit `ticket:updated` `{ ticket: TicketSummary, changed }` + `ticket:rerouted` `{ ticket_id, from_department_id, to_department_id }`.
+- `visits.service.ts` + `visits/index.ts` — inject `emitter?`; emit `verification:pending` `{ visit_id, guest_id, hotel_id }` (from T18 create) + `verification:resolved` `{ visit_id, status }` (from T16 verify + T17 reject/approve).
+- update the affected service unit tests (assert `emitter.emitToHotel` called with the right `(hotelId, event, payload)` instead of the old no-op callback).
+
+**Approach**
+- **Port (S1)**: `interface SocketEmitterPort { emitToHotel(hotelId: string, event: SocketEvent, payload: unknown): void }`; `SocketEvent` = union of the §3 names. **Adapter**: `SocketIoEmitterAdapter` wraps `SocketServerLike`, does `this.io.to('hotel:' + hotelId).emit(event, payload)`. `NoopSocketEmitter` (default) for pre-DEP-7 / tests-without-assertion.
+- **Payloads (S3)** — reuse existing serializers, no new shapes: `TicketSummary` = `serializeTicketListItem` (T11 list-item wire); visit payloads = snake_case scalars from the row; `AppNotification` = T19 `serializeNotification`. `ticket:rerouted`/`verification:resolved` are pure key-remaps of the existing seam data; `verification:pending` adds `hotel_id`; `ticket:updated` sources `TicketSummary` from the post-mutation ticket the service already re-loads for its response.
+- **Wiring (S2)**: services emit at the current seam sites via the injected port. Emitter is **optional** (default `NoopSocketEmitter`) so existing call paths are unchanged when absent. Bootstrap (DEP-4) constructs `SocketIoEmitterAdapter(io)` and passes it to `buildTicketsService`/`buildVisitsService`.
+- **Tests (S4)**: mock `SocketEmitterPort`, assert each mutation calls `emitToHotel(hotelId, event, payload)`; adapter unit with a fake `io` asserts room `hotel:${id}` + event + payload. `make check` + integration green; T11–T19 unchanged.
+
+**GAP / scope boundary (flag — not silently working around)**
+- **No Slot-B producer for 4 of the 8 §3 events**: `ticket:created` (AI-service inserts tickets), `ticket:escalated` (escalation worker), `verification:failed_3x` (failed-3x worker), `notification:new` (notifications are inserted by workers/AI — **T19 is read/mark only, no create path**). The **port supports all 8** and I'll add ready-to-use emit helpers (e.g. exported `notificationEvent(row)` builder reusing `serializeNotification`), but there is **nothing in the current Slot-B surface that creates these** → no live call site to wire now. **My intent: wire the 4 that have producers** (`ticket:updated`, `ticket:rerouted`, `verification:pending`, `verification:resolved`), and ship the port + payload builders for the other 4 so their producers (AI/Integration/workers, other repos/tasks) can emit with one line. Flag if you want me to add a stub producer somewhere instead.
+
+**Merge posture**: port + adapter + wiring fully testable now (mock port / fake io); **live emission is DEP-7 (foundation bootstraps `io` + room-join)**. No `api.ts`/`core`/server edits; no new package.
+
+Awaiting PM B ACK — especially **Q-B-14 (location: A `shared/socket/` recommended)** + **DEP-7 boundary** + the **4-of-8-events producer scoping**. Not creating any files before ACK.
+
 ---
 
 <!--
