@@ -113,7 +113,12 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
   return app;
 }
 
-const GM: TenantContext = { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin' };
+const GM: TenantContext = {
+  userId: 'u-1',
+  hotelId: 'hotel-1',
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
 
 describe('ticketsRoutes', () => {
   let app: FastifyInstance;

@@ -20,6 +20,7 @@ export interface SessionUser {
 }
 
 export interface TenantContext {
+  userId: string;
   hotelId: string;
   isSuperAdmin: boolean;
   role: SessionRole;
@@ -35,6 +36,7 @@ export function deriveTenantContext(user: SessionUser | undefined): TenantContex
     throw new AuthError('No session on request');
   }
   const ctx: TenantContext = {
+    userId: user.userId,
     hotelId: user.hotelId,
     isSuperAdmin: user.role === 'super_admin',
     role: user.role,

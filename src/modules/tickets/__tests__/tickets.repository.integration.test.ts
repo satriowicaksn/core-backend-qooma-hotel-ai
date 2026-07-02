@@ -30,15 +30,27 @@ const GUEST_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const GUEST_VVIP = 'dddddddd-cccc-4ccc-8ccc-cccccccccccc';
 const USER_1 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
-const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };
-const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };
+const gmA: TenantContext = {
+  userId: USER_1,
+  hotelId: HOTEL_A,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
+const gmB: TenantContext = {
+  userId: USER_1,
+  hotelId: HOTEL_B,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
 const deptHead1: TenantContext = {
+  userId: USER_1,
   hotelId: HOTEL_A,
   isSuperAdmin: false,
   role: 'dept_head',
   deptId: DEPT_1,
 };
 const deptHead2: TenantContext = {
+  userId: USER_1,
   hotelId: HOTEL_A,
   isSuperAdmin: false,
   role: 'dept_head',

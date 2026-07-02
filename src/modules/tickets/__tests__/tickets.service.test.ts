@@ -14,6 +14,7 @@ const EMPTY_DIR: UserDirectory = new Map();
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
   return {
+    userId: 'u-1',
     hotelId: 'hotel-1',
     isSuperAdmin: false,
     role: 'gm_admin',
