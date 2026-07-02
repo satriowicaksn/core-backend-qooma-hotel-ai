@@ -2173,6 +2173,82 @@ Property-level assertion, matches existing test style. Bumps T03 suite from 14 �
 
 Awaiting PM A ACK on **both GAPs** before coding. If PM A resolves GAP-1 as Path A, coding pauses pending PM B B-side merge. If Path B, coding proceeds with expanded scope. GAP-2 Path A likely uncontroversial but explicit ACK requested to keep slot discipline audit-clean.
 
+##### PM A resolution — T-INFRA-02 GAPs (H0 2026-07-02) by PM A (Nanak)
+
+Excellent GAP surfacing — this is exactly what Advisory PLAN checks are for. Ship both fixes; scope expanded with clear guardrails.
+
+**GAP-2 → Path A (in-scope) — ACK**
+
+You're correct on the read. HARD constraint at line 2011 named the SOURCE file `tenant-guard.hooks.ts` — test file `tenant-guard.hooks.test.ts` wasn't explicitly named. Test-assertion update is the natural downstream consequence of an interface change, matches DoD "still green" semantic, stays in Slot A. Ship the 1-line diff to line 44-46: add `userId: 'u-1'` to the expected tenant shape. File count now: **3 modify (tenant-guard.ts + tenant-guard.test.ts + tenant-guard.hooks.test.ts)**.
+
+**GAP-1 → Path B (expand scope with guardrails) — PM A override with rationale**
+
+I know I recommended you default to Path A. Overriding that after seeing your analysis. Reason: **TypeScript type-breaking changes cannot cleanly sequence across independent PRs**.
+
+- If PM B ships fixture PR first (`userId: 'u-1'` added to bare literals): TS `excess-property-check` fails because `TenantContext` doesn't have userId yet → his `make check` breaks
+- If T-INFRA-02 ships first: Slot B fails typecheck for a window (until B fixture PR merges)
+- Only "clean" sequences are: (a) atomic simultaneous merge (git doesn't support), (b) intermediate `userId?: string` optional step then required in follow-up (2 hops + weakens type + defeats forcing-function rationale), (c) single combined PR
+
+Path B is forced by the type-system semantics, not chosen for speed. Protocol spirit preserved via guardrails.
+
+**Guardrails for Path B execution (WAJIB — pelanggaran = REJECT)**
+
+1. **Slot B edits are TEST FILES ONLY** — 100% enumerated in your Adv #1 (8 bare literals + 3 Partial builders across 7 files). Zero touch to Slot B production code (`*.service.ts`, `*.routes.ts`, `*.repository.ts`, `*.serializer.ts`). If your final grep surfaces any bare literal outside a test file, STOP + report — do NOT touch.
+
+2. **Edits are MECHANICAL fixture defaults only** — add `userId: '<value>'` to each site. Do NOT:
+   - Change any other field on those literals
+   - Change any test assertions or logic
+   - Change any test setup/teardown
+   - Add or remove test cases
+   - Rename any fixture
+
+3. **Fixture value convention** — follow Slot B's existing pattern. From your Adv #1 evidence, Nathan uses `'u-1'`, `'u-2'` for SessionUser fixtures. For each file, grep for the SessionUser userId convention used in nearby fixtures and match it. If a file has no nearby SessionUser reference, use `'u-1'` as the default. Explicit list you'll cite in SUBMIT with file:line + chosen value.
+
+4. **Commit body labeling** — in the code commit message, separate the Slot A changes and Slot B changes clearly:
+   ```
+   feat(plugins): T-INFRA-02 add userId to TenantContext + deriveTenantContext
+
+   Slot A (owner scope):
+     - src/plugins/tenant-guard.ts (+1 field, +1 line in derive)
+     - src/plugins/__tests__/tenant-guard.test.ts (+1 test, fixtures verify)
+     - src/plugins/__tests__/tenant-guard.hooks.test.ts (+1 line in expected shape)
+
+   Slot B test fixtures (mechanical accommodation for type change, PM A ratified
+   PARENT §10 scope override — see GAP-1 resolution):
+     - src/modules/tickets/__tests__/<files> (add userId default to N sites)
+     - src/modules/guests/__tests__/<files> (add userId default to M sites)
+     Total: 11 sites, ~15 LOC, no test-logic change
+
+   Closes PARENT §10 DEP-5. Unblocks Nathan's T19.
+   ```
+
+5. **Escape hatch** — if any test site can't be trivially defaulted (e.g., userId is asserted at a specific value that needs coordination with seeded DB fixtures), STOP that site + report in SUBMIT. PM A will coord with PM B via PARENT §10 for the outlier.
+
+6. **PM B post-hoc ratification path** — PM A will add a PARENT §10 coord note in the same tracker-updates commit (BEFORE your code commit) documenting the scope override + the fixture-value convention chosen. PM B sees it on his next session read. Post-merge, PM A adds a note to PARENT §10 saying "PM B — fixture defaults match your existing SessionUser convention; welcome to rename to your preferred value in any future PR — no breakage risk".
+
+**Also actioned by PM A in the same tracker-updates commit** (before you code):
+- PARENT §10: new coord note documenting the Path B scope override with rationale + guardrails
+- PARENT §2 line 118: annotation correcting Nathan's H13 "observed SHIPPED" claim (documented as coordination gap, not blame — per PO ack this session)
+
+**Updated ASSIGNMENT scope for T-INFRA-02**
+- Files modify (previously 2, now up to ~10):
+  - `src/plugins/tenant-guard.ts` (interface + derive)
+  - `src/plugins/__tests__/tenant-guard.test.ts` (fixtures + new test)
+  - `src/plugins/__tests__/tenant-guard.hooks.test.ts` (1-line expected shape update)
+  - `src/modules/tickets/__tests__/*.test.ts` — enumerate exact files in SUBMIT (Slot B territory, PATH B override applies)
+  - `src/modules/guests/__tests__/*.test.ts` — same
+- DoD additions:
+  - Slot B test files enumerated in SUBMIT with file:line + chosen `userId` value per site
+  - Slot B production code UNTOUCHED (verified via `git diff main -- src/modules/**/*.ts | grep -vE "__tests__"` should return zero non-test changes)
+  - `make check` PASS with ~191 tests (190 baseline + 1 new)
+- Advisory carryover: your Adv #1-#6 analyses stand; Adv #4 grep result confirmed (0 hits on `tenant.userId` in Slot B production) becomes load-bearing evidence for Path B safety
+
+**Meta note (memory tracking, no action for exec-A)**: this session surfaced 2 instances of a related meta-pattern worth tracking for future memory consolidation — (a) "verify downstream claims before acting" (Nathan's DEP-5 misclaim, this task), and (b) "type-breaking changes cross-slot force single-PR execution" (this GAP-1 resolution). Per PM A's ≥2-emergence rule, will consolidate to memory if either pattern re-emerges.
+
+**Proceed with expanded scope on branch `feat/foundation-userid-tenant-context`.** SUBMIT expectations updated per DoD additions above.
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
