@@ -16,6 +16,12 @@ import {
   type TenantContext,
 } from '@plugins/tenant-guard.js';
 import {
+  emitTicketRerouted,
+  emitTicketUpdated,
+  NoopSocketEmitter,
+  type SocketEmitterPort,
+} from '@shared/socket/index.js';
+import {
   assertValidTicketTransition,
   type TicketStatus,
 } from '@shared/utils/ticket-state-machine.js';
@@ -50,13 +56,9 @@ export interface TicketsServiceDeps {
   // Resolves Auth-owned user ids → { name, role }. Absent in dev (GAP T11-#2) →
   // assigned_to / actor_name / actor_role serialize as null.
   readonly resolveUsers?: (userIds: readonly string[]) => Promise<UserDirectory>;
-  // Socket emit seams — T20 wires the real gateway; default no-op (TT6).
-  readonly onTicketUpdated?: (evt: { ticketId: string; changed: readonly string[] }) => void;
-  readonly onTicketRerouted?: (evt: {
-    ticketId: string;
-    fromDepartmentId: string;
-    toDepartmentId: string;
-  }) => void;
+  // Socket emit port (T20). Defaults to NoopSocketEmitter; foundation injects a
+  // live SocketIoEmitterAdapter at bootstrap (DEP-7).
+  readonly emitter?: SocketEmitterPort;
 }
 
 // Tenant + dept scope arms — the single scope implementation reused by the list,
@@ -148,10 +150,14 @@ export function buildTicketWhere(
 }
 
 export class TicketsService {
+  private readonly emitter: SocketEmitterPort;
+
   constructor(
     private readonly repo: TicketsRepository,
     private readonly deps: TicketsServiceDeps = {},
-  ) {}
+  ) {
+    this.emitter = deps.emitter ?? new NoopSocketEmitter();
+  }
 
   async list(ctx: TenantContext, rawQuery: unknown): Promise<TicketListResponse> {
     const now = new Date();
@@ -251,8 +257,10 @@ export class TicketsService {
         to,
       });
     }
-    this.deps.onTicketUpdated?.({ ticketId: id, changed: ['status'] });
-    return this.detail(ctx, id);
+    const response = await this.detail(ctx, id);
+    // ticket:updated payload — the detail wire is a superset of TicketSummary (§3).
+    emitTicketUpdated(this.emitter, row.hotelId, response.data, ['status']);
+    return response;
   }
 
   async reroute(ctx: TenantContext, id: string, rawBody: unknown): Promise<TicketDetailResponse> {
@@ -280,7 +288,7 @@ export class TicketsService {
         note,
         actorUserId: ctx.userId,
       });
-      this.deps.onTicketRerouted?.({
+      emitTicketRerouted(this.emitter, row.hotelId, {
         ticketId: id,
         fromDepartmentId: row.departmentId,
         toDepartmentId: toDeptId,

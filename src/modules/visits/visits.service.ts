@@ -6,6 +6,12 @@ import type { Prisma } from '@prisma/client';
 import { BusinessRuleError, NotFoundError } from '@core/errors/app-errors.js';
 
 import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.js';
+import {
+  emitVerificationPending,
+  emitVerificationResolved,
+  NoopSocketEmitter,
+  type SocketEmitterPort,
+} from '@shared/socket/index.js';
 
 import { deriveCheckout } from './visits.checkout.js';
 import type { VisitsRepository } from './visits.repository.js';
@@ -60,10 +66,9 @@ export interface VisitsServiceDeps {
     to: VisitStatus;
     actorUserId: string;
   }) => void;
-  // Socket emit seam (V2/T20): `verification:resolved` is wired by T20, not here.
-  readonly onVerificationResolved?: (event: { visitId: string; status: VisitStatus }) => void;
-  // Socket emit seam (T18/T20): `verification:pending` on manual visit create.
-  readonly onVerificationPending?: (event: { visitId: string; guestId: string }) => void;
+  // Socket emit port (T20). Defaults to NoopSocketEmitter; foundation injects a
+  // live SocketIoEmitterAdapter at bootstrap (DEP-7).
+  readonly emitter?: SocketEmitterPort;
 }
 
 const DEFAULT_TZ = 'UTC';
@@ -94,10 +99,14 @@ export function buildVisitWhere(
 }
 
 export class VisitsService {
+  private readonly emitter: SocketEmitterPort;
+
   constructor(
     private readonly repo: VisitsRepository,
     private readonly deps: VisitsServiceDeps = {},
-  ) {}
+  ) {
+    this.emitter = deps.emitter ?? new NoopSocketEmitter();
+  }
 
   async list(ctx: TenantContext, rawQuery: unknown): Promise<VisitListResponse> {
     const query = parseListQuery(rawQuery);
@@ -138,7 +147,10 @@ export class VisitsService {
       ...(input.specialRequest !== undefined ? { specialRequest: input.specialRequest } : {}),
     });
 
-    this.deps.onVerificationPending?.({ visitId: created.id, guestId: created.guestId });
+    emitVerificationPending(this.emitter, created.hotelId, {
+      visitId: created.id,
+      guestId: created.guestId,
+    });
     return { data: serializeVisit(created) };
   }
 
@@ -174,7 +186,7 @@ export class VisitsService {
     }
 
     this.deps.recordVisitAudit?.({ visitId: id, from: PENDING, to, actorUserId: ctx.userId });
-    this.deps.onVerificationResolved?.({ visitId: id, status: to });
+    emitVerificationResolved(this.emitter, row.hotelId, { visitId: id, status: to });
 
     const updated = await this.repo.findById(id);
     if (!updated) {
@@ -259,7 +271,7 @@ export class VisitsService {
       });
     }
     this.deps.recordVisitAudit?.({ visitId: id, from: expectedFrom, to, actorUserId: ctx.userId });
-    this.deps.onVerificationResolved?.({ visitId: id, status: to });
+    emitVerificationResolved(this.emitter, hotelId, { visitId: id, status: to });
 
     const updated = await this.repo.findById(id);
     if (!updated) {

@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
+import type { SocketEmitterPort, SocketEvent } from '@shared/socket/index.js';
 
 import { deriveCheckout } from '../visits.checkout.js';
 import type { VisitsRepository } from '../visits.repository.js';
@@ -28,6 +29,19 @@ function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
     isSuperAdmin: false,
     role: 'gm_admin',
     ...overrides,
+  };
+}
+
+interface EmitCall {
+  hotelId: string;
+  event: SocketEvent;
+  payload: unknown;
+}
+function spyEmitter(): { port: SocketEmitterPort; calls: EmitCall[] } {
+  const calls: EmitCall[] = [];
+  return {
+    calls,
+    port: { emitToHotel: (hotelId, event, payload) => calls.push({ hotelId, event, payload }) },
   };
 }
 
@@ -300,12 +314,12 @@ describe('VisitsService.verifyManual', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('should fire the audit + socket no-op seams with ctx.userId on a resolved transition', async () => {
+  it('should fire the audit seam + emit verification:resolved on a resolved transition', async () => {
     const audit: unknown[] = [];
-    const socket: unknown[] = [];
+    const emitted = spyEmitter();
     const deps: VisitsServiceDeps = {
       recordVisitAudit: (e) => audit.push(e),
-      onVerificationResolved: (e) => socket.push(e),
+      emitter: emitted.port,
     };
     const service = new VisitsService(
       repoWith(makeRow({ status: 'pending_verification' }), 1, makeRow({ status: 'rejected' })),
@@ -315,7 +329,13 @@ describe('VisitsService.verifyManual', () => {
     expect(audit).toEqual([
       { visitId: 'visit-1', from: 'pending_verification', to: 'rejected', actorUserId: 'user-9' },
     ]);
-    expect(socket).toEqual([{ visitId: 'visit-1', status: 'rejected' }]);
+    expect(emitted.calls).toEqual([
+      {
+        hotelId: 'hotel-1',
+        event: 'verification:resolved',
+        payload: { visit_id: 'visit-1', status: 'rejected' },
+      },
+    ]);
   });
 });
 
@@ -532,13 +552,18 @@ describe('VisitsService.create', () => {
     expect(captured.hotelId).toBe('hotel-1'); // ctx.hotelId, never body
   });
 
-  it('should fire the verification:pending seam', async () => {
-    const events: unknown[] = [];
-    const service = new VisitsService(repo({}), {
-      onVerificationPending: (e) => events.push(e),
-    });
+  it('should emit verification:pending on create (§3 snake_case payload)', async () => {
+    const emitted = spyEmitter();
+    const service = new VisitsService(repo({}), { emitter: emitted.port });
     await service.create(ctx(), { guest_id: GUEST_ID, check_in: '2026-06-11T06:00:00.000Z' });
-    expect(events).toHaveLength(1);
+    expect(emitted.calls[0]?.event).toBe('verification:pending');
+    const payload = emitted.calls[0]?.payload as {
+      visit_id: string;
+      guest_id: string;
+      hotel_id: string;
+    };
+    expect(payload.hotel_id).toBe('hotel-1');
+    expect(payload.guest_id).toBe(GUEST_ID);
   });
 
   it('should 404 when the guest does not exist', async () => {
