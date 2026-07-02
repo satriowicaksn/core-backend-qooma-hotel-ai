@@ -66,6 +66,14 @@ const EnvSchema = z.object({
   S3_BUCKET: z.string().min(1).optional(),
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+
+  // Cross-DB check gate (T21 Q-C-02 — Opsi C dev-DB deviation, PARENT §4).
+  // When true, features skip queries that need cross-service tables (e.g.
+  // `users.department_id` for departments delete-conflict), because those
+  // tables live in Auth DB not `hotel_core_dev`. Default true (safe-in-DEV).
+  // Set false only after PARENT §4 Opsi A / multi-schema restoration lands.
+  // Prod-with-flag-true = observability warning (see departments.service).
+  SKIP_CROSS_DB_CHECKS: z.coerce.boolean().default(true),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
