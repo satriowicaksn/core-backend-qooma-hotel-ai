@@ -46,12 +46,13 @@
 | T19 | Notifications CRUD | ✅ approved | `feat/notifications-crud` | ✅ **merged (PR #9)** |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
-| T20 | Socket emitters | 🟡 wip (PLAN ACK'd) — LAST task | `feat/socket-emitters` | — |
+| T20 | Socket emitters | ✅ approved (attempt 1) 🏁 | `feat/socket-emitters` @ `47aabbd` (merges clean) | ⏳ awaiting PO merge |
 
-**Counts**: ✅ **9/10 merged (T11,T13,T14,T15,T12,T16,T17,T18,T19)** · 🟡 T20 assigned (socket emitters, LAST). **1 task from Slot B complete.** Foundation: only DEP-4 (`api.ts` bootstrap + Socket.io server) remains for go-live.
+**Counts**: ✅ **9/10 merged + T20 approved (awaiting merge) = 10/10 done** 🏁. **Slot B core CRM + socket layer COMPLETE.** Foundation-only remainder for go-live: **DEP-4** (`api.ts` bootstrap) + **DEP-7** (live Socket.io server) — flip everything from built→live.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 14 — 2026-07-02 — 🏁 T20 APPROVED → Slot B 10/10.** Socket emitter layer done (PM rerun: make check 256 no-Docker, integration 69, shared/socket coverage 100%, drift 0, merge dry-run CLEAN, **T11–T19 regression green** via callback→port consolidation, **no dep added**, no core/api.ts edit, emit-manifest disclosed 4-live/4-builder). → merge `feat/socket-emitters`. **Slot B core CRM + socket layer COMPLETE (10/10).** Remaining is foundation-only: DEP-4 (`api.ts` bootstrap) + DEP-7 (live `io` server) to go live.
 - **Loop 13b — 2026-07-02 — T19 MERGED (PR #9); T20 issued (finale).** Slot B **9/10 merged**. Issued **T20** (socket emitters — LAST task). It's cross-cutting: `SocketEmitterPort` + adapter (hexagonal) + wire every module's no-op emit-seam to real events per §3 catalog (room `hotel:${hotelId}`). Flagged **Q-B-14** (port location — may touch `core/`) + **DEP-7** (live Socket.io server = foundation/DEP-4). Testable now by mocking the port. **Last task to 10/10.**
 - **Loop 13 — 2026-07-02 — T19 APPROVED (last CRUD module).** Notifications done (PM rerun: make check 249 no-Docker, coverage 97.39%, drift clean, merge dry-run CLEAN, **per-user isolation test present** — USER_A vs USER_B, the crux; markRead idempotency + 404). → merge `feat/notifications-crud`. **9/10 done pending merge.** Only **T20 (socket emitters)** remains = Slot B finish line.
 - **Loop 12b — 2026-07-02 — T18 MERGED (PR #8); T19 issued.** Slot B **8/10 merged**, visits module complete. Issued **T19** (notifications CRUD, new `notifications/` module, per-user `ctx.userId` scope). Q-B-07 flagged (envelopes). Remaining: T19 (wip) → T20 (socket, last task). Finish line 2 tasks away.
@@ -88,7 +89,7 @@
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
 | T18 | Manual visit create                                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #8 `5925c48`) 2026-07-02**. make check 230 + coverage 96.84% + T16/T17 regression clean. **Visits module complete.** |
 | T19 | Notifications CRUD + optimistic ops                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #9 `a70a435`) 2026-07-02**. make check 249 + coverage 97.39% + per-user isolation proven. |
-| T20 | Socket emitters                                           | assigned     | —              | Issued §2 (2026-07-02, LAST task). `SocketEmitterPort`+adapter + wire seams per §3 catalog. Q-B-14 (port location) + DEP-7 (io server = foundation). Awaiting PLAN. |
+| T20 | Socket emitters                                           | **approved** 🏁 | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 256 (no-Docker) + integration 69 + shared/socket coverage 100% + drift clean + merge dry-run CLEAN + T11–T19 regression green + no dep added. **Merge `feat/socket-emitters` @ `47aabbd` → Slot B 10/10.** Awaiting PO merge. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
@@ -1798,6 +1799,30 @@ Notes / boundary
 - 🏁 **This is the last Slot-B task — T20 completes the slot (10/10).**
 
 Requesting PM B VERDICT.
+
+##### VERDICT T20 — APPROVED (attempt 1) by PM B (2026-07-02, H14) 🏁
+Verified by **my own rerun** on `feat/socket-emitters` @ `47aabbd`.
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: **256 passed + 1 skipped**, 1.03s (no-Docker). **T11–T19 regression GREEN** through the callback→port consolidation.
+- `make test-integration` → **PASS**: 69 tests.
+- Coverage (PM rerun) — **`shared/socket` 100%** (port/adapter/events all 100%). Touched service files stay ≥ prior. ✓ S4.
+- **Drift**: all 0.
+- **Boundary checks** (I verified each): files only in `shared/socket/` + `tickets`/`visits` services; **NO `api.ts`/`core/`/`package.json`/lock touched**; **`socket.io` NOT added** (structural `SocketServerLike`) — DEP-7 boundary honored. **Merge dry-run into latest main: CLEAN ✓.**
+
+**DoD spot-verified in code:**
+- S1 ✓ `SocketEmitterPort` + `SocketIoEmitterAdapter` (`io.to('hotel:'+hotelId).emit(...)`, structural type) + `NoopSocketEmitter` (`adapter.ts:22,29`).
+- S2 ✓ **4 live wirings**: `emitTicketUpdated`/`emitTicketRerouted` (`tickets.service.ts:262,291`), `emitVerificationPending`/`emitVerificationResolved` (visits). Consolidated into `emitter = deps.emitter ?? new NoopSocketEmitter()` (`:159`) — default no-op, T11–T19 behavior unchanged.
+- S3 ✓ 8 payload builders reuse serializers, snake_case, room = resource's own hotel.
+- S4 ✓ adapter room-emit test (fake io) + service emit assertions; coverage 100% shared/socket.
+- **Emit-surface manifest disclosed** (no silent cap): ✅ wired-live (4) `ticket:updated`, `ticket:rerouted`, `verification:pending`, `verification:resolved`; 🟡 builder-only (4) `ticket:created`, `ticket:escalated`, `verification:failed_3x`, `notification:new` — no Slot-B producer, ready for AI/Integration/workers.
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/socket-emitters` @ `47aabbd`. Attempt 1, zero rejects. **Merges CLEAN into latest main.**
+- **→ PO: merge `feat/socket-emitters`.** On merge → **Slot B 10/10 COMPLETE.** 🏁
+- → §1 tracker updated (approved); PARENT §1 T20 → approved; roll-up PARENT §2.
+
+Textbook finale — hexagonal port, honest scoping, zero boundary violations, full regression preserved. **T20 closed. Slot B core CRM + socket layer done.** Only foundation **DEP-4** (`api.ts` bootstrap) + **DEP-7** (live `io` server) remain to flip everything from "built & tested" to "live". 🟢
 
 ---
 
