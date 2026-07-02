@@ -13,10 +13,10 @@
 ## 0. Current focus (slot C)
 
 - **Day**: H0 (2026-07-03) — first Slot C activity
-- **Active task**: **T21 Departments CRUD** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN
-- **Branch**: `feat/settings-departments-crud` (executor to create on claim)
+- **Active task**: **T21 Departments CRUD** — PLAN ACK'd 2026-07-03 H0 with 1 override (no `api.ts` touch); Executor C coding on `feat/settings-departments-crud`
+- **Branch**: `feat/settings-departments-crud`
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 active; T22–T30 backlog (see §8 note) — T26 + T30 hard-blocked at DEV by Opsi C DB deviation (PARENT §4)
+- **My queue (preview)**: T21 wip; T22–T30 backlog (see §8 note) — T26 + T30 hard-blocked at DEV by Opsi C DB deviation (PARENT §4)
 
 ---
 
@@ -26,7 +26,7 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T21 | Departments CRUD (escalation tree + operating hours) | assigned (PLAN pending) | — | ASSIGNMENT issued 2026-07-03 H0 (PM C → Exec C). All impl deps green post foundation: T02 (schema) merged; T04 RBAC + tenant-guard hooks (approved awaiting PO merge); T07-slice-1 `BusinessRuleError` merged; T-INFRA-01/-02/-03 merged/approved. DEP-4 api.ts bootstrap NOT blocking impl — follow Slot B convention (build + testcontainers, routes 401 until DEP-4 lands). |
+| T21 | Departments CRUD (escalation tree + operating hours) | wip (PLAN ACK'd with 1 override) | — | PLAN ACK'd 2026-07-03 H0. Files scope: `src/modules/departments/*` (8 files) + `src/core/config/env.ts` additive (`SKIP_CROSS_DB_CHECKS` per Q-C-02). Zero touch on `src/entrypoints/api.ts` (Slot B convention: barrel-only wiring; DEP-4 will register at foundation ship). 3 GAPs registered §3 (Q-C-01/-02/-03). Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -187,6 +187,38 @@ Q-B-01 / Q-B-02 already resolved per PM ASSIGNMENT — not re-raising.
 
 Awaiting PM C ACK.
 
+##### PM C ACK — T21 PLAN APPROVED with 1 override (proceed to coding, 2026-07-03 H0)
+
+Structural approach ✓ · Files list ✓ (serializer + routes test additions consistent with Slot B convention verified independently: `src/modules/notifications/` + `src/modules/tickets/` + `src/modules/guests/` + `src/modules/visits/` all use identical 8-file layout — schema + types + repository + service + serializer + routes + barrel `index.ts` + 3-file `__tests__/`) · session-start gate ✓ · `assertHotelOwnership` reference at `src/plugins/tenant-guard.ts:57` verified · baseline 278/1/279 matches post-T09 main ✓.
+
+**Override #1 — `api.ts` treatment**: do NOT modify `src/entrypoints/api.ts`. My original ASSIGNMENT line ("register `departmentsRoutes` in the route registration block, mirror Slot B's T11 pattern") was overprescriptive — I independently verified `src/entrypoints/api.ts` is a fully-stubbed TODO (lines 20-39 all commented) and every Slot B barrel (`grep ticketsRoutes|guestsRoutes|visitsRoutes|notificationsRoutes src/modules/*/index.ts`) exports the plugin from `index.ts` but NOTHING wires them in `api.ts`. Slot B convention is: **barrel export is the wiring seam; foundation DEP-4 will register all module barrels at once**. Drop the commented-out `// await fastify.register(departmentsRoutes, ...)` line. Zero diff on `src/entrypoints/api.ts`. This shrinks your "Files to modify" list to zero — you touch only `src/modules/departments/*` + `src/core/config/env.ts` (for GAP #2 env addition).
+
+**GAP responses**
+
+- **GAP T21-#1 (operating_hours JSONB shape) → RESOLVED**: your option A (`z.object({}).catchall(z.unknown())`) confirmed. Permissive-now, FE-contract-driven-later. Registered §3 as Q-C-01 (status: `resolved (provisional, PM C ratified)`). If FE MSW diverges, revisit in follow-up ticket — zero break risk since permissive schema forward-compatible.
+
+- **GAP T21-#2 (users cross-DB check under Opsi C) → RESOLVED with 3 constraints**: your option B (`SKIP_CROSS_DB_CHECKS` env flag) confirmed. Precedent: T08 (multipart) added 5 optional S3 env fields cleanly — additive env changes are pattern-consistent, not out-of-scope. Constraints on implementation:
+  1. Use `z.coerce.boolean().default(true)` in `src/core/config/env.ts` (matches existing boolean env pattern; default `true` = safe-in-DEV).
+  2. **Startup WARN when flag is `true` AND `NODE_ENV === 'production'`**: emit via winston at api bootstrap (deferred to DEP-4) — for now, service constructor logs `logger.warn({ skipCrossDbChecks: true, env: NODE_ENV }, 'DEPARTMENTS: users cross-DB check skipped')` once per hot start when flag is on. Prevents silent prod ship.
+  3. Service comment (JSDoc on `countAssignedUsers` or the delete-conflict method) explains the Opsi C context + which flag toggles it. Reader will understand without reading PARENT §4.
+  Registered §3 as Q-C-02 (status: `open (PO ratify before staging)`). Will roll up to PARENT §3b at SUBMIT time — PO's Opsi A/multi-schema resolution eventually removes this.
+
+- **GAP T21-#3 (skip_to_l3_categories enum) → RESOLVED**: your option A confirmed (`z.array(z.string().min(1).max(32)).max(20)`). Spec §1.5:195-207 uses examples ("vvip, urgent, complaint") — not exhaustive enum. Permissive-with-bounds prevents unbounded payload while leaving room for hotel-specific categories. Registered §3 as Q-C-03 (status: `resolved (provisional, PM C ratified)`).
+
+**Coding checklist reminders** (things easy to miss)
+
+- Prisma delete-conflict: use **`count`** queries not `findMany` — cheaper + no memory pressure.
+- `super_admin` cross-hotel bypass: rely on `assertHotelOwnership` built-in bypass (per `tenant-guard.ts:57` verified earlier); do NOT re-implement.
+- Route plugin registration: mirror `src/modules/notifications/notifications.routes.ts` prefix-and-hooks pattern exactly. If notifications register a `preHandler` chain of `[requireTenant, requireRole([...])]`, use the same helpers — don't invent parallel ones.
+- Snake_case serializer boundary: DomainDepartment (camelCase in-service) → wire DTO (snake_case). One-way, at the route boundary only.
+- `escalation_chain.l1_sla_minutes`: required per spec §1.5:194 (default = 5). Enforce in zod schema.
+- Integration test dept-code fixtures: use `CON`, `HSK`, `FNB`, `ENG`, `FO` to mirror T05 seed + Slot B testcontainer convention (see tickets integration test).
+- `pnpm install --frozen-lockfile` fresh + `pnpm prisma:generate` if needed. Do NOT `pnpm rebuild @prisma/client`.
+
+**Mid-task CHECKPOINT trigger**: if the session crosses ~4h with more than 3 files still incomplete, post a CHECKPOINT sub-block here with current state so I can spot-flag drift early. Otherwise straight-line to SUBMIT.
+
+Proceed to coding on `feat/settings-departments-crud`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -294,7 +326,9 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 
 | ID            | Question | Source         | Status | Resolution |
 | ------------- | -------- | -------------- | ------ | ---------- |
-| —             | —        | —              | —      | —          |
+| Q-C-01        | `operating_hours` JSONB shape not fully specified in spec §1.5 (cross-refs API-CONTRACT §2.10 absent from repo). Enum/tighten now or leave permissive for MVP? | T21 · exec-C PLAN GAP #1 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive `z.object({}).catchall(z.unknown())` — parses `{}` and forwards any JSON forward-compat. Tighten in FE-driven follow-up ticket if MSW/UX diverges. Zero-break risk since forward-compat schema. |
+| Q-C-02        | `users.department_id` cross-DB check impossible under Opsi C dev-DB deviation (users lives in Auth DB, not `hotel_core_dev`). Skip in DEV or gate behind env flag? | T21 · exec-C PLAN GAP #2 | **open (PO ratify before staging)** — implementation shipping under safe defaults | `SKIP_CROSS_DB_CHECKS` env flag added to `core/config/env.ts` (`z.coerce.boolean().default(true)`). Service skips `users` count when flag is `true`; tickets check always runs. Startup WARN when flag is `true` + `NODE_ENV === 'production'` prevents silent prod ship. Root fix = PARENT §4 Opsi A / Prisma multi-schema (foundation, PO decision). Will roll up to PARENT §3b at T21 SUBMIT. |
+| Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
 
 ---
 
