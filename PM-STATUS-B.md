@@ -43,15 +43,16 @@
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
-| T19 | Notifications CRUD | ✅ approved (attempt 1) | `feat/notifications-crud` @ `f35e7a2` (merges clean) | ⏳ awaiting PO merge |
+| T19 | Notifications CRUD | ✅ approved | `feat/notifications-crud` | ✅ **merged (PR #9)** |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
-| T20 | Socket emitters | 🟢 unblocks on T19 merge (T11✓+T16✓+T19) — LAST task | — | — |
+| T20 | Socket emitters | 🟡 assigned (awaiting PLAN) — LAST task, cross-cutting | `feat/socket-emitters` | — |
 
-**Counts**: ✅ **8/10 merged** + **T19 approved (awaiting merge)** · ⚪ T20 (socket, LAST — unblocks on T19 merge). **9/10 done pending T19 merge.** Only T20 left = Slot B finish line.
+**Counts**: ✅ **9/10 merged (T11,T13,T14,T15,T12,T16,T17,T18,T19)** · 🟡 T20 assigned (socket emitters, LAST). **1 task from Slot B complete.** Foundation: only DEP-4 (`api.ts` bootstrap + Socket.io server) remains for go-live.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 13b — 2026-07-02 — T19 MERGED (PR #9); T20 issued (finale).** Slot B **9/10 merged**. Issued **T20** (socket emitters — LAST task). It's cross-cutting: `SocketEmitterPort` + adapter (hexagonal) + wire every module's no-op emit-seam to real events per §3 catalog (room `hotel:${hotelId}`). Flagged **Q-B-14** (port location — may touch `core/`) + **DEP-7** (live Socket.io server = foundation/DEP-4). Testable now by mocking the port. **Last task to 10/10.**
 - **Loop 13 — 2026-07-02 — T19 APPROVED (last CRUD module).** Notifications done (PM rerun: make check 249 no-Docker, coverage 97.39%, drift clean, merge dry-run CLEAN, **per-user isolation test present** — USER_A vs USER_B, the crux; markRead idempotency + 404). → merge `feat/notifications-crud`. **9/10 done pending merge.** Only **T20 (socket emitters)** remains = Slot B finish line.
 - **Loop 12b — 2026-07-02 — T18 MERGED (PR #8); T19 issued.** Slot B **8/10 merged**, visits module complete. Issued **T19** (notifications CRUD, new `notifications/` module, per-user `ctx.userId` scope). Q-B-07 flagged (envelopes). Remaining: T19 (wip) → T20 (socket, last task). Finish line 2 tasks away.
 - **Loop 12 — 2026-07-02 — T18 APPROVED (visits module complete).** Manual visit create done (PM rerun: make check 230 no-Docker, coverage 96.84%, drift clean, merge dry-run CLEAN, T16/T17 regression clean — visits suite 80 tests, guest-guard cross-tenant 404 no-create). → merge `feat/visits-manual-create`. **8/10 done pending merge.** Visits trio (T16+T17+T18) complete. Remaining: **T19 (notifications) → T20 (socket)** = finish line.
@@ -86,7 +87,8 @@
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
 | T18 | Manual visit create                                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #8 `5925c48`) 2026-07-02**. make check 230 + coverage 96.84% + T16/T17 regression clean. **Visits module complete.** |
-| T19 | Notifications CRUD + optimistic ops                       | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 249 (no-Docker) + coverage 97.39% + drift clean + merge dry-run CLEAN + per-user isolation test present. **Merge `feat/notifications-crud` @ `f35e7a2`.** Last CRUD module. Awaiting PO merge. |
+| T19 | Notifications CRUD + optimistic ops                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #9 `a70a435`) 2026-07-02**. make check 249 + coverage 97.39% + per-user isolation proven. |
+| T20 | Socket emitters                                           | assigned     | —              | Issued §2 (2026-07-02, LAST task). `SocketEmitterPort`+adapter + wire seams per §3 catalog. Q-B-14 (port location) + DEP-7 (io server = foundation). Awaiting PLAN. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
@@ -1658,6 +1660,30 @@ Verified by **my own rerun** on `feat/notifications-crud` @ `f35e7a2`.
 - → §1 tracker updated (approved); PARENT §1 T19 → approved; roll-up PARENT §2.
 
 Clean — per-user isolation properly proven. **T19 closed. 9/10 done pending merge.** 🟢
+
+---
+
+### ASSIGNMENT T20 — Socket emitters — issued by PM B (Nathan) 2026-07-02 (H14)
+- Branch: `feat/socket-emitters` (off latest main) · Routed from PARENT §1 T20 = MVP §1.2 **B10** · Spec: `02-hotel-core.md §3` (event catalog L735-750) + `README §2.5` (gateway + room `hotel:${hotelId}`)
+- Dependency: **T11 + T12 + T16 + T17 + T18 + T19 all ✅ merged** (their emit-seams exist as no-ops). **LAST Slot-B task.** Cross-cutting: wires seams across `tickets/`, `visits/`, `notifications/` (all Slot B, single task → no collision).
+- **Hexagonal (CLAUDE §4)**: socket emit = outbound push → **WAJIB port + adapter.** Define a `SocketEmitterPort`; the Socket.io adapter implements it.
+
+**Scope — emitter abstraction + payload shapes + wire every seam (NOT the live server)**
+- **Events** (per §3 catalog, room `hotel:${hotelId}`): `ticket:created` `{ticket: TicketSummary}` · `ticket:updated` `{ticket: TicketSummary, changed: string[]}` · `ticket:escalated` · `ticket:rerouted` · `verification:pending` `{visit_id, guest_id, hotel_id}` · `verification:resolved` `{visit_id, status}` · `verification:failed_3x` `{visit_id, attempts}` · `notification:new` `{notification: AppNotification}`.
+
+**DoD**
+- [ ] S1 — **`SocketEmitterPort`** interface (`emitToHotel(hotelId, event, payload): void` or async) + a **`SocketIoEmitterAdapter`** implementing it (wraps a Socket.io `Server`, emits to room `hotel:${hotelId}`). Adapter takes the `io` server via constructor (injected at bootstrap — see DEP).
+- [ ] S2 — **Wire every module seam** (currently no-op) to the port with the correct event + payload: tickets (`ticket:created/updated/escalated/rerouted` — reuse T11 `serializeTicketListItem`→`TicketSummary`), visits (`verification:pending` from T18 create, `verification:resolved` from T16 verify + T17 reject/approve, `verification:failed_3x` if applicable), notifications (`notification:new` from any persist — reuse T19 serializer→`AppNotification`). Each seam receives the injected emitter (default no-op in tests).
+- [ ] S3 — Payload shapes match §3 exactly (`visit_id`/`guest_id`/`hotel_id` snake_case; `TicketSummary` = list-item shape; `AppNotification` = notification wire). Reuse existing serializers — no new shapes.
+- [ ] S4 — tests: unit — each mutation calls the emitter with the correct `(hotelId, event, payload)` (**mock the port**, assert calls); adapter unit (emits to the right room, given a mock `io`). ≥80% cov changed files. `make check`+integration green. **T11–T19 tests stay green** (seam wiring must not change existing behavior when emitter is no-op/mock).
+
+**Architecture Q + DEP (raise in PLAN — this is the crux of T20):**
+- **Q-B-14** — **where does `SocketEmitterPort` + adapter live?** Options: `src/core/socket/` (cross-cutting infra, but `core/*` is foundation — would need Parent/Slot-A coordination like DEP-6) vs `src/shared/` vs a small `src/modules/_socket`-style module. **Propose in PLAN; if it lands in `core/`, I escalate to Parent (boundary).** The *port + wiring* is Slot B; the physical location needs a ruling.
+- **DEP-7 (go-live, foundation)** — the **live Socket.io `Server`** (attached to Fastify, `hotel:${hotelId}` room-join on connect from the auth cookie — README §2.5 "server-side authoritative") is **server bootstrap = DEP-4 family, foundation**. T20 delivers the port + adapter + wiring (fully testable by mocking the port); **live emission works once foundation bootstraps the `io` server + room-join**. Flag DEP-7; don't build the Fastify/Socket.io server wiring here.
+
+**Session-start gate**: identity, read §3 catalog + README §2.5 + the merged modules' emit-seams (`onTicketUpdated`/`onVerificationResolved`/`onVerificationPending`/`onNotificationNew` etc.), `make typecheck`/`make lint` clean. Then PLAN. **No code before PM B ACK** — and I especially want the Q-B-14 location proposal + DEP-7 boundary in the PLAN before you touch anything.
+
+Awaiting exec-B PLAN for T20.
 
 ---
 
