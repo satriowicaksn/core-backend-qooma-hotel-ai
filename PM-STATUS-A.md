@@ -2545,6 +2545,75 @@ Alternative was to add `testPathIgnorePatterns` to `jest.config.ts` as a top-lev
 
 Awaiting **PLAN T-INFRA-03** from exec-A.
 
+#### PLAN T-INFRA-03 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Single-line change at `package.json:25` — extend `test:unit` script with `--testPathIgnorePatterns='\\.integration\\.test\\.ts$'` so it stops discovering `*.integration.test.ts` files. Script-layer split preserves `jest.config.ts testMatch` broad by design and keeps `test:integration` + `test:coverage` untouched. Fix closes PARENT §3b GAP-T11-3 (Docker-free `make check`).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `package.json:25-27` (current 3 test scripts: `test:unit` catches both patterns due to broader regex, `test:integration` narrows to integration, `test:coverage` runs everything via config); `jest.config.ts:8` (`testMatch` intentionally broad — `test:integration` relies on it); `Makefile:148` (`check` prereq chain — will remain intact) ✓
+- Parent docs spot-read: PARENT §3b GAP-T11-3 rationale + PM B's original proposed fix ✓
+- Dependencies: T-INFRA-01 ✓, T-INFRA-02 ✓ merged (foundation healthy)
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T-INFRA-02 merge)
+- Scaffolder risk: **none** — 1-line JSON edit
+
+**Files to modify** (1, 0 create)
+- `package.json` line 25 — `test:unit` script (add `--testPathIgnorePatterns` flag)
+
+**Files NOT touched** (per HARD constraints)
+- `jest.config.ts` — `testMatch` stays broad (design decision preserves `test:integration` behavior)
+- `Makefile` — `check` target semantic changes but line unchanged
+- All test files (`src/**/__tests__/**`) — zero test-logic touch
+- All `src/` production code
+- `pnpm-lock.yaml` — no dep change
+
+**Approach**
+
+*Empirical verification already done before writing PLAN* — ran `pnpm jest --testPathPattern='__tests__/.*\.test\.ts' --testPathIgnorePatterns='\.integration\.test\.ts$' --listTests` and confirmed:
+- Lists exactly **11 unit test files** (all `*.test.ts` NOT ending in `.integration.test.ts`)
+- Excludes **3 integration files** (`guests.repository.integration.test.ts`, `tickets.repository.integration.test.ts`, `_template.repository.integration.test.ts`)
+- Regex works cleanly at CLI level. Only remaining unknown was JSON escaping.
+
+*Baseline test counts captured before edit* — for post-fix reconciliation math:
+- Current `pnpm test:unit` (with bug, runs everything): **191 pass / 2 skip / 193 total** across 12+2 suites
+- `pnpm test:integration`: **31 pass / 1 skip / 32 total** across 2+1 suites (`_template` integration is 1 skip)
+
+*Final `package.json` script value* (matching PM A's proposed exact syntax + preserving existing double-backslash convention from `test:integration` at line 26):
+```json
+"test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts --testPathIgnorePatterns='\\.integration\\.test\\.ts$'"
+```
+
+JSON string decoding: `\\` → `\`, so runtime shell receives `jest --testPathPattern=__tests__/.*\.test\.ts --testPathIgnorePatterns='\.integration\.test\.ts$'`. Single quotes protect the trailing `$` from shell variable interpretation (defensive vs `\.test\.ts` in the primary pattern which has no `$`).
+
+**Explicit resolution of PM A's 6 advisory checks**
+
+- **Adv #1 — JSON string escape sanity**: **verified pre-PLAN via `--listTests`**. Ran the equivalent shell invocation and confirmed the regex correctly filters: 11 unit files listed, 3 integration files excluded. Escape count for JSON → shell → jest regex is straightforward: `\\.` in JSON becomes `\.` in shell, which passes to jest as a literal-dot regex atom. Post-edit verification plan: `pnpm test:unit --listTests` returns exactly the same 11 files. If not, revert + escalate.
+
+- **Adv #2 — Baseline test-count reconciliation** (exact math, captured pre-PLAN):
+  - **Current `test:unit`** (bug — matches integration too): 191 pass / 2 skip / 193 total (12 executed + 2 skipped suites of 14 total test files)
+  - **Current `test:integration`**: 31 pass / 1 skip / 32 total (2 executed + 1 skipped of 3 integration files; the skip is `_template.repository.integration.test.ts`)
+  - **Expected post-fix `test:unit`**: **160 pass / 1 skip / 161 total** (11 unit files run, 1 is `_template.service.test.ts` skipped, 10 execute with 160 tests total). Computed as 193 − 32 (integration subset) = 161.
+  - **Expected post-fix `test:integration`**: unchanged at 31 pass / 1 skip / 32 total.
+  - **Sum sanity**: 161 (unit) + 32 (integration) = 193 total; 160 + 31 = 191 pass; 1 + 1 = 2 skip. All match baseline exactly.
+
+- **Adv #3 — `make check` no-Docker signal** (primary DoD):
+  - Pre-fix `make check` (unit portion) currently runs integration tests via the bug → Docker spins for testcontainers. Post-fix, `test:unit` (called by `make check`) excludes integration → no testcontainers startup. Evidence approach in SUBMIT:
+    1. Capture full `make check` output tail: verify absence of "PASS src/modules/*/__tests__/*.integration.test.ts" lines (currently present).
+    2. Verify absence of testcontainers-provisioned duration signals (currently `(8.786 s)` on integration suite entries).
+    3. Report time delta: current `make check` test:unit portion ~10.98s → post-fix expected ~1-2s (unit-only, no Docker container startup latency).
+
+- **Adv #4 — `test:coverage` script unchanged behavior**: script at line 27 is `jest --coverage` — passes no path filter, relies on `jest.config.ts:8 testMatch` which stays broad. Post-fix verification plan: `pnpm test:coverage 2>&1 | tail -5` reports the full 193 baseline (191 pass + 2 skip across all 14 files). If it drops, `test:coverage` was accidentally inheriting `test:unit`'s filter — investigate + escalate.
+
+- **Adv #5 — CI implications** (acknowledged, OUT of T-INFRA-03 scope): confirmed the CI-regression concern. Post-fix, `make check` (which CI likely calls) runs only unit; integration coverage would need a separate CI step (e.g. `make check-full` or `pnpm test:integration` job) OR CI must not depend on `make check` for integration coverage. Not addressing here per PM A directive (single-concern PR pattern). Will call out in SUBMIT as a **T-INFRA-04 candidate** with concrete options: (a) new `make check-full = check + test-integration` target; (b) separate CI job for `pnpm test:integration`; (c) do nothing if CI already handles it. PO/PM A to decide separately.
+
+- **Adv #6 — Dev-flow guidance for Nathan/Satrio** (acknowledged, OUT of T-INFRA-03 scope): post-fix, contributors touching integration tests must remember `pnpm test:integration` as an additional local gate. `docs/TESTING.md` is a planning doc (I cannot edit per EXECUTOR-PROTOCOL §10). Will flag in SUBMIT as a follow-up doc-PR item for PARENT §10 or `docs/TESTING.md` — PM A / Planning to author the doc update on their own timeline.
+
+**GAPs / questions**: none. Escape form verified empirically pre-PLAN; math clean; primary DoD signal (no-Docker) has clear evidence plan.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
