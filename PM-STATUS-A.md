@@ -4734,6 +4734,81 @@ Test isolation strategy:
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T10 PLAN APPROVED, proceed to coding (H0 2026-07-03) by PM A (Nanak)
+
+Zero-rebuttal quality. All 6 advisories resolved with concrete pre-PLAN evidence. Two PO-flagged design decisions both accepted with rationale.
+
+**Verified in PLAN**:
+- **Adv #1** ✓ — final imports enumerated (bull, `@core/config/env.js`, `@core/errors/app-errors.js`) → zero `@core/redis/redis-client` reference. SUBMIT-time grep will confirm.
+- **Adv #2** ✓ — JSDoc `<module>:<job-type>` → `<domain>.<action>` update planned in same file. Cross-task alignment before Nathan/Satrio consumer tasks land.
+- **Adv #3** ✓ — Node multi-listener support verified. T-INFRA-01's prisma-disconnect + T10's queue-close both fire on shutdown. No conflict.
+- **Adv #4** ✓ — Bull.Queue lazy construction verified via `node_modules/bull/index.d.ts` inspection. Tests inspect `.name`/`.opts` shape only; spy on `.close()` for shutdown assertion. Zero real Redis I/O.
+- **Adv #5** ✓ — grep-verified `ConflictError` at `app-errors.ts:51` (present since boilerplate, T07-slice-1 didn't touch). No GAP needed.
+- **Adv #6** ✓ — honest dual strategy adopted (see PO Item #1 below).
+
+**Two PO-flagged design decisions — both accepted**:
+
+**1. Adv #6 indirect NODE_ENV assertion → ACCEPT**
+Direct `process.listenerCount('SIGTERM')` delta measurement via `jest.isolateModulesAsync` is genuinely fragile with ESM+ts-jest. Exec-A's dual-strategy is disciplined transparency:
+- **(a) Guard verification** via `NODE_ENV === 'test'` assertion at test time + structural code-review at VERDICT stage = confidence without flakiness
+- **(b) Behavior verification** via direct `shutdownAllQueues()` call in test #7 = end-to-end shutdown path proof without needing to fire real signals
+
+Naming the fragility limitation transparently is better than false confidence with flaky tests. Same discipline family as `feedback_verify_before_act.md` — knowing what your test proves vs assumes.
+
+**2. Re-entrancy in `shutdownAllQueues` (clear-then-await pattern) → ACCEPT**
+Pattern:
+```ts
+const queues = Array.from(registry.values());  // sync snapshot
+registry.clear();                               // sync clear
+await Promise.all(queues.map((q) => q.close()));// async
+```
+
+Concurrent-call analysis:
+- **Serial**: Call 1 clears + closes. Call 2 sees empty registry, no-op resolves immediately. ✓
+- **Concurrent**: Both threads snapshot before clear (JS single-threaded — no interleave), both call `registry.clear()`, both close same queue references. Bull v4 `.close()` is documented idempotent (double-close is a no-op).
+
+Stronger cached-promise idempotency pattern:
+```ts
+let shutdownPromise: Promise<void> | null = null;
+export function shutdownAllQueues(): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => { /* ... */ })();
+  return shutdownPromise;
+}
+```
+Would guarantee same Promise for concurrent callers (semantically cleaner) but adds mutable module state. Exec-A's simpler pattern is defensible given Bull's idempotency + typical shutdown scenarios (signal fires once from OS). If future consumers report double-close friction, upgrade to cached-promise in slice-2. Not blocking.
+
+**Verified design details**:
+- **Registry as `Map<string, Queue<unknown>>`** — clean, enables lookup + shutdown coord + duplicate detection without exposing internal state
+- **Cast on `registry.set`** — `Queue<TData>` → `Queue<unknown>` widening; safe because registry only used for `.close()` — well-scoped narrowing
+- **Bull's 3-arg constructor `new Bull(name, url, opts)`** — cleanest form; `opts.redis.db` override sets Redis DB per env
+- **Signal handler idiom matches T-INFRA-01 verbatim** — `void shutdownAllQueues()` inside sync arrow wrapping; cross-task consistency (T-INFRA-01/T05/T09 all use this)
+- **Test isolation via unique names per test + `afterEach shutdownAllQueues()`** — proper hygiene; prevents test-order dependencies
+
+**Scope match** ✓ — 1 modify + 1 create, all within `src/core/queue/`. Zero touch to `redis-client.ts` / `prisma-client.ts` / all other src/ / prisma/ / docs/ / config / deps.
+
+**Test plan (8 cases)** — well-structured, all DoD items covered. Test #7 (shutdown behavior) + test #8 (NODE_ENV guard) implement the dual-strategy from Adv #6.
+
+**Continued efficacy datapoints (mental tracking, no new memory)**:
+- **`feedback_verify_before_act.md`** — **9th consecutive PLAN with clean ACK** (T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03, T05, T08, T09, T10). Adv #4 (Bull.Queue lazy construction verified via `node_modules/bull/index.d.ts` inspection) + Adv #5 (`ConflictError` grep) exemplify the routine application.
+- **`feedback_git_slip_transparency.md`** — mitigation held for **4 consecutive tasks** so far (T-INFRA-03/T05/T08/T09); T10 will be 5th if pattern continues.
+
+**Proceed to implementation on branch `feat/foundation-workers-harness`.**
+
+**SUBMIT expectations (reminders)**:
+- Post-code: `grep '@core/redis' src/core/queue/bull-factory.ts` returns 0 hits (Adv #1 verification signal)
+- JSDoc line 5+ shows `<domain>.<action>` dot notation (Adv #2)
+- `make check` PASS — expect baseline+8 new tests (baseline may shift again from Nathan velocity; reconcile per T08/T09 discipline: report main-only baseline + delta cleanly in SUBMIT)
+- Coverage on `bull-factory.ts` ≥ 90%
+- Drift scans clean on both files (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export)
+- `git diff main --name-only` = exactly 2 files (`bull-factory.ts` + fresh test)
+- `git diff main -- src/core/redis/redis-client.ts src/core/prisma/prisma-client.ts` = **empty** (stubs+singleton untouched)
+- Branch-slip mitigation: **5th consecutive task** — `git branch --show-current` verify pre-commit
+- Nathan/Satrio velocity baseline reconciliation captured cleanly (main-only baseline + T10 delta math both stated)
+- **Milestone acknowledgment in SUBMIT**: this is the last main-queue T01-T10 task — celebrate cleanly (not required but appropriate)
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
