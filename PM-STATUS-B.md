@@ -45,7 +45,7 @@
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
-| T18 | Manual visit create | 🟡 assigned (awaiting PLAN) — extends `visits/` | `feat/visits-manual-create` | — |
+| T18 | Manual visit create | 🟡 wip (PLAN ACK'd) — extends `visits/` | `feat/visits-manual-create` | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
 **Counts**: ✅ **7/10 merged (T11, T13, T14, T15, T12, T16, T17)** · 🟡 T18 assigned (visits) · 🟢 T19 ready (notifications) · ⚪ T20 (←T19). Zero foundation blockers (only DEP-4 go-live). **Sisa 3: T18, T19, T20.**
@@ -82,7 +82,7 @@
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
-| T18 | Manual visit create                                       | assigned     | —              | Issued §2 (2026-07-02, T17 merged). Extends `visits/`, `POST /visits` → pending_verification. Awaiting PLAN. Q-B-13 (body+response shape). |
+| T18 | Manual visit create                                       | wip          | —              | PLAN ACK'd 2026-07-02 (§2). Q-B-13 ruled (return Visit, persist special_request, nights 1–30). Coding `feat/visits-manual-create`. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1434,6 +1434,20 @@ One `gm_admin`-only endpoint `POST /api/visits` — create a manual visit for an
 
 Awaiting PM B ACK (PLAN + Q-B-13 body/response/special_request/nights). Not coding before ACK.
 
+##### PM B ACK — T18 PLAN APPROVED (2026-07-02, H14)
+Clean. **ACK — create `feat/visits-manual-create`, implement.** No required fixes. **Q-B-13 all four ruled:**
+
+- **(a) body** `{ guest_id (req), check_in (req ISO), nights?, room_number?, booking_source?, special_request? }` — APPROVED (provisional on FE MSW). `.strict()` rejects `hotel_id`/`status`.
+- **(b) response → `{ data: VisitWire }` (the created Visit) — RATIFIED, with the AC discrepancy on record.** MVP §5 AC prose says "returns Guest with the new visit appended," but that would couple the *visits* module to the guest-detail shape (T14's domain) + duplicate its serializer — a boundary smell. Returning the created `Visit` is cleaner, module-cohesive, REST-idiomatic, and consistent with verify-manual/reject/approve-manual. **This is the working contract; FE MSW is the tiebreaker** — IF the MSW POST handler returns guest+`visits[]`, switch the serializer (read guest+visits via Prisma, **no** guests-module import) — a one-file change. Don't import the guests module regardless.
+- **(c) `special_request` — persist if provided** ✓. Column exists; dropping loses data. (Q-CONTRACT-20 "ephemeral" ≠ "must discard".)
+- **(d) `nights` 1–30 on create** ✓ (DDL range; zod ⊆ DB). Looser than the verify-flow's 1–7 approval — no conflict (different endpoint).
+
+**Approach endorsed:** guest guard `findGuestById` → `NotFoundError` + `assertHotelOwnership` (cross-tenant → 404, super_admin bypass) via Prisma (no guests-module import); `hotelId = ctx.hotelId` **never body**; `status` default pending_verification (DB default); no `check_out` on create; `onVerificationPending` no-op seam (T20); reuse `serializeVisit`.
+
+**At SUBMIT I verify:** MV1–MV5, guest-scope (cross-tenant guest → 404 **no-create**), `hotelId` from ctx, body `.strict()`, response = ratified shape, **T16/T17 regression green**, drift, `make check`+integration, ≥80% cov.
+
+Proceed. 🟢
+
 ---
 
 <!--
@@ -1560,6 +1574,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-B-10        | Guest messages: source, ordering, envelope. | T15 · §1.3 | **RESOLVED (PM ratify) 2026-07-02** | (a) aggregate `ticket_messages WHERE hotelId=ctx.hotelId AND ticket.guestId=:id` (guest-load + 404 guard); (b) **newest-first** `sent_at DESC,id DESC` (scrollback); (c) cursor `{data,pageInfo:{nextCursor,hasMore}}`. M4: no body masking. Provisional on FE MSW. |
 | T-CLEAN-02    | Promote base64 keyset cursor codec to `@shared/utils/` (T11 + T15 duplicate it). | follow-up (post-T15) | **queued (Slot B cleanup)** | Module-local for now; consolidate with T-CLEAN-01 as a post-CRM cleanup pass. |
 | Q-B-12        | T17 `/reject` body + `/approve-manual` nights. | T17 · §1.3 | **RESOLVED (PM ratify) 2026-07-02** | (a) `/reject` = no body (`.strict()`; reason deferred to audit table Q-B-09). (b) `approve-manual` `nights` OPTIONAL (derive checkout if present, else null). Provisional on FE MSW. |
+| Q-B-13        | T18 `POST /visits` body + response shape + special_request + nights range. | T18 · §1.3 / MVP §5 AC | **RESOLVED (PM ratify) 2026-07-02** | (a) body `{guest_id,check_in,nights?,room_number?,booking_source?,special_request?}`. (b) response `{data: VisitWire}` (created Visit) — **AC discrepancy noted** (§5 says "guest+visit"); FE MSW tiebreaker → serializer swap if needed (no guests-module import). (c) persist special_request. (d) nights 1–30 on create. |
 | Q-B-05        | Canonical `Visit` wire shape (T14 embeds, T16 owns). | T14/T16 · §2.3 DDL | **RESOLVED (PM ratify) 2026-07-01** | Pinned in §2 (13 fields from DDL §2.3). T16 owns serializer; T14 embeds same shape module-local. Unblocks T14 ∥ T16 parallel. Provisional on FE MSW. |
 | Q-B-07        | Notifications list + `unread-count` envelope. | T19 · §1.9 | **open** | exec-B propose per §2.7 + FE MSW in PLAN. |
 
