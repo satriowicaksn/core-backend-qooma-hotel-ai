@@ -1601,6 +1601,40 @@ Strong PLAN — the per-user scope + markRead idempotency are exactly right. **A
 
 Proceed. 🟢
 
+### SUBMIT T19 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Notifications CRUD + optimistic ops — `GET /api/notifications` · `GET /unread-count` · `PATCH /:id/read` · `POST /mark-all-read`
+Branch: **`feat/notifications-crud`** (pushed; commit `f35e7a2`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 10 new, **all** in `src/modules/notifications/` (greenfield; 0 outside — no `api.ts`/`prisma`/`core` edits)
+  - `notifications.types.ts` (wire DTOs + cursor + Q-B-07 response shapes), `notifications.schema.ts` (zod list/param + module-local cursor codec), `notifications.serializer.ts`, `notifications.repository.ts` (Prisma direct), `notifications.service.ts` (per-user scope + 4 ops), `notifications.routes.ts` (4 routes), `index.ts` (barrel + factory) + 3 test files
+
+DoD self-check
+- [x] **NT1 (crux)** — **per-user scope on EVERY endpoint**: `{ userId: ctx.userId, hotelId: ctx.hotelId }`, **NO super_admin bypass** (personal data). `hotel_id`/`user_id` never from URL/body. Integration: user A can't see/mark user B's (same hotel) nor another hotel's.
+- [x] **NT2** — `GET /notifications`: `?is_read` bool filter, cursor keyset (`created_at DESC, id`) via module-local codec (N1 OR-decomposition; T-CLEAN-02 later); `limit` default 20 / max 100; malformed cursor → 400. Serializer emits `{ id, hotel_id, user_id, type, title, body, link, metadata, is_read, read_at, created_at }` (per ACK adjustment).
+- [x] **NT3** — `GET /unread-count` → `{ data: { count } }` (`is_read=false` for the user). Integration asserts per-user accuracy (A1=2, A2=2, B1=1).
+- [x] **NT4** — `PATCH /:id/read`: guarded `updateMany(where {id,userId,hotelId,isRead:false})` + `findOwned` → not-owned → `NotFoundError` 404 (anti-enumeration, NOT 403). **Idempotent**: already-read → 200 preserving original `read_at` (integration-verified). Returns `{ data: NotificationWire }`.
+- [x] **NT5** — `POST /mark-all-read`: one `updateMany(where {userId,hotelId,isRead:false})`; `{ data: { updated } }`; idempotent (2nd call → updated 0). Integration: flips only the caller's rows, other user untouched.
+- [x] **NT6** — unit (scope build, cursor codec, read/mark) + integration (≥2 users + cross-hotel; isolation, unread-count, mark-all idempotency, 404 no-mutate). ≥80% cov. `make check`+integration green.
+
+Quality gate
+- `make check`: **PASS** (**249 passed, 1 skipped** template placeholder)
+- `make test-integration`: **PASS** (notifications **8** via testcontainers)
+
+Drift scans (src/modules/notifications): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Per-user + per-hotel scope on every read/write (no super_admin bypass — the make-or-break isolation); cross-user/cross-tenant masked 404 (§7), verified no-mutate. `AppError` only; correlationId; no secrets/PII in logs.
+
+Test evidence
+- Unit/component: **19** (service 13 + routes 6). Integration: **8**. **Changed-file line coverage 97.24%** (service 100 / repo 100 / serializer 100 / routes 96.96 / schema 94.28).
+- Sample: `GET /api/notifications?is_read=false&limit=20` → `{ data: [ { id, hotel_id, user_id, type, title, …, is_read:false, read_at:null, created_at } ], pageInfo: { nextCursor, hasMore } }`. `PATCH /api/notifications/<other-user-id>/read` → `404 { error:{ code:'NOT_FOUND' } }` (no mutation). `POST /mark-all-read` → `{ data: { updated: 2 } }`.
+
+Notes
+- **Q-B-07** shipped as ratified (list `{data,pageInfo}` · unread `{data:{count}}` · mark-all `{data:{updated}}` · markRead `{data:NotificationWire}`); serializer includes `hotel_id`/`user_id` per the ACK adjustment.
+- Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(notificationsRoutes)` (DEP-4, foundation — untouched). **Only T20 (socket) remains in Slot B.**
+
+Requesting PM B VERDICT.
+
 ---
 
 <!--
