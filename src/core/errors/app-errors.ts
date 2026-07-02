@@ -84,3 +84,24 @@ export class BillingRequiredError extends AppError {
   readonly statusCode = 402;
   readonly code = 'BILLING_REQUIRED';
 }
+
+/**
+ * BusinessRuleError — HTTP 422 for domain rule violations (invalid state
+ * transitions, business invariant breaks).
+ *
+ * Wire contract per PARENT §10 DEP-6 (PM B ratified):
+ *   envelope `code = 'BUSINESS_RULE'` (generic category)
+ *   + `details.rule` = specific rule identifier
+ *     (e.g. 'INVALID_TICKET_TRANSITION', 'PENDING_VERIFICATION_ONLY')
+ *
+ * Consumer pattern:
+ *   throw new BusinessRuleError('Cannot transition closed → open', {
+ *     rule: 'INVALID_TICKET_TRANSITION',
+ *     from: 'closed',
+ *     to: 'open',
+ *   });
+ */
+export class BusinessRuleError extends AppError {
+  readonly statusCode = 422;
+  readonly code = 'BUSINESS_RULE';
+}
