@@ -41,17 +41,18 @@
 | T13 | Ticket stats + overdue | ✅ approved | `feat/tickets-stats-overdue` | ✅ merged |
 | T14 | Guests CRUD + preferences | ✅ approved | `feat/guests-crud` | ✅ **merged (PR #3)** |
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
-| T16 | Visits list + verify-manual | ✅ approved (attempt 1, full V1–V6) | `feat/visits-list-verify` @ `1c502f3` (merges clean) | ⏳ awaiting PO merge |
+| T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
-| T17 | Visit reject + failed_3x | 🟢 unblocked on T16 merge (extends `visits/`) | — | — |
+| T17 | Visit reject + failed_3x | 🟡 assigned (awaiting PLAN) — extends `visits/` | `feat/visits-reject-override` | — |
 | T18 | Manual visit create | 🟢 unblocked on T16 merge (extends `visits/`) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **5/10 merged (T11, T13, T14, T15, T12)** + **T16 approved (awaiting merge)** · 🟢 T19 ready + T17/T18 unblock on T16 merge · ⚪ T20 (←T16+T19). **6/10 done pending T16 merge. Zero foundation blockers** (only DEP-4 go-live).
+**Counts**: ✅ **6/10 merged (T11, T13, T14, T15, T12, T16)** · 🟡 T17 assigned (visits) · 🟢 T18 + T19 ready · ⚪ T20 (←T16✓+T19). Zero foundation blockers (only DEP-4 go-live). Sisa 4: T17, T18, T19, T20.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 10b — 2026-07-02 — T16 MERGED (PR #6); T17 issued.** Visits module complete on main → **6/10 merged** (T11,T13,T14,T15,T12,T16). Going one-at-a-time (parallel deferred — worktree setup skipped for now). Issued **T17** (visit reject + approve-manual/failed_3x, extends `visits/`, reuses T16 transition tx + checkout). Remaining: T17 (wip), T18 (visits, after T17 — same module), T19 (notifications, ready anytime), T20 (←T19).
 - **Loop 10 — 2026-07-02 — T16 APPROVED (full V1–V6).** Visits verify-manual done (PM rerun: make check 205 no-Docker, coverage 98.01%, drift clean, merge dry-run CLEAN, tx atomicity + 422/404 no-mutate verified, checkout-TZ seam + module-local transition). Branch rebased cleanly (was 56 behind). → merge `feat/visits-list-verify`. **6/10 done pending merge. T16 merge unblocks T17 + T18.** Remaining: T19 (ready), T17, T18 (←T16), T20 (←T16+T19).
 - **Loop 9b — 2026-07-02 — T12 MERGED (PR #5).** Slot B **5/10 merged** (T11,T13,T14,T15,T12). Next: T16 resume V2–V5 — ⚠ branch `feat/visits-list-verify` is **56 commits behind main** (created pre-foundation-merges); **must rebase onto main first** (picks up `BusinessRuleError`+`ctx.userId`; disjoint `visits/` module → rebase should be clean) before adding verify-manual.
 - **Loop 9 — 2026-07-02 H14 — T12 APPROVED.** Ticket transition + reroute APPROVED attempt 1 (PM rerun: make check 173 in 2.5s no-Docker, coverage 96.68%, drift clean, merge dry-run into latest main CLEAN, negative tests 422+403 verified, optimistic-concurrency race-check). → merge `feat/tickets-transition`. **5/10 done pending merge.** Remaining active: T16 (resume V2–V5), T19 (ready). Then T17/T18 (←T16), T20 (←T16+T19).
@@ -77,7 +78,8 @@
 | T13 | Ticket stats + overdue                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED attempt 1 + **MERGED to main** 2026-07-01. PM rerun: make check 93 + integration 17 + coverage 96.66% + drift clean + T11 regression green. ② SSOT coherence verified 4 sites. |
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
-| T16 | Visits list + verify-manual                               | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (full V1–V6, §2, 2026-07-02) — PM rerun: make check 205 (no-Docker) + coverage 98.01% + drift clean + merge dry-run CLEAN + tx atomicity/422/404 no-mutate. **Merge `feat/visits-list-verify` @ `1c502f3`.** Unblocks T17+T18. Awaiting PO merge. |
+| T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
+| T17 | Visit reject + failed_3x override                         | assigned     | —              | Issued §2 (2026-07-02). Extends `visits/`, reuses T16 transition tx + `deriveCheckout`. `/reject` + `/approve-manual`. Awaiting PLAN. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1078,6 +1080,30 @@ Verified by **my own rerun** on `feat/visits-list-verify` @ `1c502f3` (rebased o
 - → §1 tracker updated (approved); PARENT §1 T16 → approved; roll-up PARENT §2. **T16 merge unblocks T17 + T18.**
 
 Clean, well-reasoned (the optimistic-concurrency guard + TZ seam are exactly right). **T16 closed — visits module complete.** 🟢
+
+---
+
+### ASSIGNMENT T17 — Visit reject + failed_3x override — issued by PM B (Nathan) 2026-07-02 (H14)
+- Branch: `feat/visits-reject-override` (off latest main — includes merged T16 visits module) · Routed from PARENT §1 T17 = MVP §1.2 **B7** · Spec: `02-hotel-core.md §1.3` (endpoints L100-101 + failed_3x flow L113-115) + §2.3 DDL (`visits`)
+- Dependency: **T16 ✅ merged.** **Extends `src/modules/visits/`** (you own it; single-task, no collision). **Reuse** T16's transition tx pattern + `deriveCheckout` + canonical serializer + `BusinessRuleError` — do NOT duplicate.
+- **Inherited floor** (verified at SUBMIT): tenant guard via `TenantContext` (gm_admin-only); `AppError` only; correlationId; module layout; no cross-module import; zod; ≥80% cov; `make check`+integration green; drift 0. `ctx.userId` available (DEP-5). No prisma-generate workaround needed.
+
+**Scope (2 endpoints, role `gm_admin`)**
+- `PATCH /api/visits/:id/reject` — reject a `pending_verification` visit → status `rejected`. (Dedicated endpoint; same transition as T16's verify-manual reject-mode — **reuse the shared transition tx**, don't fork the logic. Q-CONTRACT-15 = backend's call: both paths coexist.)
+- `PATCH /api/visits/:id/approve-manual` `{ guest_name, room_number, nights? }` — **failed_3x override**: approve a `failed_verification` visit → status `checked_in`. Different source-state than verify-manual (that's from `pending_verification`).
+
+**DoD**
+- [ ] R1 — `/reject`: `pending_verification → rejected`, atomic status-guarded tx (reuse T16's `verifyManualTx`-style guard + `count===0` re-resolve 404/422). Invalid source-state → `BusinessRuleError(422)` `details.rule='INVALID_VISIT_TRANSITION'`.
+- [ ] R2 — `/approve-manual`: **`failed_verification → checked_in`** only (invalid source → 422). `nights?` optional; if provided, derive checkout via the existing `deriveCheckout(checkIn, nights, config.TZ)`; `room_number`/`guest_name` handled like T16 (guest_name **validate-only**, no cross-write to `guests`).
+- [ ] R3 — **Generalize the visit transition guard**: T16 has a `pending_verification`-specific assert. Extend it to a small **module-local transition map** (`pending_verification→{rejected,checked_in}`, `failed_verification→{checked_in}`) so both T16's and T17's transitions validate through one source (§4.2-style; still module-local — do NOT import tickets' state-machine). Refactor is fine; **T16's existing tests must stay green**.
+- [ ] R4 — tenant guard + 404 (cross-tenant `assertHotelOwnership`); gm_admin (super_admin bypass). Audit + `verification:resolved` (T20) via the existing no-op seams; `actorUserId=ctx.userId`.
+- [ ] R5 — tests: unit (transition map, checkout on approve-manual) + integration (reject a pending → rejected; approve-manual a failed_verification → checked_in; **invalid source-state → 422 no-mutate**; cross-tenant 404 no-mutate; tx atomicity). ≥80% cov. `make check`+integration green.
+
+**Open Q**: Q-B-12 (if any) — does `/reject` accept an optional reason/note? And does `approve-manual` require `nights` or default it? Propose in PLAN against §1.3 + FE MSW; don't guess.
+
+**Session-start gate**: identity, read §1.3 (reject/approve-manual + failed_3x flow) + the merged `visits/` module (reuse points), `make typecheck`/`make lint` clean. Then PLAN. **No code before PM B ACK.**
+
+Awaiting exec-B PLAN for T17.
 
 ---
 
