@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T05 APPROVED (`feat/foundation-seed-hotel-core` @ `cdd1ed5`, awaiting PO merge). PM A pauses + awaits PO direction. Both durable-pattern mitigations held (branch-slip 2nd consecutive not-recurring + verify-before-act strongest efficacy yet).
-- **Branch (last active task)**: `feat/foundation-seed-hotel-core` @ `cdd1ed5` — awaiting PO merge.
-- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03 (all merged to main) · **T05** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T08 multipart upload utility (main queue continuation) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T05 merged (PO commit `2c9eb27`).
+- **Branch (current active task)**: `feat/foundation-multipart-upload` (per PO branch-per-task policy)
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 main-queue FIRST per PO directive)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 multipart (next main-queue)** · T09 CSV · T10 workers · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts), docs/TESTING.md (planning), T-INFRA-05+ (backlog only).
+- **My queue (open triage restored, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 multipart (assigned, active)** · T09 CSV · T10 workers · T-INFRA-04 (elective, PO ratification for option a/b/c) · DEP-4 api.ts bootstrap (defer until T10 done per PO) · docs/TESTING.md (planning territory).
 
 ---
 
@@ -37,7 +37,7 @@
 | T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
-| T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
+| T08 | Multipart upload utility (S3 / R2 abstraction)             | assigned | — | Main-queue continuation. Ships port + adapter per ADR-0001. Home `src/core/storage/`. Scope: object-storage port + S3Adapter (AWS SDK v3) + InMemoryAdapter for tests. New dep `@aws-sdk/client-s3` — PO ratification required. Signed URLs deferred to T08-slice-2. |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
@@ -3279,6 +3279,113 @@ Matches PLAN + SUBMIT exactly. ✓
 PM A pauses + awaits PO next-task direction (should be straight-line T08 per PO directive, but confirming before draft).
 
 Ship it.
+
+### ASSIGNMENT T08 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-multipart-upload` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T08 (PO relaxed to open triage, main-queue preferred default; PM A picks T08 per numeric queue order + CLAUDE.md §4 port+adapter pattern demonstration value)
+- Depends on: T-INFRA-01 ✓ (real Prisma client), T-INFRA-02 ✓, T05 ✓ (all foundation healthy)
+- Downstream consumer: Satrio **T22** (menu image upload) + **T24** (knowledge attachment). No imminent Nathan consumer.
+- Spec / reference (WAJIB read before PLAN):
+  - `CLAUDE.md §4` — Hexagonal Disiplin: external HTTP/object storage → port + adapter WAJIB
+  - `docs/decisions/0001-hexagonal-disiplin.md` — ADR
+  - `src/core/http/http-client.ts` — existing external-IO wrapper location pattern (currently a stub, but location convention is set)
+  - `src/core/config/env.ts:59` — commented placeholder `// S3_BUCKET: z.string().min(1)` already anticipates S3 config
+  - `docs/spec/02-hotel-core.md §2.4/§2.6` — menu image + knowledge attachment consumer contracts
+
+#### PM A notes untuk exec-A
+
+**Scope — T08 slice-1 (upload + delete only; signed URLs deferred to slice-2)**
+
+Ship the object-storage abstraction primitives per ADR-0001 port + adapter pattern:
+
+1. **Port interface** at `src/core/storage/object-storage.port.ts`:
+   ```ts
+   export interface ObjectStoragePort {
+     upload(input: {
+       key: string;
+       body: Buffer;
+       contentType?: string;
+     }): Promise<{ url: string; key: string }>;
+     delete(key: string): Promise<void>;
+   }
+   ```
+2. **S3Adapter** at `src/core/storage/s3-adapter.ts` — AWS SDK v3 wrapper (works with AWS S3 + Cloudflare R2 + MinIO — all S3-API-compatible). Config via env; fail-lazy at first upload if bucket/creds missing (NOT fail-fast at construction).
+3. **InMemoryAdapter** at `src/core/storage/in-memory-adapter.ts` — Map-based storage for tests + local dev without AWS credentials. `upload` returns `memory://<key>` fake URL. `delete` removes from Map. Enables Satrio's future consumer tests to inject this instead of mocking SDK.
+4. **Env schema additions** — 5 OPTIONAL fields added to `EnvSchema` in `env.ts` under `// Service-specific` section (following the commented boilerplate hint at line 59): `S3_ENDPOINT?`, `S3_REGION?`, `S3_BUCKET?`, `S3_ACCESS_KEY_ID?`, `S3_SECRET_ACCESS_KEY?`.
+
+**Design decisions (PM A ratified, no rebuttal expected but PO decision points flagged as advisories)**
+
+- **Signed URLs deferred to T08-slice-2** — this slice = public bucket upload + delete only. Signed URL generation (`getSignedUrl`) requires additional dep `@aws-sdk/s3-request-presigner` and only becomes valuable when a private-object consumer emerges. Menu images and KB attachments are public-facing anyway (guest-visible in UI). Scope tightening keeps slice-1 clean.
+- **Fail-lazy env config** — S3 env vars OPTIONAL in zod schema. S3Adapter throws `ExternalServiceError` at first upload/delete if config missing. Rationale: app should boot without S3 creds (dev, tests, seed scripts don't need upload). Fail-fast at construction would break `loadConfig()` for any non-upload workflow.
+- **Home path `src/core/storage/`** — mirrors `src/core/http/` pattern (external IO wrapper). Rejected `src/modules/uploads/` (would create a business-module without a service, awkward) and `src/shared/storage/` (shared is for pure fns per T06 precedent; storage is stateful).
+- **Content-Type**: OPTIONAL parameter, caller passes what they know. No auto-detection from filename in slice-1 (adds complexity + code paths). Future slice-2 can add detection helper if consumers want it.
+- **S3 config env names** follow `S3_*` prefix (AWS convention). For R2 usage, consumer sets `S3_ENDPOINT` to R2 endpoint URL — same SDK, endpoint swap.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+
+- **New dep `@aws-sdk/client-s3` requires PO ratification per CLAUDE.md §11**. See Adv #1 for options + PM A default recommendation. If exec-A gets to code and PO hasn't ratified in the ACK cycle, STOP + escalate.
+- **No wrap-Prisma-style anti-pattern** — adapter is legitimately swapping external IO per ADR-0001; this is the CORRECT use of port + adapter (unlike wrapping Prisma which ADR forbids)
+- **No `any` / `console.log/info/debug` / `throw new Error(` / default export** — adapter throws `ExternalServiceError` on SDK errors (per `AppError` hierarchy)
+- **`import type` for AWS SDK where possible** — avoid unnecessary runtime pulls if type-only usage suffices
+- **Do NOT ship signed URLs in this slice** — explicitly deferred to slice-2
+- **Do NOT touch `src/core/http/http-client.ts`** — its stub-state is a separate hygiene concern out of T08 scope
+- **Do NOT touch Slot B modules / T05 seed / other core/ folders** — pure T08-scope changes
+- **`env.ts` additions must be OPTIONAL** — required fields break `loadConfig()` for existing consumers
+- **Explicit return types** on all public port + adapter methods
+- **Pure fn where possible** (utility helpers within adapter); side-effects only in the actual SDK calls
+
+**Files to create (5) + modify (2)**
+
+Create:
+- `src/core/storage/object-storage.port.ts` — port interface (~20 LOC + JSDoc)
+- `src/core/storage/s3-adapter.ts` — S3Adapter class (~80 LOC + JSDoc; SDK setup, upload PutObjectCommand wiring, delete DeleteObjectCommand wiring, error translation to ExternalServiceError)
+- `src/core/storage/in-memory-adapter.ts` — InMemoryAdapter class (~40 LOC; Map-based storage, fake URL generation)
+- `src/core/storage/__tests__/in-memory-adapter.test.ts` — 5-6 unit tests (upload happy path, delete happy path, delete missing key idempotent, url shape, contentType propagation)
+- **Optional S3Adapter test**: skip or ship minimal SDK-mocked smoke test (~40 LOC). Exec-A discretion; justify in PLAN.
+
+Modify:
+- `src/core/config/env.ts` — add 5 optional S3 env vars under `// Service-specific` section (line 55-61); reuse the existing commented `S3_BUCKET` hint pattern
+- `package.json` — add `@aws-sdk/client-s3` as dep (NOT devDep; runtime); + `pnpm-lock.yaml` auto-update
+
+**T08 DoD**
+- [ ] `ObjectStoragePort` interface exported from `@core/storage/object-storage.port.js` with `upload` + `delete` methods (+ input/output types)
+- [ ] `S3Adapter` class implements the port; env-driven S3 config; throws `ExternalServiceError('S3', ...)` on SDK errors; throws `ExternalServiceError('S3', 'not configured', ...)` if env missing at first upload/delete
+- [ ] `InMemoryAdapter` class implements the port; Map-based storage; `upload` returns `memory://<key>`; `delete` removes from Map (idempotent — deleting missing key is no-op, not error)
+- [ ] `env.ts` has 5 OPTIONAL S3 fields; `loadConfig()` still succeeds without any of them (existing tests still pass)
+- [ ] Test suite for `InMemoryAdapter`: upload happy path + delete happy path + delete missing key idempotent + URL shape verification + contentType propagation. ≥ 90% coverage on `in-memory-adapter.ts`
+- [ ] `package.json` has `@aws-sdk/client-s3` in `dependencies` (not devDependencies)
+- [ ] `pnpm install` runs cleanly; no peer-dep warnings for S3 SDK
+- [ ] `make check` PASS with 165-170 total tests (160 baseline + ~5-6 new InMemory tests) — exact count in SUBMIT
+- [ ] Drift scans clean on all 5 new files (0 `any`, 0 `console.log/info/debug`, 0 `throw new Error(`, 0 default export)
+- [ ] `git diff main -- prisma/ src/modules/ src/plugins/ src/shared/ docs/ tests/ Makefile jest.config.ts tsconfig.json` = empty (T08 stays in `src/core/storage/` + `env.ts` + `package.json` + `pnpm-lock.yaml`)
+- [ ] JSDoc on `S3Adapter` documents R2 usage (set `S3_ENDPOINT` to R2 URL) + signed URL deferral note (slice-2)
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **New dep `@aws-sdk/client-s3` — PRE-RATIFIED by PO before PLAN (Slot A directive 2026-07-02 H0)**. PO accepted PM A option (a) at ASSIGNMENT ACK stage, saving a round-trip. Rationale PO documented: standard modular tree-shakeable SDK; S3/R2/MinIO compatible via `S3_ENDPOINT`; industry default per CLAUDE.md §2 stack posture; alternatives (minio SDK — locks in less R2-friendly patterns; direct HTTP+SigV4 — more code + more bugs) rejected. **Exec-A: `pnpm add @aws-sdk/client-s3` is authorized** — proceed without further gating. Modular imports still MANDATORY per Adv #4 (only `S3Client` + `PutObjectCommand` + `DeleteObjectCommand`, no whole-namespace pulls).
+
+2. **Signed URLs scope-deferral rationale for slice-2** — PLAN should acknowledge that `getSignedUrl` is intentionally OUT of scope for slice-1 (public bucket assumption). If exec-A discovers Satrio T22 spec actually requires signed URLs, escalate as GAP.
+
+3. **Env schema fail-lazy design** — verify that S3 env vars added as `.optional()` on the zod schema. Test: run `pnpm test:unit` after schema change — all existing tests should still pass (loadConfig doesn't require S3 vars). If any test fails due to schema validation, wrong pattern (need `.optional()` not `.min(1)`).
+
+4. **AWS SDK v3 modular imports** — v3 has per-command sub-packages. For our slice, we need `S3Client`, `PutObjectCommand`, `DeleteObjectCommand`. Import ONLY these to minimize bundle:
+   ```ts
+   import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+   ```
+   Do NOT import the whole `AWS` namespace or aggregated sub-package. Verify in PLAN.
+
+5. **`ExternalServiceError` shape for SDK errors** — CLAUDE.md §5.4 requires AppError subclass. Verify `ExternalServiceError` at `src/core/errors/app-errors.ts:61-72` accepts `(service, message, upstream?)` — yes it does. Adapter wraps SDK errors: `throw new ExternalServiceError('S3', err.message, { status: err.$response?.statusCode, body: err.$metadata })`. Include upstream metadata for Sentry.
+
+6. **InMemoryAdapter idempotent `delete`** — deleting a missing key should be no-op (matches S3 API behavior: `DeleteObjectCommand` returns 204 for non-existent keys, doesn't throw). Ensure InMemoryAdapter mirrors this semantic. Test explicitly.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T08 → approved
+  - Post roll-up to PARENT §2
+  - Notify PO to merge
+  - Note in PARENT §10: `core/storage/` port + adapter primitives now live; Satrio T22/T24 consumers can `import { ObjectStoragePort, S3Adapter, InMemoryAdapter } from '@core/storage/*.js'` when he onboards
+
+Awaiting **PLAN T08** from exec-A. **PO PRE-RATIFIED `@aws-sdk/client-s3` at ASSIGNMENT ACK** — exec-A authorized to `pnpm add @aws-sdk/client-s3` directly, no ratification gating needed. Modular imports still mandatory per Adv #4.
 
 <!--
 TEMPLATE — copy untuk task baru:
