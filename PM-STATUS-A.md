@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T09 APPROVED (`feat/foundation-csv-import` @ `814a5f5`, awaiting PO merge). PM A pauses + awaits PO direction. Two durable-pattern mitigations continue holding — branch-slip 4th consecutive not-recurring + verify-before-act 8th consecutive clean-ACK PLAN.
-- **Branch (last active task)**: `feat/foundation-csv-import` @ `814a5f5` — awaiting PO merge.
-- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08 (all merged to main) · **T09** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T10 workers harness (LAST main-queue T01-T10 task) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T09 merged (PO commit `1822568`). PO direct direction (no triage cycle).
+- **Branch (current active task)**: `feat/foundation-workers-harness` (per PO branch-per-task policy)
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08, T09 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · **T09 ✅** · T10 workers (LAST main-queue task, expected next) · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
+- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · T09 ✅ · **T10 workers (assigned, active — LAST main-queue)** · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 api.ts bootstrap (per PO gate — now unblocked post-T10), docs/TESTING.md (planning), T07-slice-2+ (deferred on demand), redis-client.ts stub (deferred to future cache task).
 
 ---
 
@@ -39,7 +39,7 @@
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-multipart-upload` @ `50ec906` — **awaiting PO merge**. 5 new files under `src/core/storage/` (port + S3Adapter + InMemoryAdapter + 2 tests) + env.ts additive + `@aws-sdk/client-s3` dep. `make check` **212/1/213** (Nathan baseline shift 160→205 caught cleanly by exec-A). InMemoryAdapter 100% coverage; S3Adapter fail-lazy paths only per hexagonal principle. Modular imports verified (3 named). Drift 0 (2 false positives verified). Branch-slip mitigation held 3rd consecutive. |
 | T09 | CSV import utility (used by menu + knowledge)              | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-csv-import` @ `814a5f5` — **awaiting PO merge**. 2 new files (csv-parser.ts 196 LOC + test 178 LOC, 15 tests). csv-parser.ts **97.18% coverage** (exceeds ≥ 90% DoD). `make check` **278/1/279** (baseline 263 + 15 new — Nathan +51 delta since T08 caught cleanly by exec-A). Test #15 Adv #4 UX edge case: exact `errors[0].line === 5` + `rowIndex === 1` assertion. Uncovered lines 126-127 verified as defensive QuoteInQuoted lenient-recovery (NOT silent bug). Drift 0. Branch-slip mitigation 4th consecutive not-recurring. |
-| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
+| T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | assigned | — | LAST main-queue T01-T10 task. Implements existing `bull-factory.ts` stub. Slice-1: createQueue + registerWorker + shutdownAllQueues + SIGTERM/SIGINT handler (T-INFRA-01 pattern). No new deps. PO ratified naming `<domain>.<action>`. `redis-client.ts` stub untouched (future concern). Port+adapter deferred to slice-2. |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
 | T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-business-rule-error` @ `b214743` — **awaiting PO merge**. 2 files (app-errors.ts append + fresh test file, 6 new tests). 150 tests pass on branch (+6 vs 144 baseline). Drift clean. 9 existing classes untouched (verified via git diff = pure `+`). Cherry-pick transparency clean (origin/main never touched by code). PARENT §10 DEP-6 resolved. |
 
@@ -4449,6 +4449,141 @@ Exec-A caught Nathan velocity delta cleanly (T08 baseline 212 → T09 baseline 2
 PM A pauses + awaits PO next-task direction. Straight-line **T10 workers** expected per numeric queue order.
 
 Ship it.
+
+### ASSIGNMENT T10 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-workers-harness` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T10 (PO direct direction post-T09 merge, no triage cycle — LAST main-queue T01-T10 task)
+- Depends on: foundation healthy (T01-T09 + T-INFRA-01/02/03 all merged); env vars ready (REDIS_URL / REDIS_QUEUE_DB / WORKER_CONCURRENCY_DEFAULT all in `env.ts`)
+- Downstream consumer: Nathan's future notification worker + Satrio's daily brief + escalation worker (all Slot B/C future tasks) — no imminent, but harness shape sets contract
+- Spec / reference (WAJIB read before PLAN):
+  - `src/core/queue/bull-factory.ts` — **existing boilerplate stub** with `queueFactory = {} as unknown as Record<string, unknown>` placeholder + TODO markers. Replace body with real impl (matches T-INFRA-01's prisma-client.ts pattern: stub → real singleton).
+  - `src/core/redis/redis-client.ts` — **also stub, but OUT OF T10 SCOPE** (separate concern for future cache/rate-limit task). DO NOT touch.
+  - `src/core/config/env.ts` — REDIS_URL (line 30), REDIS_QUEUE_DB (line 31), WORKER_CONCURRENCY_DEFAULT (line 53) already defined
+  - `src/core/prisma/prisma-client.ts` — T-INFRA-01 pattern for stub → real singleton + signal handler (`void shutdown()` wrapping, `NODE_ENV !== 'test'` guard) — CROSS-TASK CONSISTENCY reference
+  - `package.json` — `bull ^4.16.3` + `ioredis ^5.3.2` already present, no new deps
+  - `docs/spec/02-hotel-core.md §4` — spec-referenced workers (escalation, auto-close, notification fanout, WA batch send) — harness must support these consumer patterns
+
+#### PM A notes untuk exec-A
+
+**Scope — T10 slice-1 (harness surface only; consumer worker wiring per B/C tasks; port+adapter deferred to slice-2)**
+
+Replace `bull-factory.ts` stub with real Bull queue harness. 4 named exports + 1 internal signal handler:
+
+```ts
+// src/core/queue/bull-factory.ts
+
+import Bull, { type Queue, type ProcessCallbackFunction, type JobOptions } from 'bull';
+import { loadConfig } from '@core/config/env.js';
+
+export interface QueueConfig {
+  readonly attempts?: number;              // default 3
+  readonly backoff?: { readonly type: 'exponential' | 'fixed'; readonly delay: number };  // default { type: 'exponential', delay: 5000 }
+  readonly removeOnComplete?: number | boolean;  // default 100 (keep last N for observability)
+  readonly removeOnFail?: number | boolean;      // default 500
+}
+
+/**
+ * Create a Bull queue with sensible defaults. Adds to internal registry
+ * for shutdownAllQueues() coordination.
+ *
+ * Queue naming convention (PO ratified): `<domain>.<action>`
+ *   e.g. `notification.send`, `escalation.check`, `email.retry`
+ */
+export function createQueue<TData>(name: string, config?: QueueConfig): Queue<TData>;
+
+/**
+ * Register a job processor for the queue with configured concurrency.
+ * Defaults to WORKER_CONCURRENCY_DEFAULT from env.
+ */
+export function registerWorker<TData>(
+  queue: Queue<TData>,
+  processor: ProcessCallbackFunction<TData>,
+  concurrency?: number,
+): void;
+
+/**
+ * Gracefully close all queues created by this factory.
+ * Called by SIGTERM/SIGINT handler; can also be called explicitly by consumers.
+ */
+export function shutdownAllQueues(): Promise<void>;
+```
+
+**Behavior details**:
+- **Redis config**: `{ redis: config.REDIS_URL, db: config.REDIS_QUEUE_DB }` via `loadConfig()`. Bull manages own connections (no share with `redis-client.ts` singleton — which stays stub anyway).
+- **Default JobOptions merge**: factory-level defaults + caller-provided overrides. Sensible defaults per Bull docs recommendation.
+- **Internal registry**: module-level `Map<string, Queue<unknown>>` tracks all created queues by name. Duplicate name = throw `ConflictError` (via AppError subclass) OR return existing? PM A recommendation = throw (fail-fast on config bug; caller shouldn't create same name twice).
+- **Signal handlers**: SIGTERM + SIGINT registered ONCE at module load, guarded by `NODE_ENV !== 'test'` (matches T-INFRA-01 pattern exactly). Handler calls `void shutdownAllQueues()` — sync arrow wrapping async per `no-floating-promises` + `no-misused-promises` (matches T-INFRA-01 + T05 + T09 pattern).
+- **`shutdownAllQueues()`**: iterate registry, call `.close()` on each queue, `await Promise.all(...)`. Clear registry after.
+
+**Design decisions ratified**
+
+- **Slice-1 = harness only** — no port+adapter (defer to slice-2 if consumers want swap-ability). No real Redis integration test (defer to consumer integration tests when Nathan/Satrio wire real workers with testcontainers).
+- **`redis-client.ts` UNTOUCHED** — separate future concern for cache/rate-limit consumers. Single-concern PR discipline (9+ consecutive tasks).
+- **Own Bull-managed Redis connections** — matches T05's own-PrismaClient pattern (bounded, config-driven, not sharing the app-wide singleton).
+- **Queue naming `<domain>.<action>` (dot)** — PO ratified. Boilerplate JSDoc currently says `<module>:<job-type>` (colon at line 5) — **update JSDoc to dot notation as part of T10** (cross-task hygiene).
+- **Signal handler ADDITIVE not replacing** — Node allows multiple listeners per signal. If T-INFRA-01's prisma-client already registered SIGTERM, this one runs alongside (both `disconnect` prisma + `close` queues on shutdown). Verify no conflict.
+- **Test strategy: lazy Bull.Queue construction** — Bull constructs Queue objects without immediately connecting to Redis. Unit tests assert `.name`, `.opts.defaultJobOptions`, `.opts.settings` etc. without spinning Redis. Same hexagonal justification as T08 S3Adapter (external SDK behavior tested by consumer integration tests, not adapter unit tests).
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — bull + ioredis already in `package.json`
+- **No `any`** — use Bull's TS generics (`Queue<TData>`, `ProcessCallbackFunction<TData>`, `JobOptions`)
+- **No `console.log/info/debug`** — no logging in factory (consumers add logging in their processors)
+- **No `throw new Error(`** — use `ConflictError` (`AppError` subclass) for duplicate-queue-name, `ExternalServiceError('Redis', ...)` if config-check surfaces issues
+- **No default export** — named exports only
+- **Do NOT touch `src/core/redis/redis-client.ts`** — separate future concern
+- **Do NOT touch `src/core/prisma/prisma-client.ts`** — T-INFRA-01 code stays as-is
+- **Do NOT touch any other `src/` file, `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`, `package.json`, `pnpm-lock.yaml`**
+- **Explicit return types** on all public fns (`Queue<TData>`, `void`, `Promise<void>`)
+- **Reuse `loadConfig()`** for env access — do NOT re-parse zod schema, do NOT read `process.env` directly (except for `NODE_ENV` in signal-handler guard, matching T-INFRA-01 idiom)
+- **Update boilerplate JSDoc queue-naming convention** from `<module>:<job-type>` to `<domain>.<action>` (PO ratified) — minor doc fix within same file
+
+**Files to modify** (1) + **create** (1)
+- Modify: `src/core/queue/bull-factory.ts` — replace stub body with real impl (~100 LOC + JSDoc); update queue-naming JSDoc convention
+- Create: `src/core/queue/__tests__/bull-factory.test.ts` — 6-8 unit tests (~120 LOC)
+
+**T10 DoD**
+- [ ] `createQueue<TData>(name, config?)` returns `Bull.Queue<TData>` instance
+- [ ] Default JobOptions applied: `attempts: 3`, `backoff: { type: 'exponential', delay: 5000 }`, `removeOnComplete: 100`, `removeOnFail: 500`
+- [ ] Caller-provided config overrides defaults correctly (test proof — pass partial config, verify merged shape)
+- [ ] Redis config sourced from `loadConfig()` (REDIS_URL + REDIS_QUEUE_DB) — verified via read of `queue.opts.redis`
+- [ ] Duplicate queue name throws `ConflictError` (test proof)
+- [ ] `registerWorker<TData>(queue, processor, concurrency?)` accepts + delegates to `queue.process(...)` — test proof (mock processor + assert queue's internal handler registered, or verify via spy pattern)
+- [ ] Default concurrency = `WORKER_CONCURRENCY_DEFAULT` from env when not specified
+- [ ] `shutdownAllQueues()` iterates registry + calls `.close()` on each — test proof (create queues, call shutdown, verify registry emptied + `.close()` calls made)
+- [ ] Signal handlers registered ONLY when `NODE_ENV !== 'test'` (test-time: no signal handler registered — verify via `process.listenerCount('SIGTERM')` before/after import)
+- [ ] JSDoc queue-naming convention updated to `<domain>.<action>` (dot notation) per PO ratification
+- [ ] Test coverage ≥ 90% on `bull-factory.ts`
+- [ ] `make check` PASS with baseline + 6-8 new tests
+- [ ] Drift scans clean (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export)
+- [ ] `git diff main -- src/core/redis/redis-client.ts src/core/prisma/prisma-client.ts` = **empty** (stubs+singleton untouched)
+- [ ] `git diff main --name-only -- prisma/ docs/ package.json pnpm-lock.yaml Makefile jest.config.ts tsconfig.json` = **empty** (no dep, no schema, no config)
+- [ ] `git diff main --name-only -- src/plugins/ src/modules/ src/shared/ src/core/config/ src/core/errors/ src/core/http/ src/core/storage/` = **empty** (T10 stays in `src/core/queue/`)
+- [ ] Branch-slip mitigation: **5th consecutive task** (T-INFRA-03/T05/T08/T09/T10) — `git branch --show-current` verify pre-commit + pre-code
+- [ ] Nathan velocity baseline reconciliation captured cleanly in SUBMIT per T08+T09 discipline (main-only baseline + delta math)
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **redis-client.ts stub UNTOUCHED — single-concern PR**. Even though redis-client.ts is a stub and Bull needs Redis, the correct pattern is Bull manages its OWN connections via config URL. `redis-client.ts` is for future cache/rate-limit consumers (unrelated concern). Confirm in PLAN that grep `@core/redis/redis-client` returns 0 hits in your final bull-factory.ts. If you find yourself wanting to import the redis-client, STOP — that's scope creep.
+
+2. **Queue naming convention update in JSDoc** — boilerplate `bull-factory.ts:5` says `<module>:<job-type>` (colon). PO ratified `<domain>.<action>` (dot). Update the JSDoc as part of T10 to match ratified convention. Consumer tasks (Nathan notifications, Satrio daily brief) will follow PO convention. Small doc fix within same file — NOT scope creep, it's alignment.
+
+3. **Signal handler additive vs replacing — verify via `process.listenerCount()`** — T-INFRA-01's prisma-client registered SIGTERM/SIGINT handlers. Your bull-factory should ADD listeners (Node allows multiple), not replace. Verify no conflict: on process shutdown, BOTH prisma disconnect AND queue shutdown should run. Test explicitly if you can (create a test-mode listenerCount check — but the `NODE_ENV !== 'test'` guard means the handler doesn't register at test time, so this test is impossible in unit form; assert instead that guard is present).
+
+4. **Bull.Queue lazy construction — no Redis connection in unit tests** — Bull constructs Queue objects without immediately connecting. Verify by creating a queue in a test WITHOUT Redis running. If test hangs or errors on connect, factory is doing something eager (like `queue.isReady()`) — REMOVE. Tests should assert `.name`, `.opts.defaultJobOptions`, `.opts.settings` etc. without any network I/O.
+
+5. **`ConflictError` for duplicate queue name — verify class exists at `@core/errors/app-errors`**. Grep `export class ConflictError` in `src/core/errors/app-errors.ts` — should return 1 hit (T07-slice-1 didn't touch it; it was in original boilerplate). If missing, escalate as GAP (would need PM A ratification to add — but I recall it being there).
+
+6. **Signal handler test strategy — guard-only assertion** — Because signal handlers only register when `NODE_ENV !== 'test'`, we CAN'T easily unit-test the actual handler firing. Test instead: (a) `process.listenerCount('SIGTERM')` before + after importing the module in test mode = **unchanged** (guard prevents registration). (b) `shutdownAllQueues()` can be called directly + tested for behavior. This dual approach gives us guard-verification + shutdown-verification without needing to fire real signals.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T10 → approved
+  - Post roll-up to PARENT §2 with mitigation efficacy note (5th consecutive branch-slip absence + 9th consecutive clean-ACK PLAN)
+  - Notify PO to merge
+  - **T10 merge = MAIN-QUEUE T01-T10 COMPLETE** (major milestone worth explicit acknowledgment)
+  - Next Slot A queue: pause + await PO direction (T-INFRA-04 CI decision / DEP-4 api.ts bootstrap now unblocked / redis-client.ts stub cleanup / docs/TESTING.md / T07-slice-2+)
+
+Awaiting **PLAN T10** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
