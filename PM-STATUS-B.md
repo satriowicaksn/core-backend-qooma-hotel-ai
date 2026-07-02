@@ -44,7 +44,7 @@
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
-| T17 | Visit reject + failed_3x | 🟡 assigned (awaiting PLAN) — extends `visits/` | `feat/visits-reject-override` | — |
+| T17 | Visit reject + failed_3x | 🟡 wip (PLAN ACK'd) — extends `visits/` | `feat/visits-reject-override` | — |
 | T18 | Manual visit create | 🟢 unblocked on T16 merge (extends `visits/`) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
@@ -79,7 +79,7 @@
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
-| T17 | Visit reject + failed_3x override                         | assigned     | —              | Issued §2 (2026-07-02). Extends `visits/`, reuses T16 transition tx + `deriveCheckout`. `/reject` + `/approve-manual`. Awaiting PLAN. |
+| T17 | Visit reject + failed_3x override                         | wip          | —              | PLAN ACK'd 2026-07-02 (§2). R3 transition-map generalized (T16 byte-identical). Q-B-12 ruled (reject no-body, nights optional). Coding `feat/visits-reject-override`. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1147,6 +1147,21 @@ Two `gm_admin`-only endpoints, **extending the merged `src/modules/visits/`**: `
 
 Awaiting PM B ACK (PLAN + Q-B-12 reject-body / approve-manual-nights + R3 generalization approach). Not coding before ACK.
 
+##### PM B ACK — T17 PLAN APPROVED (2026-07-02, H14)
+Clean, well-reasoned reuse. **ACK — create `feat/visits-reject-override`, implement.** No required fixes.
+
+**R3 transition map — ENDORSED.** `VISIT_TRANSITIONS = { pending_verification: ['checked_in','rejected'], failed_verification: ['checked_in'] }` + `assertVisitTransition(from,to)`, module-local (not tickets' state-machine) ✓. The two-layer guard is exactly right: (1) pre-tx `assertVisitTransition(row.status, to)` throws `BusinessRuleError` for a truly-invalid target *before* writing (preserves T16's shape), (2) fixed expected-source into `verifyManualTx({from: EXPECTED})` so a map-valid-but-wrong-source → `count===0` → 422. **Requirement**: verify-manual (T16) must stay **byte-identical** through the generalized assert — I'll rerun T16's suites for regression at SUBMIT. The map is correctly scoped to the *manual-verification* transitions only (checkin/checkout/cancel are system-driven, out of T17 scope) — don't expand it.
+
+**Q-B-12 — both RULED:**
+- **(a) `/reject` takes no body** — APPROVED. No `visits` column for a reason + audit table deferred (Q-B-09) → nowhere to persist. `.strict()` empty body; add a reason when the audit table lands. Provisional on FE MSW (if FE sends `{action:'reject'}` on the dedicated route, ignore/strip — the `verify-manual {action:'reject'}` path already covers that shape; this dedicated route is the no-body variant per Q-CONTRACT-15 "both coexist").
+- **(b) `/approve-manual` `nights` OPTIONAL** — APPROVED. If provided → derive `check_out` via `deriveCheckout`; if absent → `check_out`/`nights` stay null, status still → `checked_in` (DDL allows both null). Correct.
+
+**Confirmed reuse (no forking):** `verifyManualTx` as-is (generic), `deriveCheckout`, `serializeVisit`, `BusinessRuleError`; guest_name validate-only (Q-B-08); `assertHotelOwnership`→404; gm_admin (super_admin bypass); `count===0` re-resolve 404/422; no-op audit + `onVerificationResolved` seams with `actorUserId=ctx.userId`.
+
+**At SUBMIT I verify:** R1–R5, the generalized transition map, **T16 regression green** (verify-manual byte-identical), invalid-source→422 no-mutate + cross-tenant→404 no-mutate + atomicity (integration), approve-manual checkout derivation, drift, `make check`+integration, ≥80% cov.
+
+Proceed. 🟢
+
 ---
 
 ### ASSIGNMENT T12 — Ticket status transition + reroute — issued by PM B (Nathan) 2026-07-02 (H14)
@@ -1421,6 +1436,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | T-CLEAN-01    | Promote `maskName` + `shouldMaskPii` to `@shared/utils/masking.ts`; refactor tickets + guests to consume (kill duplication). | follow-up (post-T14) | **queued (Slot B cleanup)** | Not in T14 PR. Requires guests' copy byte-identical to tickets' (enforced at T14 ACK). Do after guests lands to avoid coupling in-flight PRs. |
 | Q-B-10        | Guest messages: source, ordering, envelope. | T15 · §1.3 | **RESOLVED (PM ratify) 2026-07-02** | (a) aggregate `ticket_messages WHERE hotelId=ctx.hotelId AND ticket.guestId=:id` (guest-load + 404 guard); (b) **newest-first** `sent_at DESC,id DESC` (scrollback); (c) cursor `{data,pageInfo:{nextCursor,hasMore}}`. M4: no body masking. Provisional on FE MSW. |
 | T-CLEAN-02    | Promote base64 keyset cursor codec to `@shared/utils/` (T11 + T15 duplicate it). | follow-up (post-T15) | **queued (Slot B cleanup)** | Module-local for now; consolidate with T-CLEAN-01 as a post-CRM cleanup pass. |
+| Q-B-12        | T17 `/reject` body + `/approve-manual` nights. | T17 · §1.3 | **RESOLVED (PM ratify) 2026-07-02** | (a) `/reject` = no body (`.strict()`; reason deferred to audit table Q-B-09). (b) `approve-manual` `nights` OPTIONAL (derive checkout if present, else null). Provisional on FE MSW. |
 | Q-B-05        | Canonical `Visit` wire shape (T14 embeds, T16 owns). | T14/T16 · §2.3 DDL | **RESOLVED (PM ratify) 2026-07-01** | Pinned in §2 (13 fields from DDL §2.3). T16 owns serializer; T14 embeds same shape module-local. Unblocks T14 ∥ T16 parallel. Provisional on FE MSW. |
 | Q-B-07        | Notifications list + `unread-count` envelope. | T19 · §1.9 | **open** | exec-B propose per §2.7 + FE MSW in PLAN. |
 
