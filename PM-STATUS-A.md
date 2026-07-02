@@ -1733,6 +1733,37 @@ Test structure: `it.each` (single describe, many rows) preferred over `describe.
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T06 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+All 6 advisories resolved with concrete evidence. Bonus TS-level insight on Adv #6 is genuinely load-bearing (not just defensive).
+
+**Verified in PLAN**:
+- **Adv #1 (TicketStatus dup)** ✓ — sed-verified structurally identical to Nathan's `tickets.types.ts:3-11` (8 states, same order). Ships duplicate per design decision; no cross-module import needed.
+- **Adv #2 (BusinessRuleError availability)** ✓ — `grep 'export class BusinessRuleError' src/core/errors/app-errors.ts` = 1 hit at line 104. Import path proven from T07-slice-1's own test.
+- **Adv #3 (jest globbing precedent)** ✓ — same pattern as T07-slice-1's `src/core/errors/__tests__/`. Auto-discovery will confirm via `PASS src/shared/utils/__tests__/ticket-state-machine.test.ts` in SUBMIT.
+- **Adv #4 (hybrid matrix coverage)** ✓ — 40 tests: 13 `it.each` positive + 16 `it.each` terminal outbound + 3 individual invalid + 4 assert behavior + 2 boundary + 2 terminal state map. Rationale sound: lookup table = spec, full 64-pair adds noise not coverage. `it.each` over `describe.each` for cleaner jest output.
+- **Adv #5 (terminal states)** ✓ — 2 isolated map assertions (`.closed = []` / `.cancelled = []`) + 16 runtime-consequence rows.
+- **Adv #6 (nullish coalesce)** ✓ — **PM A independently verified TS constraint**: `tsconfig.json:29` has `"noUncheckedIndexedAccess": true`. Exec-A's insight is correct — `TICKET_TRANSITIONS[from]` returns `readonly TicketStatus[] | undefined`, so `.includes()` doesn't compile without `?? []` fallback. The nullish coalesce is a **typecheck requirement**, not just defensive-boundary. Elegant that runtime insurance and compile-time compliance are the same 4-char idiom. `assertValidTicketTransition` on unknown `from` correctly delegates → returns `false` → throws `BusinessRuleError` with `details.from = 'bogus_state'` (useful observability). 2 boundary tests included.
+
+**Scope match** ✓ — 2 files create (helper ~50 LOC + test ~120 LOC), 0 modify. Zero touch to Nathan's tickets module, T07-slice-1 error classes, other shared/utils files, plugins, or package.json. HARD constraints all upheld.
+
+**Design fidelity** ✓ — class shape, transition map, and JSDoc plan match ASSIGNMENT template exactly. All 8 states, 13 transitions (spec §5 lines 52-72), 2 terminal states correctly encoded.
+
+**Proceed to implementation on branch `feat/foundation-ticket-state-machine`.**
+
+**Note for future memory consolidation**: Adv #6 pattern (`?? []` fallback on `Record<K,V>` indexed access = both TS-level requirement AND runtime defense under `noUncheckedIndexedAccess: true`) is the FIRST explicit surface of this idiom in a Slot A ASSIGNMENT. Not memorializing yet — per my ≥2 emergences rule. If a future task (T05 seed, T08 multipart, T09 CSV, etc.) hits the same pattern, PM A will consolidate into `feedback_defensive_boundary_record_access.md` or similar.
+
+**SUBMIT expectations (reminders)**:
+- `make check` PASS with **~156+ tests** (150 baseline + ~40 new — wait, that's more like 40 total, PM count check: 150 + 40 = 190 total? Let me sanity-check math). Actually: 150 baseline includes all prior task tests. T06 adds ~40 tests. Expected: ~190 pass / 2 skipped / 192 total. Adjust if count differs — flag reason in SUBMIT.
+- New test suite `src/shared/utils/__tests__/ticket-state-machine.test.ts` visible in jest output (Adv #3 confirmation signal)
+- T03/T04/T-INFRA-01/T07-slice-1/T11/T13/T14/T15 all preserved green
+- 100% coverage on `ticket-state-machine.ts` (targeted `--collectCoverageFrom` if needed)
+- Drift scans clean on both files
+- `git diff package.json` empty
+- If any Slot B branch pushed mid-implementation touches `TicketStatus` shape (unlikely — no cross-import path), note compat status; no rework expected
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
