@@ -1025,6 +1025,44 @@ The blocker is gone: **`BusinessRuleError` (422) is now on main** (`core/errors/
 
 Awaiting exec-B PLAN for T12.
 
+### ASSIGNMENT T12 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/tickets-transition` (off latest main; created) · Routed from PARENT §1 T12 = MVP §1.2 B2
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T12 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+Two mutating endpoints, **extending `src/modules/tickets/`**: `PATCH /api/tickets/:id/status` (state-machine-validated, gm_admin + own-dept dept_head) and `PATCH /api/tickets/:id/department` (reroute, gm_admin-only). Each mutation + its `ticket_updates` audit row in one `$transaction`. Consume the merged `assertValidTicketTransition` — do NOT reimplement the table (§4.2).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.2` (state machine L50-74 + reroute + RBAC matrix §6) + §2.4 DDL (`ticket_updates` — `type`/`from_status`/`to_status`/`from_department_id`/`to_department_id`/`actor_user_id`/`note`); MVP §4.2 + §5 AC (dept_head reroute → 403); the merged `shared/utils/ticket-state-machine.ts` (`assertValidTicketTransition(from,to)` → `BusinessRuleError` `details.rule='INVALID_TICKET_TRANSITION'`) + `BusinessRuleError` (`app-errors.ts:104`, 422)
+- Dependency: T11 ✅ + T06 ✅ + DEP-6 ✅ all merged; extends tickets module.
+- `pnpm typecheck` + `pnpm lint` clean on `main` ✓. **Dropping the `pnpm prisma:generate` workaround** (T-INFRA-01 merged).
+- Scaffolder risk: **none**.
+
+**Files to modify** (all in `src/modules/tickets/`)
+- `tickets.schema.ts` — add `parseStatusUpdate` (`{ status: <8-enum>, note?: string }`) + `parseDepartmentUpdate` (`{ department_id: uuid, note?: string }`), `.strict()`.
+- `tickets.service.ts` — add `updateStatus(ctx, id, rawBody)` + `reroute(ctx, id, rawBody)`.
+- `tickets.repository.ts` — add `transitionStatusTx` + `rerouteTx` (status-guarded conditional `updateMany` + `ticketUpdate.create` in one `$transaction`) + `findDepartmentById`.
+- `tickets.routes.ts` — add `PATCH /tickets/:id/status` + `PATCH /tickets/:id/department`.
+- `tickets.types.ts` — add `StatusUpdate` / `DepartmentUpdate` domain types (responses reuse `TicketDetailResponse`).
+- `__tests__/` — extend service unit + routes component + integration (incl. the invalid-transition→422 negative test + dept_head-reroute→403).
+
+**Approach**
+- **status (TT1/TT2)**: load ticket (scoped `hotelId`, super_admin bypass) → 404 if missing/cross-tenant (`assertHotelOwnership`); dept_head cross-dept → 404 (`assertDeptOwnership`). Validate `to` via zod (8-enum). `assertValidTicketTransition(row.status as TicketStatus, to)` (consume merged helper; its runtime defense covers the DB-string cast) → invalid = 422 as-is. Then **one `$transaction`**: status-guarded `updateMany({ where:{ id, hotelId, status: from }, data:{ status: to } })` (count===1 confirms the transition won the race; 0 → re-resolve to 404/422, no lost update) + `ticketUpdate.create({ type:'status_change', fromStatus, toStatus, note, actorUserId })`.
+- **reroute (TT3/TT4)**: **gm_admin-only** — `dept_head` → `ForbiddenError` 403 (explicit domain guard in the service; belt-and-suspenders with T04's route RBAC, required by MVP §5 AC + testable now). Validate `department_id` (uuid); `findDepartmentById` must exist AND `hotelId===ctx.hotelId` else `NotFoundError('Department')`. One `$transaction`: update `departmentId` + `ticketUpdate.create({ type:'reroute', fromDepartmentId, toDepartmentId, note, actorUserId })`.
+- **response**: return the refreshed detail via the existing `serializeTicketDetail` (ticket + `updates[]` incl. the new audit row + `messages[]`) → `{ data: TicketDetailWire }` (reuse `TicketDetailResponse`), so FE gets the new status + timeline entry in one round-trip.
+- **socket (TT6)**: named no-op seam (`onTicketUpdated`/`onTicketRerouted`, default `() => {}` deps, like T11's `resolveUsers`) — T20 wires the real emit; not wired here.
+- **tenant/errors**: `AppError` subclasses only; `req.log`+correlationId; no cross-module import (dept read via Prisma, not the departments module).
+
+**GAP / open question**
+- **Q-B-11 — `actor_user_id` source (DEP-5 still open).** TT2/TT3 want `actor_user_id = ctx.userId`, but `TenantContext` **has no `userId`** on main (`tenant-guard.ts:22-26`; T-INFRA-02 submitted, not merged). Options: **(a)** wait for DEP-5 merge; **(b)** write `actor_user_id = null` interim (column is nullable — used for system/ai actors) behind a one-line seam + `// TODO(DEP-5)`, flip to `ctx.userId` when it lands. **My intent: (b)** — keeps T12 shippable now without coupling to unmerged T-INFRA-02 (same null-interim-+-seam pattern as GAP T11-#2); the audit row still records type/from/to/note, only the actor is deferred. Confirm (a) vs (b). (Also: should the status/reroute body accept an optional `note` for the audit row? I'm including it — flag if FE MSW omits it.)
+
+**Merge posture**: buildable + fully testable now (inject `ctx`); live once `api.ts` bootstrap wires `register(ticketsRoutes)` (DEP-4, foundation — untouched).
+
+Awaiting PM B ACK (PLAN + Q-B-11 actor decision + note-field confirm). Not coding before ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
