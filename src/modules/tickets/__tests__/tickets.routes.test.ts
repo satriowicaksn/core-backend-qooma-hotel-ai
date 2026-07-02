@@ -75,6 +75,9 @@ interface Recorder {
   detailId?: string;
   statsHit?: boolean;
   overdueHit?: boolean;
+  statusId?: string;
+  statusBody?: unknown;
+  rerouteId?: string;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -95,6 +98,19 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     overdue: (_ctx: TenantContext): Promise<OverdueListResponse> => {
       recorder.overdueHit = true;
       return Promise.resolve(OVERDUE_RESULT);
+    },
+    updateStatus: (
+      _ctx: TenantContext,
+      id: string,
+      body: unknown,
+    ): Promise<TicketDetailResponse> => {
+      recorder.statusId = id;
+      recorder.statusBody = body;
+      return Promise.resolve(DETAIL_RESULT);
+    },
+    reroute: (_ctx: TenantContext, id: string): Promise<TicketDetailResponse> => {
+      recorder.rerouteId = id;
+      return Promise.resolve(DETAIL_RESULT);
     },
   } as unknown as TicketsService;
 
@@ -119,6 +135,7 @@ const GM: TenantContext = {
   isSuperAdmin: false,
   role: 'gm_admin',
 };
+const ID = '11111111-1111-4111-8111-111111111111';
 
 describe('ticketsRoutes', () => {
   let app: FastifyInstance;
@@ -178,5 +195,39 @@ describe('ticketsRoutes', () => {
     expect(res.json()).toEqual(OVERDUE_RESULT);
     expect(recorder.overdueHit).toBe(true);
     expect(recorder.detailId).toBeUndefined();
+  });
+
+  it('should PATCH status and forward the id + body', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/tickets/${ID}/status`,
+      payload: { status: 'in_progress' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(recorder.statusId).toBe(ID);
+    expect(recorder.statusBody).toEqual({ status: 'in_progress' });
+  });
+
+  it('should PATCH department (reroute) and forward the id', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/tickets/${ID}/department`,
+      payload: { department_id: '22222222-2222-4222-8222-222222222222' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(recorder.rerouteId).toBe(ID);
+  });
+
+  it('should 401 on PATCH status without a tenant context', async () => {
+    app = buildApp(undefined, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/tickets/${ID}/status`,
+      payload: { status: 'in_progress' },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(recorder.statusId).toBeUndefined();
   });
 });

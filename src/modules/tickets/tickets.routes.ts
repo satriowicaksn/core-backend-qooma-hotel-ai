@@ -75,5 +75,27 @@ export const ticketsRoutes: FastifyPluginCallback<TicketsRoutesOptions> = (fasti
     return reply.send(result);
   });
 
+  fastify.patch('/tickets/:id/status', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    const id = parseTicketId(req.params);
+    req.log.info(
+      { module: 'tickets', action: 'status', ticketId: id, correlationId: correlationIdOf(req) },
+      'update ticket status',
+    );
+    const result = await service.updateStatus(ctx, id, req.body);
+    return reply.send(result);
+  });
+
+  fastify.patch('/tickets/:id/department', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    const id = parseTicketId(req.params);
+    req.log.info(
+      { module: 'tickets', action: 'reroute', ticketId: id, correlationId: correlationIdOf(req) },
+      'reroute ticket',
+    );
+    const result = await service.reroute(ctx, id, req.body);
+    return reply.send(result);
+  });
+
   done();
 };

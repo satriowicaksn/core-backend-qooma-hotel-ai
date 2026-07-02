@@ -3,17 +3,32 @@
 
 import type { Prisma } from '@prisma/client';
 
-import { AuthError, NotFoundError } from '@core/errors/app-errors.js';
+import {
+  AuthError,
+  BusinessRuleError,
+  ForbiddenError,
+  NotFoundError,
+} from '@core/errors/app-errors.js';
 
 import {
   assertDeptOwnership,
   assertHotelOwnership,
   type TenantContext,
 } from '@plugins/tenant-guard.js';
+import {
+  assertValidTicketTransition,
+  type TicketStatus,
+} from '@shared/utils/ticket-state-machine.js';
 
 import { notOverdueWhere, overdueWhere } from './tickets.overdue.js';
 import type { TicketsRepository } from './tickets.repository.js';
-import { encodeCursor, parseListQuery, parseOverdueQuery } from './tickets.schema.js';
+import {
+  encodeCursor,
+  parseDepartmentUpdate,
+  parseListQuery,
+  parseOverdueQuery,
+  parseStatusUpdate,
+} from './tickets.schema.js';
 import {
   serializeStats,
   serializeTicketDetail,
@@ -35,6 +50,13 @@ export interface TicketsServiceDeps {
   // Resolves Auth-owned user ids → { name, role }. Absent in dev (GAP T11-#2) →
   // assigned_to / actor_name / actor_role serialize as null.
   readonly resolveUsers?: (userIds: readonly string[]) => Promise<UserDirectory>;
+  // Socket emit seams — T20 wires the real gateway; default no-op (TT6).
+  readonly onTicketUpdated?: (evt: { ticketId: string; changed: readonly string[] }) => void;
+  readonly onTicketRerouted?: (evt: {
+    ticketId: string;
+    fromDepartmentId: string;
+    toDepartmentId: string;
+  }) => void;
 }
 
 // Tenant + dept scope arms — the single scope implementation reused by the list,
@@ -191,6 +213,80 @@ export class TicketsService {
     const dir = await this.resolveDirectory(page.map((r) => r.assignedUserId));
     const data = page.map((r) => serializeTicketListItem(r, ctx, dir, now));
     return { data, pageInfo: { nextCursor: null, hasMore } };
+  }
+
+  async updateStatus(
+    ctx: TenantContext,
+    id: string,
+    rawBody: unknown,
+  ): Promise<TicketDetailResponse> {
+    const { status: to, note } = parseStatusUpdate(rawBody);
+    const row = await this.repo.findById(id);
+    if (!row) {
+      throw new NotFoundError('Ticket', id);
+    }
+    // Scope by the TICKET's hotel (super_admin acts cross-hotel); dept_head own-dept only.
+    assertHotelOwnership(ctx, row.hotelId, 'Ticket');
+    assertDeptOwnership(ctx, row.departmentId, 'Ticket');
+    // Consume the merged state machine (no reimplement, §4.2) → 422 on invalid.
+    assertValidTicketTransition(row.status as TicketStatus, to);
+
+    const count = await this.repo.transitionStatusTx({
+      id,
+      hotelId: row.hotelId,
+      from: row.status,
+      to,
+      note,
+      actorUserId: ctx.userId,
+    });
+    if (count === 0) {
+      // Optimistic-concurrency loss: the guarded update matched 0 rows.
+      const fresh = await this.repo.findById(id);
+      if (!fresh) {
+        throw new NotFoundError('Ticket', id);
+      }
+      throw new BusinessRuleError('Ticket status changed concurrently', {
+        rule: 'INVALID_TICKET_TRANSITION',
+        from: fresh.status,
+        to,
+      });
+    }
+    this.deps.onTicketUpdated?.({ ticketId: id, changed: ['status'] });
+    return this.detail(ctx, id);
+  }
+
+  async reroute(ctx: TenantContext, id: string, rawBody: unknown): Promise<TicketDetailResponse> {
+    const { departmentId: toDeptId, note } = parseDepartmentUpdate(rawBody);
+    // Reroute is gm_admin-only (MVP §5 AC) — role gate precedes resource lookup.
+    if (ctx.role === 'dept_head') {
+      throw new ForbiddenError('Reroute is restricted to gm_admin');
+    }
+    const row = await this.repo.findById(id);
+    if (!row) {
+      throw new NotFoundError('Ticket', id);
+    }
+    assertHotelOwnership(ctx, row.hotelId, 'Ticket');
+
+    const dept = await this.repo.findDepartmentById(toDeptId);
+    if (!dept || dept.hotelId !== row.hotelId) {
+      throw new NotFoundError('Department', toDeptId);
+    }
+    if (dept.id !== row.departmentId) {
+      await this.repo.rerouteTx({
+        id,
+        hotelId: row.hotelId,
+        fromDeptId: row.departmentId,
+        toDeptId,
+        note,
+        actorUserId: ctx.userId,
+      });
+      this.deps.onTicketRerouted?.({
+        ticketId: id,
+        fromDepartmentId: row.departmentId,
+        toDepartmentId: toDeptId,
+      });
+    }
+    return this.detail(ctx, id);
   }
 
   private async resolveDirectory(ids: readonly (string | null)[]): Promise<UserDirectory> {

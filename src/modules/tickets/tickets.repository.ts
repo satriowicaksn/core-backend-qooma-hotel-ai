@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import type { TicketDetailRow, TicketListRow } from './tickets.types.js';
+import type { TicketDetailRow, TicketListRow, TicketRow } from './tickets.types.js';
 
 const LIST_INCLUDE = {
   guest: true,
@@ -55,5 +55,70 @@ export class TicketsRepository {
       orderBy: [{ slaDueAt: 'asc' }, { id: 'asc' }],
       take,
     });
+  }
+
+  async findById(id: string): Promise<TicketRow | null> {
+    return this.db.ticket.findUnique({ where: { id } });
+  }
+
+  async findDepartmentById(id: string): Promise<{ id: string; hotelId: string } | null> {
+    return this.db.department.findUnique({ where: { id }, select: { id: true, hotelId: true } });
+  }
+
+  // Status transition + audit in one atomic tx. The status-guarded updateMany is
+  // optimistic concurrency: count===1 means this transition won; 0 means the row
+  // moved/vanished — caller re-resolves. Audit row only written when the update won.
+  async transitionStatusTx(args: {
+    id: string;
+    hotelId: string;
+    from: string;
+    to: string;
+    note: string | null;
+    actorUserId: string;
+  }): Promise<number> {
+    return this.db.$transaction(async (tx) => {
+      const res = await tx.ticket.updateMany({
+        where: { id: args.id, hotelId: args.hotelId, status: args.from },
+        data: { status: args.to },
+      });
+      if (res.count === 1) {
+        await tx.ticketUpdate.create({
+          data: {
+            hotelId: args.hotelId,
+            ticketId: args.id,
+            type: 'status_change',
+            fromStatus: args.from,
+            toStatus: args.to,
+            note: args.note,
+            actorUserId: args.actorUserId,
+          },
+        });
+      }
+      return res.count;
+    });
+  }
+
+  async rerouteTx(args: {
+    id: string;
+    hotelId: string;
+    fromDeptId: string;
+    toDeptId: string;
+    note: string | null;
+    actorUserId: string;
+  }): Promise<void> {
+    await this.db.$transaction([
+      this.db.ticket.update({ where: { id: args.id }, data: { departmentId: args.toDeptId } }),
+      this.db.ticketUpdate.create({
+        data: {
+          hotelId: args.hotelId,
+          ticketId: args.id,
+          type: 'reroute',
+          fromDepartmentId: args.fromDeptId,
+          toDepartmentId: args.toDeptId,
+          note: args.note,
+          actorUserId: args.actorUserId,
+        },
+      }),
+    ]);
   }
 }

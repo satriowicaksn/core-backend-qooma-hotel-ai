@@ -46,9 +46,21 @@ export interface UserDirectoryEntry {
 }
 export type UserDirectory = ReadonlyMap<string, UserDirectoryEntry>;
 
+export type TicketRow = Prisma.TicketGetPayload<Record<string, never>>;
 export type TicketListRow = Prisma.TicketGetPayload<{
   include: { guest: true; assignedUser: true };
 }>;
+
+// Validated mutation payloads (T12).
+export interface StatusUpdate {
+  readonly status: TicketStatus;
+  readonly note: string | null;
+}
+
+export interface DepartmentUpdate {
+  readonly departmentId: string;
+  readonly note: string | null;
+}
 
 export type TicketDetailRow = Prisma.TicketGetPayload<{
   include: {

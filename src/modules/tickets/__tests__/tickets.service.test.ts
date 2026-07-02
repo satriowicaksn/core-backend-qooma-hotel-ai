@@ -1,14 +1,26 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { AuthError, ValidationError } from '@core/errors/app-errors.js';
+import {
+  AuthError,
+  BusinessRuleError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import type { TicketsRepository } from '../tickets.repository.js';
-import { decodeCursor, encodeCursor, parseListQuery } from '../tickets.schema.js';
+import {
+  decodeCursor,
+  encodeCursor,
+  parseDepartmentUpdate,
+  parseListQuery,
+  parseStatusUpdate,
+} from '../tickets.schema.js';
 import { serializeTicketListItem } from '../tickets.serializer.js';
 import { buildTicketWhere, TicketsService } from '../tickets.service.js';
-import type { TicketListRow, UserDirectory } from '../tickets.types.js';
+import type { TicketDetailRow, TicketListRow, UserDirectory } from '../tickets.types.js';
 
 const EMPTY_DIR: UserDirectory = new Map();
 
@@ -304,5 +316,133 @@ describe('TicketsService.list — pagination + directory (fake repo)', () => {
     expect(res.data[0]?.assigned_to).toBe('Sari');
     expect(res.pageInfo.hasMore).toBe(true);
     expect(res.pageInfo.nextCursor).not.toBeNull();
+  });
+});
+
+function makeDetailRow(overrides: Partial<TicketListRow> = {}): TicketDetailRow {
+  return { ...makeRow(overrides), updates: [], messages: [] } as unknown as TicketDetailRow;
+}
+
+describe('parseStatusUpdate / parseDepartmentUpdate', () => {
+  it('should accept a valid status with optional note', () => {
+    expect(parseStatusUpdate({ status: 'in_progress', note: 'picked up' })).toEqual({
+      status: 'in_progress',
+      note: 'picked up',
+    });
+    expect(parseStatusUpdate({ status: 'cancelled' })).toEqual({ status: 'cancelled', note: null });
+  });
+
+  it('should reject an unknown status and unknown keys', () => {
+    expect(() => parseStatusUpdate({ status: 'bogus' })).toThrow(ValidationError);
+    expect(() => parseStatusUpdate({ status: 'open', extra: 1 })).toThrow(ValidationError);
+  });
+
+  it('should require a uuid department_id', () => {
+    expect(
+      parseDepartmentUpdate({ department_id: '11111111-1111-4111-8111-111111111111' }),
+    ).toEqual({
+      departmentId: '11111111-1111-4111-8111-111111111111',
+      note: null,
+    });
+    expect(() => parseDepartmentUpdate({ department_id: 'nope' })).toThrow(ValidationError);
+  });
+});
+
+describe('TicketsService.updateStatus', () => {
+  function repo(overrides: Partial<TicketsRepository>): TicketsRepository {
+    return {
+      findById: () => Promise.resolve(makeRow({ status: 'open' })),
+      findDetailById: () => Promise.resolve(makeDetailRow({ status: 'in_progress' })),
+      transitionStatusTx: () => Promise.resolve(1),
+      ...overrides,
+    } as unknown as TicketsRepository;
+  }
+
+  it('should 404 when the ticket is missing', async () => {
+    const service = new TicketsService(repo({ findById: () => Promise.resolve(null) }));
+    await expect(
+      service.updateStatus(ctx(), 't1', { status: 'in_progress' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should reject an invalid transition with BusinessRuleError (422) before writing', async () => {
+    let wrote = false;
+    const service = new TicketsService(
+      repo({
+        findById: () => Promise.resolve(makeRow({ status: 'open' })),
+        transitionStatusTx: () => {
+          wrote = true;
+          return Promise.resolve(1);
+        },
+      }),
+    );
+    // open → closed is not a valid transition
+    await expect(service.updateStatus(ctx(), 't1', { status: 'closed' })).rejects.toBeInstanceOf(
+      BusinessRuleError,
+    );
+    expect(wrote).toBe(false);
+  });
+
+  it('should commit a valid transition and fire the socket seam', async () => {
+    const events: Array<{ ticketId: string; changed: readonly string[] }> = [];
+    const service = new TicketsService(repo({}), {
+      onTicketUpdated: (e) => events.push(e),
+    });
+    const res = await service.updateStatus(ctx(), 't1', { status: 'in_progress' });
+    expect(res.data.status).toBe('in_progress');
+    expect(events).toEqual([{ ticketId: 't1', changed: ['status'] }]);
+  });
+
+  it('should surface a concurrency loss (count 0) as BusinessRuleError', async () => {
+    const service = new TicketsService(
+      repo({
+        findById: () => Promise.resolve(makeRow({ status: 'open' })),
+        transitionStatusTx: () => Promise.resolve(0),
+      }),
+    );
+    await expect(
+      service.updateStatus(ctx(), 't1', { status: 'in_progress' }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+  });
+});
+
+describe('TicketsService.reroute', () => {
+  function repo(overrides: Partial<TicketsRepository>): TicketsRepository {
+    return {
+      findById: () => Promise.resolve(makeRow({ departmentId: 'dept-1' })),
+      findDepartmentById: () => Promise.resolve({ id: 'dept-2', hotelId: 'hotel-1' }),
+      findDetailById: () => Promise.resolve(makeDetailRow({ departmentId: 'dept-2' })),
+      rerouteTx: () => Promise.resolve(undefined),
+      ...overrides,
+    } as unknown as TicketsRepository;
+  }
+
+  it('should 403 when a dept_head attempts a reroute', async () => {
+    const service = new TicketsService(repo({}));
+    await expect(
+      service.reroute(ctx({ role: 'dept_head', deptId: 'dept-1' }), 't1', {
+        department_id: '22222222-2222-4222-8222-222222222222',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('should 404 when the target department is missing or cross-hotel', async () => {
+    const service = new TicketsService(
+      repo({ findDepartmentById: () => Promise.resolve({ id: 'dept-2', hotelId: 'other' }) }),
+    );
+    await expect(
+      service.reroute(ctx(), 't1', { department_id: '22222222-2222-4222-8222-222222222222' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should reroute and fire the socket seam', async () => {
+    const events: Array<{ ticketId: string; fromDepartmentId: string; toDepartmentId: string }> =
+      [];
+    const service = new TicketsService(repo({}), { onTicketRerouted: (e) => events.push(e) });
+    const res = await service.reroute(ctx(), 't1', {
+      department_id: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(res.data.department_id).toBe('dept-2');
+    expect(events[0]?.fromDepartmentId).toBe('dept-1');
   });
 });
