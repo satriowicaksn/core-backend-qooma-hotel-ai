@@ -1105,6 +1105,48 @@ Clean, well-reasoned (the optimistic-concurrency guard + TZ seam are exactly rig
 
 Awaiting exec-B PLAN for T17.
 
+### ASSIGNMENT T17 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/visits-reject-override` (off latest main incl. merged T16; created on ACK) · Routed from PARENT §1 T17 = MVP §1.2 B7
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T17 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+Two `gm_admin`-only endpoints, **extending the merged `src/modules/visits/`**: `PATCH /api/visits/:id/reject` (`pending_verification → rejected`) and `PATCH /api/visits/:id/approve-manual` (failed_3x override: `failed_verification → checked_in`). Reuse T16's `verifyManualTx` (generic status-guarded tx), `deriveCheckout`, canonical serializer, and `BusinessRuleError` — no forking.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.3` (reject L100 + approve-manual L101 + failed_3x flow L113-115) + §2.3 DDL (`visits` status CHECK) + §7; merged `visits/` module (reuse points: `verifyManualTx`, `deriveCheckout`, `serializeVisit`, `assertPendingVerification`→to-generalize)
+- Dependency: T16 ✅ merged; `ctx.userId` available (DEP-5). Extends visits module (I own it, single-task).
+- `pnpm typecheck` + `pnpm lint` clean on `main` ✓. No prisma-generate/Docker workaround.
+- Scaffolder risk: **none**.
+
+**Files to modify** (all in `src/modules/visits/`)
+- `visits.service.ts` — **R3: replace `assertPendingVerification` with a module-local `VISIT_TRANSITIONS` map + `assertVisitTransition(from, to)`**; add `reject()` + `approveManual()`; verify-manual switches to the generalized assert (behavior identical — see below).
+- `visits.schema.ts` — add `parseApproveManual` (`{ guest_name, room_number, nights? }`, `.strict()`); `/reject` body handling per Q-B-12.
+- `visits.types.ts` — add `ApproveManualInput`.
+- `visits.routes.ts` — add `PATCH /visits/:id/reject` + `PATCH /visits/:id/approve-manual`.
+- `visits.repository.ts` — **reuse `verifyManualTx` as-is** (already generic: `{ id, hotelId, from, data }`); no new method. (Add a one-line doc note that it serves all guarded visit transitions.)
+- `__tests__/` — extend service unit (transition map, approve-manual checkout) + routes component + integration (reject, approve-manual, invalid-source→422, cross-tenant→404, atomicity). **T16 tests must stay green.**
+
+**Approach**
+- **R3 transition map (single source, module-local — NOT tickets' state-machine):**
+  ```
+  VISIT_TRANSITIONS = { pending_verification: ['checked_in','rejected'], failed_verification: ['checked_in'] }
+  assertVisitTransition(from, to): throw BusinessRuleError({rule:'INVALID_VISIT_TRANSITION', from, to}) if to ∉ map[from]
+  ```
+  Each endpoint pre-checks `assertVisitTransition(row.status, to)` (row.status as `from` → truly-invalid target throws *before* the tx, preserving T16's "before writing" + its `details:{from:row.status,to}` assertion) AND passes its **fixed expected source** to `verifyManualTx({ from: EXPECTED, data })` (the DB guard enforces per-endpoint source; a wrong-but-map-valid source → `count===0` → re-resolve → 422). Net: T16's verify-manual behavior is byte-identical; the new endpoints are source-restricted (R1/R2).
+- **`/reject`**: expected source `pending_verification`, `data={ status:'rejected' }`. Reuses the exact reject transition T16's verify-manual reject-mode uses (Q-CONTRACT-15 both-paths-coexist).
+- **`/approve-manual`**: expected source `failed_verification`, `data={ status:'checked_in', roomNumber, ...(nights ? { nights, checkOut: deriveCheckout(checkIn, nights, tz) } : {}) }`. `guest_name` **validate-only** (GAP T16-#2 / Q-B-08 — no cross-write to `guests`). Reuses `deriveCheckout`.
+- **Guards/seams**: `assertHotelOwnership` (cross-tenant → 404); gm_admin (super_admin bypass); `count===0` re-resolve → 404/422; existing `recordVisitAudit` + `onVerificationResolved` no-op seams fire with `actorUserId=ctx.userId` (T20 wires real emit). Response reuses `serializeVisit`.
+
+**GAP / open question**
+- **Q-B-12** — (a) does `/reject` take an optional `reason`/`note`? There is **no `visits` column** for it and the audit table is deferred (Q-B-09), so it has nowhere to persist. **My intent: `/reject` takes no body** (empty; `.strict()` rejects stray keys) — a reason can be added when the audit table lands. (b) does `/approve-manual` require `nights`? **My intent: `nights` OPTIONAL** (per R2) — if provided, derive `check_out`; if absent, leave `check_out`/`nights` unset (status still → `checked_in`). Confirm both against §1.3 + FE MSW; not guessing silently.
+
+**Merge posture**: buildable + fully tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched).
+
+Awaiting PM B ACK (PLAN + Q-B-12 reject-body / approve-manual-nights + R3 generalization approach). Not coding before ACK.
+
 ---
 
 ### ASSIGNMENT T12 — Ticket status transition + reroute — issued by PM B (Nathan) 2026-07-02 (H14)
