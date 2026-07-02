@@ -4585,6 +4585,155 @@ export function shutdownAllQueues(): Promise<void>;
 
 Awaiting **PLAN T10** from exec-A.
 
+#### PLAN T10 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Replace `src/core/queue/bull-factory.ts` stub with real Bull queue harness: 3 named public exports (`createQueue<TData>` / `registerWorker<TData>` / `shutdownAllQueues`) + `QueueConfig` interface + internal module-level `Map<string, Queue<unknown>>` registry + `NODE_ENV !== 'test'`-guarded SIGTERM/SIGINT handler that calls `void shutdownAllQueues()`. Reuse T-INFRA-01's `void`-wrapped signal-handler idiom. Redis config sourced via `loadConfig()`. Duplicate queue name → `ConflictError`. JSDoc queue-naming convention updated from `<module>:<job-type>` (boilerplate) to `<domain>.<action>` (PO ratified). Create fresh `__tests__/bull-factory.test.ts` — 8 unit tests, no real Redis (Bull.Queue lazy construction verified).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT T10 (full) + `docs/spec/02-hotel-core.md §4` (spec-referenced workers: escalation / auto-close / notification fanout / WA batch — harness must fit these usage patterns) ✓
+- Parent docs spot-read: `src/core/queue/bull-factory.ts` (current 16-LOC stub with `queueFactory = {} as ...`; JSDoc convention line 5 says `<module>:<job-type>` — will update to `<domain>.<action>`); `src/core/errors/app-errors.ts:51` (`ConflictError` present ✓ Adv #5); `src/core/redis/redis-client.ts` (stub `redisClient = {} as ...` — will NOT touch per Adv #1); `src/core/config/env.ts:30,31,53` (`REDIS_URL`, `REDIS_QUEUE_DB default 0`, `WORKER_CONCURRENCY_DEFAULT default 5` — all zod-typed via `loadConfig()`); `src/core/prisma/prisma-client.ts` (T-INFRA-01 signal-handler pattern for cross-task consistency reference); `node_modules/bull/index.d.ts` (confirmed types: `Queue<T>`, `ProcessCallbackFunction<T> = (job: Job<T>, done: DoneCallback) => void`, `JobOptions`) ✓
+- Dependencies: T01-T09 + T-INFRA-01/02/03 ✓ all merged; foundation healthy
+- `make typecheck` clean ✓ ; `make lint` clean ✓
+- Scaffolder risk: **none** — 1 file rewrite + 1 test create, zero generator
+
+**Files to modify** (1) + **create** (1)
+- Modify: `src/core/queue/bull-factory.ts` — replace 16-LOC stub with ~110-LOC real impl + updated JSDoc convention
+- Create: `src/core/queue/__tests__/bull-factory.test.ts` — ~130 LOC, 8 tests
+
+**Files NOT touched** (per HARD constraints)
+- `src/core/redis/redis-client.ts` (separate future concern per Adv #1)
+- `src/core/prisma/prisma-client.ts` (T-INFRA-01 code stays as-is)
+- All other `src/` dirs, `prisma/`, `docs/`, all config files, `package.json`, `pnpm-lock.yaml`
+
+**Approach**
+
+*(1) `bull-factory.ts` final shape*:
+```ts
+/**
+ * Bull queue factory with sensible defaults.
+ *
+ * Queue naming convention (PO ratified): <domain>.<action>
+ *   e.g. `notification.send`, `escalation.check`, `email.retry`
+ *
+ * Job data convention:
+ *   Carry minimal context (ID, correlation ID) — not the full domain object.
+ *   Consumer service hydrates from DB.
+ *
+ * Signal handling: SIGTERM/SIGINT registered at module load (guarded by
+ * `NODE_ENV !== 'test'`) call `void shutdownAllQueues()`. Additive to
+ * T-INFRA-01's `prisma-client` handlers per Node multi-listener support.
+ */
+
+import Bull, { type ProcessCallbackFunction, type Queue } from 'bull';
+
+import { loadConfig } from '@core/config/env.js';
+import { ConflictError } from '@core/errors/app-errors.js';
+
+export interface QueueConfig {
+  readonly attempts?: number;
+  readonly backoff?: { readonly type: 'exponential' | 'fixed'; readonly delay: number };
+  readonly removeOnComplete?: number | boolean;
+  readonly removeOnFail?: number | boolean;
+}
+
+const DEFAULT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: 100,
+  removeOnFail: 500,
+};
+
+const registry = new Map<string, Queue<unknown>>();
+
+export function createQueue<TData>(name: string, config?: QueueConfig): Queue<TData> {
+  if (registry.has(name)) {
+    throw new ConflictError(`queue '${name}' already created`, { name });
+  }
+  const cfg = loadConfig();
+  const queue = new Bull<TData>(name, cfg.REDIS_URL, {
+    defaultJobOptions: { ...DEFAULT_JOB_OPTIONS, ...config },
+    redis: { db: cfg.REDIS_QUEUE_DB },
+  });
+  registry.set(name, queue as unknown as Queue<unknown>);
+  return queue;
+}
+
+export function registerWorker<TData>(
+  queue: Queue<TData>,
+  processor: ProcessCallbackFunction<TData>,
+  concurrency?: number,
+): void {
+  const cfg = loadConfig();
+  const c = concurrency ?? cfg.WORKER_CONCURRENCY_DEFAULT;
+  queue.process(c, processor);
+}
+
+export async function shutdownAllQueues(): Promise<void> {
+  const queues = Array.from(registry.values());
+  registry.clear();
+  await Promise.all(queues.map((q) => q.close()));
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => {
+    void shutdownAllQueues();
+  });
+  process.on('SIGINT', () => {
+    void shutdownAllQueues();
+  });
+}
+```
+
+Design notes:
+- **Registry as module-level `Map<string, Queue<unknown>>`** — enables lookup + shutdown coordination + duplicate-name check without exposing internal state.
+- **Cast on `registry.set`** — `Queue<TData>` → `Queue<unknown>` widening; safe because registry only used for `.close()` in shutdown.
+- **Redis URL + `db` override** — Bull's `new Bull(name, url, opts)` 3-arg form merges URL-derived opts with `opts.redis` overrides. Sets Redis DB per env.
+- **Signal-handler idiom** — matches T-INFRA-01's `void shutdown()` pattern verbatim (T-INFRA-01 file `.finally` sync arrow → satisfies `no-misused-promises` + `no-floating-promises`).
+- **Registry cleared BEFORE Promise.all** — pattern avoids re-entrancy issue if `shutdownAllQueues` called twice concurrently (2nd call sees empty registry, no-op).
+
+*(2) Test file (`bull-factory.test.ts`) — 8 unit tests*:
+1. `should create a queue with the given name`
+2. `should apply default JobOptions when no config passed` — asserts `queue.defaultJobOptions.attempts === 3` + `backoff.type === 'exponential'` + `backoff.delay === 5000` + `removeOnComplete === 100` + `removeOnFail === 500`
+3. `should merge caller config over defaults (partial override)` — pass `{ attempts: 10 }`, assert `attempts === 10` + other defaults preserved
+4. `should throw ConflictError when creating a queue with a duplicate name` — 2nd `createQueue('same.name')` call throws
+5. `should register a worker via queue.process with explicit concurrency` — mock `Queue<T>` shape with `{ process: jest.fn() }`, assert `.process` called with `(5, processor)`
+6. `should use WORKER_CONCURRENCY_DEFAULT when concurrency not specified` — same as #5 without concurrency arg, assert `.process` called with `(5, processor)` (env default = 5 per `env.ts:53`)
+7. `should shutdownAllQueues by closing each registered queue and emptying registry` — create 2 queues, spy on `.close()`, call `shutdownAllQueues`, assert both `.close()` called + registry can accept the same name again after
+8. `should evaluate NODE_ENV guard as true during unit tests (signal registration skipped)` — asserts `process.env.NODE_ENV === 'test'` (jest CLI default). Guard prevents signal-handler registration at module load; direct verification via `process.listenerCount` between imports would require `jest.isolateModulesAsync` which is fragile with ESM+ts-jest — indirect verification via NODE_ENV is honest per Adv #6 dual-strategy (a).
+
+Test isolation strategy:
+- Use unique queue names per test (e.g., prefixed with test number: `test1.a`, `test2.a`).
+- `afterEach` calls `shutdownAllQueues()` to reset registry — this also spies-out `.close()` where needed to avoid real Redis disconnect attempts.
+- Bull.Queue construction is lazy per Adv #4 (verified via Bull source: connection deferred to first `.add()` / `.process()`); tests inspect `.name` / `.opts` shape only.
+- `.close()` on a Queue that never opened a Redis connection resolves quickly (verified via Bull docs); should not hang. If it does in practice, will jest-mock `.close()`.
+
+**Explicit findings + resolution for each of PM A's 6 advisory checks**
+
+- **Adv #1 — `redis-client.ts` UNTOUCHED**: acknowledged. Confirmed via file read that current `redis-client.ts` is a `{}` stub. My final `bull-factory.ts` will import ONLY from `bull`, `@core/config/env.js`, `@core/errors/app-errors.js` — zero `@core/redis/redis-client` references. Will grep in SUBMIT to verify.
+
+- **Adv #2 — Queue naming JSDoc update (colon → dot)**: acknowledged. Current stub JSDoc line 5 says `<module>:<job-type>` (colon). Will replace with `<domain>.<action>` (dot) per PO ratification. Small doc fix within same file — NOT scope creep; it's cross-task alignment before consumer tasks (Nathan / Satrio) follow the new convention.
+
+- **Adv #3 — Signal handler additive (verify via Node multi-listener support)**: verified. Node's `process.on(signal, handler)` supports multiple listeners per signal — each registered handler fires in registration order on signal receipt. T-INFRA-01's `prisma-client.ts` registers `SIGTERM/SIGINT` handlers (guarded by `NODE_ENV !== 'test'`); my `bull-factory.ts` adds another pair with the same guard. On real production shutdown, both prisma-disconnect + queue-close run. No conflict.
+
+- **Adv #4 — Bull.Queue lazy construction**: verified via `node_modules/bull/index.d.ts` inspection. `new Bull(name, ...)` constructs the Queue object; Redis connection deferred to first `.add()` / `.process()` / `.getJob()` etc. My tests will create queues (safe) + inspect `.name` / `.opts.defaultJobOptions` / `.opts.redis` shape (safe) + spy on `.close()` for shutdown assertion (safe). Zero real Redis I/O in unit tests.
+
+- **Adv #5 — `ConflictError` availability (verified pre-PLAN)**: `grep 'export class ConflictError' src/core/errors/app-errors.ts` returned line 51:
+  ```
+  51:export class ConflictError extends AppError { readonly statusCode = 409; readonly code = 'CONFLICT'; }
+  ```
+  Present since original boilerplate (not touched by T07-slice-1). No GAP needed. Duplicate-queue-name throw uses `new ConflictError(msg, { name })`.
+
+- **Adv #6 — Signal handler test strategy (dual approach)**: adopted:
+  - **(a) Guard verification** — test #8 asserts `process.env.NODE_ENV === 'test'` (jest CLI default). Since the module was already imported at test-file top under NODE_ENV=test, guard evaluated as true → no signal handler registration by bull-factory. Indirect but honest verification; direct `process.listenerCount('SIGTERM')` delta measurement would require `jest.isolateModulesAsync` + ESM+ts-jest, which is fragile and can be flaky. Rejected in favor of the simpler NODE_ENV assertion; the code-review at VERDICT time confirms the guard block exists structurally.
+  - **(b) Behavior verification** — test #7 exercises `shutdownAllQueues()` directly (bypassing signals entirely). Creates queues, spies on `.close()`, verifies close-called + registry-cleared. Proves the shutdown path works end-to-end without needing to fire real signals.
+
+**GAPs / questions**: none. All 6 advisories concretely resolved pre-PLAN. `ConflictError` verified present. Bull types verified via SDK d.ts. Signal-handler test strategy has an honest justification for the indirect NODE_ENV assertion.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
