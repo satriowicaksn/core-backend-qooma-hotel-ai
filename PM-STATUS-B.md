@@ -1397,6 +1397,43 @@ Clean reuse, T16 preserved. **T17 closed.** 🟢
 
 Awaiting exec-B PLAN for T18.
 
+### ASSIGNMENT T18 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/visits-manual-create` (off latest main incl. merged T16+T17; created on ACK) · Routed from PARENT §1 T18 = MVP §1.2 B8
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T18 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+One `gm_admin`-only endpoint `POST /api/visits` — create a manual visit for an **existing** guest → `pending_verification`. **Extends `src/modules/visits/`** (I own it). Reuse the canonical `serializeVisit` + validation patterns; guest read via Prisma (no `guests`-module import).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.3` (`POST /api/visits` L98 + pending-verification flow) + §2.3 DDL (`visits` — status/nights/booking_source CHECKs) + MVP §5 AC ("returns Guest with the new visit appended; status pending_verification"); merged `visits/` module reuse points
+- Dependency: T16 + T17 ✅ merged; `ctx.userId` available. Extends visits module.
+- `pnpm typecheck` + `pnpm lint` clean on `main` ✓. No prisma-generate/Docker workaround.
+- Scaffolder risk: **none**.
+
+**Files to modify** (all in `src/modules/visits/`)
+- `visits.schema.ts` — add `parseCreateVisit` (`.strict()`).
+- `visits.types.ts` — add `CreateVisitInput`.
+- `visits.repository.ts` — add `findGuestById` (select `{ id, hotelId }`) + `createVisit(data)`.
+- `visits.service.ts` — add `create(ctx, rawBody)`: validate guest (404) → insert → serialize.
+- `visits.routes.ts` — add `POST /visits`.
+- `__tests__/` — extend service unit + routes component + integration. **T16/T17 tests stay green.**
+
+**Approach**
+- **Guest guard (MV2)**: `findGuestById(body.guest_id)` → `!guest` → `NotFoundError('Guest')`; `assertHotelOwnership(ctx, guest.hotelId, 'Guest')` → gm_admin cross-tenant guest → 404 (anti-enumeration), super_admin bypass. Read via Prisma; no guests-module import.
+- **Create (MV1)**: `hotelId = ctx.hotelId` (session, **never** body); `guestId = body.guest_id`; `status` defaults to `pending_verification` (DB default, not sent); `checkIn`, optional `nights`/`roomNumber`/`bookingSource`/`specialRequest`. No `check_out` on create (set at verify). Reuse `serializeVisit`; respond `{ data: VisitWire }`.
+- **Validation (MV3)**: zod `.strict()` — `guest_id` uuid (required), `check_in` ISO (required), `nights?` int **1–30** (DDL range; see Q-B-13), `room_number?` (≤16), `booking_source?` enum (`ota_email|direct|walk-in|pms`, reuse `BOOKING_SOURCES`), `special_request?` string. Unknown keys (incl. `hotel_id`, `status`) → `ValidationError`.
+- **Guard/seam (MV4)**: gm_admin (super_admin bypass); `verification:pending` emit via a named no-op seam (`onVerificationPending`, default `() => {}`) — T20 wires the real emit. No `actor`/`created_by` column on `visits` → audit seam only (no persisted actor).
+
+**GAP / open question**
+- **Q-B-13** — (a) **body**: proposing `{ guest_id (req), check_in (req, ISO), nights?, room_number?, booking_source?, special_request? }` (Q-CONTRACT-20 ASSUMED). (b) **response**: MVP §5 AC says "returns **Guest** with the new visit appended", but this is the *visits* module — **my intent: return the created `Visit` (`{ data: VisitWire }`)**, consistent with verify-manual/reject/approve-manual + REST-idiomatic for POST. If FE MSW needs the guest+`visits[]`, I'll read guest+visits via Prisma (still no guests-module import) — flag. (c) **`special_request`**: Q-CONTRACT-20 calls it "ephemeral"; the DDL column exists → **my intent: persist it if provided** (dropping loses data; column is there). (d) **nights range**: **1–30** on create (DDL CHECK), looser than the verify-flow's 1–7 approval contract (no conflict, zod ⊆ DB) — confirm.
+
+**Merge posture**: buildable + tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched).
+
+Awaiting PM B ACK (PLAN + Q-B-13 body/response/special_request/nights). Not coding before ACK.
+
 ---
 
 <!--
