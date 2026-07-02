@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-03 (GAP-T11-3 test-glob split) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T-INFRA-02 merged (PO commit `e95a23d`). Nathan already claimed T12 + PLAN (`4ffd12f`); his Q-B-11 auto-resolves via T-INFRA-02.
-- **Branch (current active task)**: `feat/foundation-testglob-split` (per PO branch-per-task policy)
-- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02 (all merged to main)
+- **Active task**: T-INFRA-03 APPROVED (`feat/foundation-testglob-split` @ `59b12cd`, awaiting PO merge). PM A pauses + awaits PO direction. Mitigation from `feedback_git_slip_transparency.md` held — no 4th slip recurrence.
+- **Branch (last active task)**: `feat/foundation-testglob-split` @ `59b12cd` — awaiting PO merge.
+- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02 (all merged to main) · **T-INFRA-03** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · T-INFRA-02 ✅ · **T-INFRA-03 (assigned, next)** · T05 seed (Opsi C coord question posted PARENT §10, awaiting PM B input) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · T-INFRA-02 ✅ · **T-INFRA-03 ✅** · T-INFRA-04 candidate (CI/check-full — PO decision via §10) · T05 seed (PM B input pending via §10) · DEP-4 api.ts bootstrap · docs/TESTING.md dev-flow update (planning) · T08–T10 backlog
 
 ---
 
@@ -35,7 +35,7 @@
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
 | T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
 | T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
-| T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | assigned | — | Addresses PARENT §3b GAP-T11-3. ~1 LOC change in `package.json:25` `test:unit` script (add `--testPathIgnorePatterns='\.integration\.test\.ts$'`). Non-blocking hygiene; benefits everyone's `make check` speed. |
+| T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -2761,6 +2761,93 @@ Notes / operational
 Env note (session-local): re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
 
 Requesting PM A VERDICT.
+
+##### VERDICT T-INFRA-03 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-testglob-split` @ commit `59b12cd`. All gates green. Primary DoD signal (Docker-free `make check`) empirically confirmed via independent rerun.
+
+**Transparency verification**
+- `git log 493e905..origin/main --oneline` (since ACK) → 1 commit `dfe8dde` (exec-A SUBMIT, docs-only). No source leaked.
+- `git log origin/main -- package.json` → 3 commits (initial `5ce7f86` + H12 scope `df81f1b` + T01 `00e100b`). No T-INFRA-03 code touched main. ✓
+- **Mitigation efficacy datapoint**: exec-A adopted `git branch --show-current` pre-commit verify from `feedback_git_slip_transparency.md` (memorialized after 3rd slip). **Slip did NOT recur** in T-INFRA-03. First evidence that the mitigation works. Updating memory with efficacy datapoint per PO ask.
+
+**DoD verification (9 items)** — all ✓
+- `package.json:25` `test:unit` script now has `--testPathIgnorePatterns='\\.integration\\.test\\.ts$'` ✓ (verified via `git show`)
+- `make check` PASSES without Docker ✓ — PM independent rerun: 10/11 suites pass, 160 tests, **test:unit portion 0.532s** (baseline was ~11s → **~20x faster**). Zero `PASS *.integration.test.ts` lines in output. Zero testcontainers `(6.85 s)` duration signals.
+- **Test count trio** (PM independent rerun on branch, matches SUBMIT + PLAN):
+  ```
+  test:unit         → 160 pass / 1 skip / 161 total  (in 0.639s)
+  test:integration  → 31 pass / 1 skip / 32 total   (in 11.662s)
+  test:coverage     → 191 pass / 2 skip / 193 total (full baseline via config testMatch, no filter inheritance)
+  ```
+- **Sum sanity** (independently verified):
+  ```
+  161 unit + 32 integration = 193 total  ✓
+  160 + 31 = 191 pass  ✓
+  1 + 1 = 2 skip  ✓
+  ```
+- Zero regression: all pre-fix passing tests still pass on their appropriate runner ✓
+- Drift scan N/A (config-only, no TS-rule categories apply); sanity: no accidental `console.log` or other insertion in diff ✓
+- `git diff main -- package.json` = single-line change (script value only, no key add/rename, no dep add) ✓
+- `git diff main --name-only -- jest.config.ts Makefile src/ pnpm-lock.yaml` = **empty** ✓
+- No new deps in `pnpm-lock.yaml` (zero-line diff) ✓
+
+**Adv #1 empirical verification** (PM independent rerun)
+```
+pnpm test:unit --listTests | grep "\.test\.ts$" | wc -l    → 11
+pnpm test:unit --listTests | grep "\.integration\.test\.ts$" | wc -l → 0
+```
+Regex correctly excludes integration files. Escape chain (JSON `\\.` → shell `\.` → jest regex `\.`) works as designed. ✓
+
+**Adv #3 no-Docker signal — 3 checkpoints verified**
+1. Absence of `PASS *.integration.test.ts` lines in `test:unit` output → **confirmed** (only unit test file names in output).
+2. Absence of testcontainers duration signals like `(6.85 s)` → **confirmed** (only sub-second suite durations in unit output).
+3. Time delta: `test:unit` **0.532s** vs baseline ~11s → ~20x faster, primary DoD signal. Total `make check` = 8.920s (dominated by prisma-generate + typecheck; test portion now negligible).
+
+**Adv #5 CI implications acknowledgment (T-INFRA-04 candidate)**
+Exec-A named 3 concrete options in SUBMIT — appropriately out-of-scope per single-concern PR pattern. PM A will surface to PARENT §10 as coord item for PO decision.
+
+**Adv #6 dev-flow guidance follow-up**
+Exec-A flagged in SUBMIT — planning-doc territory per EXECUTOR-PROTOCOL §10, correctly out-of-scope. PM A will surface to PARENT §10 as coord item.
+
+**Two adopted discipline patterns held under stress test**
+1. **`git branch --show-current` mitigation**: exec-A explicitly verified branch before code edit → **NO slip this session**. First evidence the memorialized mitigation from `feedback_git_slip_transparency.md` actually works. Efficacy datapoint being added to memory in same commit as this VERDICT.
+2. **Empirical `--listTests` pre-PLAN verification**: worked exactly as designed — PLAN committed to a syntax that was already known to work at CLI level. No REJECT-PLAN cycle needed. `feedback_verify_before_act.md` (memorialized in ACK commit) now has this as a load-bearing exemplar.
+
+**Spot-check** (PM-AGENT §3 Step 5)
+- File naming: `package.json` — config, N/A ✓
+- No test-file / production changes ✓
+- Diff is minimal and single-concern per Adv #5 append discipline ✓
+- Commit body has full verification numbers + explicit test count trio + timing → high SUBMIT quality ✓
+- LOC delta: -1 / +1 (single script value change) ✓
+
+**Security floor** — N/A. `--testPathIgnorePatterns` is a filesystem-glob filter; no user input, no PII, no crypto, no external surface.
+
+**Follow-ups actioned in same commit**
+- → §1 T-INFRA-03 → approved
+- → §0 Active task refreshed → next triage (T-INFRA-04 CI implication vs T05 seed pending PM B input vs DEP-4)
+- → PARENT §1 T-INFRA-03 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §3b GAP-T11-3 → **RESOLVED**
+- → PARENT §10 NEW coord item: **T-INFRA-04 candidate (CI implication)** — 3 options for PO decision
+- → PARENT §10 NEW coord item: **docs/TESTING.md dev-flow guidance follow-up** — planning-doc update for PARENT/Planning to author
+- → Memory `feedback_git_slip_transparency.md` extended with mitigation efficacy datapoint (per PO ask)
+
+**PO action item — branch merge**
+`feat/foundation-testglob-split` @ `59b12cd` on `origin`; PM A verified: `make check` PASS on branch (160/161 unit-only, 0.532s), test count trio math clean, all Slot A/B suites still green on their appropriate runners, zero non-test files touched, transparency clean, mitigation held. Per CLAUDE.md §12, **please merge `feat/foundation-testglob-split` → `main`**. Post-merge: everyone's `make check` becomes Docker-free + ~10x faster. CI stragey decision needed separately via PARENT §10 T-INFRA-04 coord item.
+
+**Next Slot A queue** (post-merge)
+1. **T-INFRA-04 candidate** (CI/make check-full strategy) — pending PO priority signal via PARENT §10 coord item
+2. **T05 seed** — pending PM B S1/S2/S3/S4 input via PARENT §10 T05 coord Q (silent-ratification path: default S2 after ~1 session cycle if no PM B signal)
+3. **DEP-4** api.ts bootstrap (big go-live) — biggest remaining gate item
+4. **T08/T09/T10** no imminent consumer
+5. **docs/TESTING.md** dev-flow guidance update — planning-doc, needs PARENT/Planning session
+
+**Slot A ledger**: **9/10 approved** (T01, T02, T03, T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02, **T-INFRA-03**).
+
+PM A pauses + awaits PO next-task direction.
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
