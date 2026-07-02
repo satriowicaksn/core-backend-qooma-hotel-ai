@@ -3591,6 +3591,61 @@ Rationale for skipping S3Adapter happy-path SDK-mocked tests: (a) `S3Client` is 
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T08 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+All 6 advisories cleanly resolved with concrete pre-PLAN evidence — `feedback_verify_before_act.md` discipline continuing durable application. Two PO-flagged design decisions both accepted per hexagonal principle.
+
+**Verified in PLAN**:
+- **Adv #1 (PRE-RATIFIED)** ✓ — acknowledged, `pnpm add @aws-sdk/client-s3` authorized to dependencies (not devDependencies), modular imports MANDATORY per Adv #4.
+- **Adv #2 (signed URLs deferral)** ✓ — **spec-verified pre-PLAN**: `docs/spec/02-hotel-core.md §2.6 line 168` (menu multipart image = guest-visible → public) + `§7 line 317` (daily brief PDF explicitly "server-side fetch; **no redirect to a presigned URL** — keeps the cookie-auth path"). Slice-1 public-bucket assumption is spec-conformant for both known consumers. Signed URLs deferred to future slice-2 on demand. Rock-solid rationale.
+- **Adv #3 (env fail-lazy)** ✓ — grep-proven: `grep -rn "S3_BUCKET|S3_REGION|S3_ENDPOINT|S3_ACCESS_KEY|S3_SECRET" src/` = **1 hit**, which is `env.ts:59` commented placeholder itself. Zero external consumers. Adding 5 `.optional()` fields is zero-risk for existing tests.
+- **Adv #4 (modular imports)** ✓ — final imports exactly `{ DeleteObjectCommand, PutObjectCommand, S3Client }` from `'@aws-sdk/client-s3'`. No whole-namespace, no re-exports. Will verify via grep in SUBMIT.
+- **Adv #5 (ExternalServiceError shape)** ✓ — pre-verified `app-errors.ts:61-72` constructor `(service, message, upstream?: {status?, body?})`. Adapter wraps with `body: err` (full object → Sentry gets `$metadata`/`$response`). Reasonable decision to skip `status` extraction in slice-1 (marginal value vs type-guard cost; can add in slice-2 if Sentry dashboards need it).
+- **Adv #6 (Map.delete idempotency)** ✓ — `Map.prototype.delete()` returns boolean, never throws. InMemoryAdapter ignores boolean → matches S3 `DeleteObjectCommand` 204 behavior. Explicit test #5 proves it.
+
+**Two PO-flagged design decisions — both accepted per hexagonal principle**:
+
+**1. S3Adapter test scope (fail-lazy only, no SDK mocks) → ACCEPT**
+Exec-A's 3-part justification is hexagonally consistent:
+- (a) S3Client complex to mock cleanly + brittle → true, and mocks would test mock behavior not real behavior
+- (b) Consumer tests use InMemoryAdapter via port injection → **this is the whole point of the port+adapter pattern** — the abstraction exists so consumers don't need to know or mock SDK details
+- (c) Real S3 behavior verified downstream by Satrio T22/T24 integration tests → correct division of responsibility
+
+Mild PM A observation (not blocking): `buildUrl` (endpoint-aware URL construction) and `wrap` (err-instance-of-Error narrow) are adapter-owned code. If they regress, only downstream integration tests would catch. Two acceptable resolutions if you want more coverage: (i) extract as pure module-level fns and unit test independently, (ii) leave as-is and rely on typecheck + code review. Exec-A chose (ii); defensible given the ~5-line simplicity of each. Not requesting change.
+
+**2. InMemoryAdapter `peek()` test-only accessor → ACCEPT**
+Legitimate hexagonal pattern:
+- `peek` is on the `InMemoryAdapter` class only, NOT on the `ObjectStoragePort` interface
+- Consumers typed against `ObjectStoragePort` cannot call it (type-system enforces the port boundary)
+- Consumers using `InMemoryAdapter` directly (in tests) get inspection access — this is the entire purpose of a test double
+- Naming `peek` matches FIFO/stack "read-only observation" convention; alternatives (`getStored`/`inspect`/`snapshot`) would also work but not necessary
+- JSDoc explicitly marks it as "Test-only accessor — NOT on the port"
+
+Zero port leak. Standard test-double pattern.
+
+**Scope match** ✓ — 5 create + 2 modify (env.ts + package.json via `pnpm add`), all within `src/core/storage/` + env + deps. Zero touch to `src/plugins/`, `src/modules/`, `src/shared/`, `prisma/`, `docs/`, other core/ folders, `http-client.ts` (stub-state preserved as single-concern PR pattern).
+
+**Design fidelity** ✓ — matches ASSIGNMENT template exactly. Port interface + input/output types + S3Adapter with lazy client + InMemoryAdapter with Map + env optional fields under existing "Service-specific" boilerplate hint.
+
+**Test count projection sanity** ✓ — 160 baseline + 7 new (5 InMemory + 2 S3 fail-lazy) = 167 pass / 1 skip / 168 total. `test:integration` unchanged 31/1/32. `test:coverage` 198/2/200. Math clean.
+
+**Continued efficacy datapoint (feedback_verify_before_act.md)**: 6 advisories → 6 pre-PLAN verifications (spec section reads, grep evidence, file-level shape confirmation) → 0 REJECT-PLAN cycle. Pattern is showing durable across every ASSIGNMENT cycle now. Not adding new emergence; tracking as continued efficacy. Adv #2's spec-line-reference-driven rationale is particularly strong — proves scope decisions with authoritative source.
+
+**Proceed to implementation on branch `feat/foundation-multipart-upload`.**
+
+**SUBMIT expectations (reminders)**:
+- `pnpm add @aws-sdk/client-s3` at implementation start → `package.json` `dependencies` (not devDep); `pnpm-lock.yaml` auto-updated
+- Post-code: `grep 'from .@aws-sdk/client-s3.' src/core/storage/s3-adapter.ts` returns exactly 1 hit with only `{ DeleteObjectCommand, PutObjectCommand, S3Client }` (Adv #4 verification)
+- `make check` PASS with **167/1/168** unit tests (160 baseline + 7 new); integration unchanged 31/1/32; coverage 198/2/200
+- Drift scans clean on all 5 new files + env.ts diff (0 `any`, 0 `console.log/info/debug`, 0 `throw new Error(`, 0 default export)
+- `git diff main -- src/plugins/ src/modules/ src/shared/ prisma/ docs/ Makefile jest.config.ts tsconfig.json src/core/http/` = empty (T08 stays in `src/core/storage/` + env.ts + package.json + pnpm-lock.yaml)
+- InMemoryAdapter coverage ≥ 90% (5 tests should easily hit 100% on the ~45 LOC file)
+- JSDoc on `S3Adapter` documents R2 usage (`S3_ENDPOINT` swap) + signed URL deferral note (slice-2)
+- Silent-ratification not applicable (T08 has no coord Q pending)
+- Branch-slip mitigation held (3rd consecutive task expected; adopt `git branch --show-current` verify pre-commit)
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
