@@ -9,7 +9,12 @@ import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.
 
 import { deriveCheckout } from './visits.checkout.js';
 import type { VisitsRepository } from './visits.repository.js';
-import { parseApproveManual, parseListQuery, parseVerifyManual } from './visits.schema.js';
+import {
+  parseApproveManual,
+  parseCreateVisit,
+  parseListQuery,
+  parseVerifyManual,
+} from './visits.schema.js';
 import { serializeVisit } from './visits.serializer.js';
 import type {
   VerifyManualInput,
@@ -57,6 +62,8 @@ export interface VisitsServiceDeps {
   }) => void;
   // Socket emit seam (V2/T20): `verification:resolved` is wired by T20, not here.
   readonly onVerificationResolved?: (event: { visitId: string; status: VisitStatus }) => void;
+  // Socket emit seam (T18/T20): `verification:pending` on manual visit create.
+  readonly onVerificationPending?: (event: { visitId: string; guestId: string }) => void;
 }
 
 const DEFAULT_TZ = 'UTC';
@@ -108,6 +115,31 @@ export class VisitsService {
       data,
       pageInfo: { page: query.page, pageSize: query.pageSize, total, hasMore },
     };
+  }
+
+  // Manual visit create (T18). hotelId from session (never body); status defaults to
+  // pending_verification (DB default). Guest must exist + belong to the tenant.
+  async create(ctx: TenantContext, rawBody: unknown): Promise<VisitDetailResponse> {
+    const input = parseCreateVisit(rawBody);
+    const guest = await this.repo.findGuestById(input.guestId);
+    if (!guest) {
+      throw new NotFoundError('Guest', input.guestId);
+    }
+    // Cross-tenant guest masked as 404 (anti-enumeration); super_admin bypasses.
+    assertHotelOwnership(ctx, guest.hotelId, 'Guest');
+
+    const created = await this.repo.createVisit({
+      hotelId: ctx.hotelId,
+      guestId: input.guestId,
+      checkIn: input.checkIn,
+      ...(input.nights !== undefined ? { nights: input.nights } : {}),
+      ...(input.roomNumber !== undefined ? { roomNumber: input.roomNumber } : {}),
+      ...(input.bookingSource !== undefined ? { bookingSource: input.bookingSource } : {}),
+      ...(input.specialRequest !== undefined ? { specialRequest: input.specialRequest } : {}),
+    });
+
+    this.deps.onVerificationPending?.({ visitId: created.id, guestId: created.guestId });
+    return { data: serializeVisit(created) };
   }
 
   async verifyManual(

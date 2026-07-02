@@ -295,3 +295,52 @@ describe('VisitsService.approveManual (integration)', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+describe('VisitsService.create (integration)', () => {
+  it('should create a pending_verification visit for an own-tenant guest', async () => {
+    const before = await db.visit.count({ where: { hotelId: HOTEL_A } });
+    const res = await service.create(gmA, {
+      guest_id: GUEST_A,
+      check_in: '2026-06-20T06:00:00.000Z',
+      nights: 3,
+      room_number: '1501',
+      booking_source: 'direct',
+      special_request: 'high floor',
+    });
+    expect(res.data.status).toBe('pending_verification');
+    expect(res.data.room_number).toBe('1501');
+    expect(res.data.special_request).toBe('high floor');
+    expect(res.data.check_out).toBeNull(); // not set on create
+
+    const row = await db.visit.findUnique({ where: { id: res.data.id } });
+    expect(row?.hotelId).toBe(HOTEL_A);
+    expect(row?.guestId).toBe(GUEST_A);
+    expect(row?.specialRequest).toBe('high floor');
+    const after = await db.visit.count({ where: { hotelId: HOTEL_A } });
+    expect(after).toBe(before + 1);
+  });
+
+  it('should 404 (no-create) for a cross-tenant guest', async () => {
+    const before = await db.visit.count();
+    // GUEST_B belongs to hotel B; gmA must not create against it.
+    await expect(
+      service.create(gmA, { guest_id: GUEST_B, check_in: '2026-06-20T06:00:00.000Z' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await db.visit.count()).toBe(before);
+  });
+
+  it('should 404 (no-create) for a non-existent guest', async () => {
+    await expect(
+      service.create(gmA, {
+        guest_id: '99999999-9999-4999-8999-999999999999',
+        check_in: '2026-06-20T06:00:00.000Z',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('should reject an invalid body (missing check_in) with ValidationError', async () => {
+    await expect(service.create(gmA, { guest_id: GUEST_A })).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+    });
+  });
+});

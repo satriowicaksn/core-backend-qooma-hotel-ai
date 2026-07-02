@@ -94,3 +94,14 @@ export interface ApproveManualInput {
   readonly roomNumber: string;
   readonly nights?: number;
 }
+
+// Manual visit create (T18 / Q-B-13). hotelId comes from the session (never body);
+// status defaults to pending_verification. nights range 1–30 (DDL, looser than verify).
+export interface CreateVisitInput {
+  readonly guestId: string;
+  readonly checkIn: Date;
+  readonly nights?: number;
+  readonly roomNumber?: string;
+  readonly bookingSource?: BookingSource;
+  readonly specialRequest?: string;
+}

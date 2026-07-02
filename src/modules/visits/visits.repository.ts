@@ -26,6 +26,16 @@ export class VisitsRepository {
     return this.db.visit.findUnique({ where: { id } });
   }
 
+  // Guest lookup for T18 create — id + hotelId only (scope check). Read via Prisma;
+  // the guests module is never imported (cross-module boundary).
+  async findGuestById(id: string): Promise<{ id: string; hotelId: string } | null> {
+    return this.db.guest.findUnique({ where: { id }, select: { id: true, hotelId: true } });
+  }
+
+  async createVisit(data: Prisma.VisitUncheckedCreateInput): Promise<VisitRow> {
+    return this.db.visit.create({ data });
+  }
+
   // Status-guarded verify-manual transition in one atomic tx (V2). The `status`
   // arm of the WHERE is the optimistic-concurrency guard: count===1 means this
   // transition won; 0 means the row moved/vanished (caller re-resolves). A visit
