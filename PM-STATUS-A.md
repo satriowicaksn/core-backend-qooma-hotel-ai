@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T06 APPROVED (`feat/foundation-ticket-state-machine` @ `0e6d211`, awaiting PO merge). PM A pauses + awaits PO direction on next task.
-- **Branch (last active task)**: `feat/foundation-ticket-state-machine` @ `0e6d211` — awaiting PO merge.
-- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1 (all merged to main) · **T06** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T-INFRA-02 (DEP-5 fix — `TenantContext.userId`) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T06 merged (PO commit `4f4a5d0`). Triage rationale: Nathan's H13 "observed SHIPPED" for DEP-5 was inaccurate — PM A verified `tenant-guard.ts` unchanged, userId still missing → T19 remains blocked. Fix now (~5 LOC).
+- **Branch (current active task)**: `feat/foundation-userid-tenant-context` (per PO branch-per-task policy)
+- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1, T06 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · **T06 ✅** · T05 seed (Opsi C twist pending) · T07-slice-2+ (deferred) · T08 multipart · T09 CSV · T10 workers
+- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · **T-INFRA-02 (assigned, next — DEP-5)** · T-INFRA-03 (GAP-T11-3 test-glob, queued) · T05 seed (Opsi C pending) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
 
 ---
 
@@ -33,7 +33,8 @@
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
-| T06 | Ticket state-machine helper + unit-test the transition table | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-ticket-state-machine` @ `0e6d211` — **awaiting PO merge**. 2 files (helper 61 LOC + test 137 LOC, 40 tests). 100% coverage. `make check` PASS 190/192 on branch. Nullish coalesce Adv #6 verified as TS+runtime necessity. Envelope shape matches PM B ratified. All Slot B tests preserved green. Cherry-pick transparency clean (2nd instance). |
+| T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
+| T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | assigned | — | Addresses PARENT §10 DEP-5. Nathan's "observed SHIPPED" claim was inaccurate — PM A read of `tenant-guard.ts` confirms userId still missing. ~5 LOC change + test fixture updates. Unblocks T19. |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -1946,6 +1947,118 @@ Per PM A's ≥2 emergences rule, updating existing memory `feedback_git_slip_tra
 PM A pauses + awaits PO next-task direction.
 
 Ship it.
+
+### ASSIGNMENT T-INFRA-02 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-userid-tenant-context` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T-INFRA-02 + §10 DEP-5 (escalated by PM B / Nathan during T15 close-out; Nathan's H13 "observed SHIPPED" claim inaccurate — PM A verified file unchanged)
+- Depends on: T03 ✓ merged (owns `tenant-guard.ts`), T04 ✓ merged (rbac tests use TenantContext), T-INFRA-01 ✓ merged, T07-slice-1 ✓ merged, T06 ✓ merged
+- Downstream unblocks: **T19** (notifications = per-user scope, Nathan blocked). Also strengthens the `SessionContext` seam ratified in Q-B-02 resolution.
+- Spec / reference (WAJIB read before PLAN):
+  - `src/plugins/tenant-guard.ts:15-46` — current `SessionUser` (has `userId`), `TenantContext` (missing `userId`), `deriveTenantContext` (doesn't copy userId)
+  - `src/plugins/__tests__/tenant-guard.test.ts` — T03's 14 tests + fixtures
+  - `docs/spec/02-hotel-core.md §2.5` — Notifications table (`user_id` field = per-user scope)
+  - PARENT §10 DEP-5 row (line 320) — PM B's proposed 2-line fix
+  - PARENT §2 line 118 — Nathan's inaccurate "observed SHIPPED" claim
+  - `CLAUDE.md §5` — TypeScript strict mode (`userId: string` non-optional matches SessionUser shape)
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Two-file change: extend `TenantContext` to carry `userId` + update `deriveTenantContext` to copy it + update T03 tests. **NO** other file touched.
+
+Final `tenant-guard.ts` shape (only 3 hunks change):
+```ts
+// (1) Add userId to TenantContext interface (line 22-27, add first field)
+export interface TenantContext {
+  userId: string;       // ← NEW (non-optional per spec §2.5 + SessionUser)
+  hotelId: string;
+  isSuperAdmin: boolean;
+  role: SessionRole;
+  deptId?: string;
+}
+
+// (2) Add userId copy to deriveTenantContext body (line 33-46, add first assignment)
+export function deriveTenantContext(user: SessionUser | undefined): TenantContext {
+  if (!user) {
+    throw new AuthError('No session on request');
+  }
+  const ctx: TenantContext = {
+    userId: user.userId,   // ← NEW
+    hotelId: user.hotelId,
+    isSuperAdmin: user.role === 'super_admin',
+    role: user.role,
+  };
+  if (user.deptId !== undefined) {
+    ctx.deptId = user.deptId;
+  }
+  return ctx;
+}
+```
+
+Test file update: add 1 new test `it('should copy userId from SessionUser to TenantContext')` + update the 14 existing tests' `SessionUser` fixtures to include `userId` (they already do per T03 code — verify no fixture is missing it after adding TenantContext expectations).
+
+**Design decision — `userId` REQUIRED (non-optional)**
+
+Per `SessionUser` shape at line 15-20 (`userId: string`), the source is always non-null. Copying to TenantContext as non-optional is spec-correct. Downside: any consumer that constructs a bare `TenantContext` literal (bypassing `deriveTenantContext`) will get a typecheck error until they add `userId`. This is DELIBERATE — the type system forces the correct shape.
+
+Alternative considered (`userId?: string` optional) — rejected: propagates unnecessary null-checking burden to every consumer + weaker type + doesn't match spec.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — imports unchanged
+- **No `any` / `console.log` / `throw new Error(` / default export** — same drift rules
+- **Do NOT modify Nathan's `src/modules/tickets/*` / `src/modules/guests/*` files** — Slot B territory
+- **Do NOT modify T04 rbac.ts / tenant-guard.hooks.ts / T07-slice-1 error classes / T06 ticket-state-machine.ts** — out of scope
+- **Do NOT touch other `src/plugins/*` files** (rbac.ts stays untouched — reads TenantContext, will auto-pick up new field)
+- **Pure fn design preserved** — `deriveTenantContext` remains pure
+- **Explicit return type** on `deriveTenantContext` already `: TenantContext` — verify unchanged
+
+**Files to modify** (2 total, 0 create)
+- `src/plugins/tenant-guard.ts` — 3 hunks: `TenantContext` interface (add 1 line), `deriveTenantContext` body (add 1 line in the ctx object literal), no signature change
+- `src/plugins/__tests__/tenant-guard.test.ts` — add `userId` fixture assertions where missing + 1 new test `it('should copy userId from SessionUser to TenantContext')`
+
+**T-INFRA-02 DoD**
+- [ ] `TenantContext.userId: string` (required, non-optional) — verified via file read + TypeScript typecheck
+- [ ] `deriveTenantContext(user)` copies `user.userId` → `tenant.userId` — verified via new test
+- [ ] All 14 existing T03 tenant-guard tests still pass (fixtures already have userId per SessionUser shape)
+- [ ] New test `it('should copy userId from SessionUser to TenantContext')` verifies mapping
+- [ ] All 3 T04 tenant-guard.hooks tests still green (they use SessionUser fixtures with userId)
+- [ ] All 11 T04 rbac tests still green (they construct TenantContext via `deriveTenantContext(...)` → auto-inherits userId; if they construct literal TenantContext directly, may need userId in fixture — flag if so)
+- [ ] Nathan's Slot B tests still green — verified via full `make check` (T11/T13/T14/T15 preserved). If ANY Slot B test breaks at typecheck due to missing userId in a TenantContext literal, exec-A **STOPS**, notes in SUBMIT as GAP, PM A coordinates fix path with PM B (may require B-side fixture update outside T-INFRA-02 scope)
+- [ ] `make check` PASS with **~191 tests** (190 baseline + 1 new)
+- [ ] Drift scans clean on both files (0 `any`, 0 `console.log`, 0 `throw new Error(`, 0 default export)
+- [ ] `git diff main -- package.json pnpm-lock.yaml` empty
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **Grep Slot B / Slot C TenantContext literals** — before coding, run:
+   ```bash
+   grep -rn "TenantContext" src/modules/ src/entrypoints/
+   ```
+   Enumerate every usage. Two patterns matter:
+   - **Via `deriveTenantContext(user)`**: auto-benefits from the fix, no consumer change. ✓
+   - **Via bare literal `const t: TenantContext = { hotelId, ... }`**: will FAIL typecheck when `userId` becomes required. Flag in PLAN with file:line refs. If found in Nathan's tests, coordinate before shipping (fixture update needed on his side). If found in Nathan's production code, this is a real seam that needed userId anyway — Nathan can update in T19 PLAN.
+   
+2. **Rbac tests fixture pattern check** — T04's `src/plugins/__tests__/rbac.test.ts:9-16` constructs test fixtures. Confirm whether they go through `deriveTenantContext(...)` (safe) or bare TenantContext literal (needs fixture update). Read the file. If bare, T-INFRA-02 scope grows to include rbac.test.ts fixture update (still Slot A territory, allowed).
+
+3. **Hooks tests fixture pattern check** — T04's `src/plugins/__tests__/tenant-guard.hooks.test.ts:36-79`. Same check as #2. `SessionUser` fixtures already include userId per T03 shape, so the derived TenantContext will auto-carry it. Likely no changes needed. Verify.
+
+4. **Nathan's H13 "observed SHIPPED" claim reconciliation** — PARENT §2 line 118 says "DEP-5 observed SHIPPED by Slot A (`ctx.userId` on `TenantContext`)". PM A confirmed via file read this is inaccurate. Two possibilities: (a) Nathan misread another commit (e.g., saw SessionUser has userId and conflated), or (b) Nathan's Slot B code already assumes `tenant.userId` exists and would show typecheck errors on fresh checkout. Advisory: grep as part of #1 — if Nathan is already referencing `tenant.userId` in his module code, his current branch is broken at typecheck. If so, T-INFRA-02 unblocks his fix too. Note findings in PLAN.
+
+5. **`FastifyRequest.tenant?` augmentation impact** — `tenant-guard.types.ts` line 28-32 augments `FastifyRequest.tenant?: TenantContext`. When TenantContext gains userId, all `req.tenant?.userId` accesses become typed. No file change needed to types.ts — but verify tsc doesn't complain about the augmentation module.
+
+6. **Test count reconciliation** — 190 baseline + 1 new = **191 tests** expected. Adv #6 (from T06) `noUncheckedIndexedAccess` pattern doesn't apply here (no Record indexing). Standard test-count sanity. Flag in SUBMIT if delta differs.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T-INFRA-02 → approved
+  - Update PARENT §3b DEP-5 → resolved
+  - Update PARENT §10 DEP-5 → resolved
+  - Correct PARENT §2 record: note that Nathan's H13 "observed SHIPPED" was inaccurate; actual ship is T-INFRA-02
+  - Post roll-up
+  - Notify PO to merge → post-merge Nathan can PLAN T19
+
+Awaiting **PLAN T-INFRA-02** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
