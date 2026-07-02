@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-03 APPROVED (`feat/foundation-testglob-split` @ `59b12cd`, awaiting PO merge). PM A pauses + awaits PO direction. Mitigation from `feedback_git_slip_transparency.md` held — no 4th slip recurrence.
-- **Branch (last active task)**: `feat/foundation-testglob-split` @ `59b12cd` — awaiting PO merge.
-- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02 (all merged to main) · **T-INFRA-03** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T05 seed (main queue per PO strict directive) — ASSIGNMENT posted §2, awaiting exec-A PLAN. S2 default (runtime Prisma upsert) per silent-ratification of PARENT §10 T05 coord Q. T-INFRA-03 merged (PO commit `cf65e99`).
+- **Branch (current active task)**: `feat/foundation-seed-hotel-core` (per PO branch-per-task policy)
+- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · T-INFRA-02 ✅ · **T-INFRA-03 ✅** · T-INFRA-04 candidate (CI/check-full — PO decision via §10) · T05 seed (PM B input pending via §10) · DEP-4 api.ts bootstrap · docs/TESTING.md dev-flow update (planning) · T08–T10 backlog
+- **My queue (T01–T10 main-queue FIRST per PO directive)**: T01–T04 ✅ · T06 ✅ · T-INFRA-01 ✅ · T-INFRA-02 ✅ · T-INFRA-03 ✅ · T07-slice-1 ✅ · **T05 (assigned, active)** · T08 multipart (next main-queue) · T09 CSV · T10 workers · THEN electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts), docs/TESTING.md (planning), T-INFRA-05+ (backlog only).
 
 ---
 
@@ -32,7 +32,7 @@
 | T02 | Prisma schema initial migration (18 HC tables + indexes + CHECK constraints) | approved | PM A (Nanak) | 2 migrations applied: init + CHECK/partial-indexes; DEV DB deviation: fresh `hotel_core_dev` DB (Opsi C) — see PARENT §4 |
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
-| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
+| T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | assigned | — | Main queue per PO directive. S2 default (runtime Prisma upsert) per silent-ratification of PARENT §10 T05 Opsi C coord Q. Modifies existing `prisma/seeds/index.ts` stub. Env `SEED_HOTEL_ID` with default UUID; idempotent upserts. PM B welcome to review/override at SUBMIT stage. |
 | T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
 | T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
@@ -2848,6 +2848,98 @@ Exec-A flagged in SUBMIT — planning-doc territory per EXECUTOR-PROTOCOL §10, 
 PM A pauses + awaits PO next-task direction.
 
 Ship it.
+
+### ASSIGNMENT T05 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-seed-hotel-core` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T05 (PO strict main-queue directive — T01-T10 before electives)
+- Depends on: T02 ✓ (Prisma schema migrated), T-INFRA-01 ✓ (real Prisma client), T-INFRA-02 ✓ + T06 ✓ + T07-slice-1 ✓ + T-INFRA-03 ✓ (all merged)
+- Downstream benefit: unblocks `make start-fresh` demo flow + provides Satrio's future integration test seed data
+- Spec / reference (WAJIB read before PLAN):
+  - `prisma/schema.prisma:40-63` (Hotel — id-only stub per Opsi C), `:82-102` (Department — hotelId+name+code, unique on hotel+code), `:284-323` (MenuCategory + MenuItem), `:325-341` (KnowledgeEntry)
+  - `prisma/migrations/20260701112000*/migration.sql` — CHECK constraints applied at T02 (verify seed values don't violate)
+  - `package.json:32` — `"seed": "tsx prisma/seeds/index.ts"` (existing invocation via tsx, not ts-node)
+  - `prisma/seeds/index.ts` — current stub (commented-out template + console.warn); modify in-place
+  - `docs/spec/02-hotel-core.md §4` deviation (Opsi C: no Auth API access in dev)
+  - PARENT §10 T05 Opsi C coord Q — silent-ratification path activated
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Modify existing `prisma/seeds/index.ts` stub to a real seed implementation shipping S2 (runtime Prisma upsert per silent-ratification of PARENT §10 coord Q):
+- 1 hotel row (env-configurable `SEED_HOTEL_ID`, fallback default UUID)
+- 5 departments (concierge, housekeeping, F&B, engineering, front-office — codes ≤ 8 chars per schema VarChar constraint)
+- Sample menu (3 categories × 3-4 items each = ~10 items)
+- Sample KB (5-6 entries — mix of Q&A + policy)
+- All operations via `prisma.<model>.upsert({ where: { id }, create: {...}, update: {} })` — idempotent
+- Own `PrismaClient` instance (NOT the singleton — see design rationale below)
+
+**Design decisions ratified in ASSIGNMENT (silent-ratification of S2 default)**
+
+Per PARENT §10 T05 coord Q, PM A defaulted to **S2 (runtime Prisma upsert)** after T-INFRA-03 merge + ~1 session cycle no PM B signal. PM B is currently mid-T12 wip; his silence isn't objection, just attention focus. He remains welcome to review/override at SUBMIT stage or in a future PR — zero breakage risk since seed script is dev-only. If exec-A finds Nathan's Slot B code has fixture ID conventions worth aligning with (e.g., hotel IDs used in testcontainer fixtures), note in PLAN and PM A will coord.
+
+**Why own `PrismaClient` (not the T-INFRA-01 singleton)**:
+- Singleton at `@core/prisma/prisma-client.js` calls `loadConfig()` at module top → requires ALL env vars (JWT secrets, encryption key, etc.). Seed script only needs DATABASE_URL — using singleton would fail-fast on unrelated env in dev machines that just want to seed data.
+- Singleton registers SIGTERM/SIGINT handlers (per T-INFRA-01 mitigation guarded by `NODE_ENV !== 'test'`) — unnecessary noise for a short-lived seed run.
+- Prisma seed convention (their docs) instantiates its own client anyway.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — Prisma + PrismaClient already available; `tsx` (used by `pnpm seed`) already in devDependencies
+- **No `throw new Error(`** in service files — but seed script is script territory; standard `throw new Error(msg)` OK at top-level (main fn catch → `process.exit(1)`). AppError subclass NOT needed for seed context.
+- **No `any`** — use proper Prisma types (`Prisma.HotelCreateInput`, etc.)
+- **No default export** — the seed file uses top-level async invocation (per template)
+- **`console.warn` and `console.error` ALLOWED** in seed per drift rule exception (`console.log/info/debug` still banned)
+- **Do NOT import from `@core/prisma/prisma-client.js`** — instantiate own `PrismaClient` (see rationale)
+- **Do NOT touch `prisma/schema.prisma`** — no schema changes, no new migrations
+- **Do NOT touch any file in `src/`** — pure seed-side work
+- **Do NOT touch Slot B modules** — obvious
+- **Idempotent via `upsert`** — running `pnpm seed` twice must not error or duplicate
+- **Explicit return type** on `main` fn (`Promise<void>`)
+- **Deterministic UUIDs** — hardcoded stable UUIDs for all seed IDs (not `randomUUID()`), so re-runs land the same rows
+
+**Files to modify** (1, 0 create)
+- `prisma/seeds/index.ts` — replace stub body with real implementation
+
+**Files NOT touched** (per HARD constraints)
+- `prisma/schema.prisma`, `prisma/migrations/*`, `package.json`, `pnpm-lock.yaml`, all `src/`, all `docs/`
+
+**T05 DoD**
+- [ ] `prisma/seeds/index.ts` implements S2 (Prisma upsert, own PrismaClient, env-configurable hotel ID)
+- [ ] 1 hotel row seeded (id = `process.env.SEED_HOTEL_ID ?? '<fixed-default-uuid>'`)
+- [ ] 5 department rows seeded — codes ≤ 8 chars, unique per hotel, `escalation_chain` + `operating_hours` as valid JSON (empty `{}` OK per schema default), `is_active: true`
+- [ ] Menu: 3 categories + 9-12 items (spread across categories, valid `price_idr` Decimal, `is_available: true`)
+- [ ] KB: 5-6 entries (mix of policy + Q&A, `tags` as string[] per schema)
+- [ ] `pnpm seed` runs successfully on **empty** DB — evidence: fresh `hotel_core_dev` state
+- [ ] `pnpm seed` runs successfully on **already-seeded** DB (idempotent proof) — evidence: 2nd run completes with no errors, no duplicate rows
+- [ ] All existing 191 unit + 32 integration tests still pass — `make check` PASS
+- [ ] Drift scans clean on `prisma/seeds/index.ts` (0 `any`, 0 `console.log/info/debug`, 0 default export; `throw new Error` at top-level main fn OK per script context)
+- [ ] `git diff main -- package.json pnpm-lock.yaml prisma/schema.prisma prisma/migrations/` = **empty** (no dep, no schema, no migration changes)
+- [ ] Own `PrismaClient` instantiated (not the singleton import) — verified via file read
+- [ ] Silent-ratification note documented in seed file JSDoc header
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **Schema field verification before coding** — Read `prisma/schema.prisma` lines 82-102 (Department), 284-323 (Menu*), 325-341 (KnowledgeEntry) and enumerate required fields per model. Especially watch: Department `code` is `VarChar(8)` (hard 8-char limit), MenuItem `priceIdr` is `Decimal(12, 2)` (needs Prisma `Decimal` type or string), KnowledgeEntry `tags` is `String[]` (Postgres array). Note any surprises in PLAN.
+
+2. **CHECK constraints from T02 raw SQL migration** — `prisma/migrations/20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql` added ~19 CHECK constraints at T02. Grep for CHECK definitions relevant to Department / MenuCategory / MenuItem / KnowledgeEntry BEFORE picking seed values. Common issues: department `code` format constraint, menu item `price_idr > 0` constraint, etc. If any seed value would violate, adjust in PLAN.
+
+3. **Own PrismaClient vs singleton** — rationale spelled out in ASSIGNMENT. Verify by grepping `import.*prisma-client` in your final seed file — should be **0 hits**. Instead: `import { PrismaClient } from '@prisma/client'` + `new PrismaClient()`. Also: no need for `db.$disconnect()` in the `.finally()` — but do it for hygiene per Prisma template.
+
+4. **Idempotent upsert vs create** — every insert must be `prisma.<model>.upsert({ where: { id: '<uuid>' }, create: {...}, update: {} })`. Note: `update: {}` = no-op on re-run (won't overwrite existing rows). If you want re-run to update mutable fields (e.g., menu prices), consider `update: { priceIdr: ... }` — but conservative default is `{}`. Justify choice in PLAN.
+
+5. **Env variable convention** — `process.env.SEED_HOTEL_ID` with fallback default UUID. No zod validation (seed context is different from service context; short-lived, permissive). Default UUID should be a stable, memorable-ish value — suggest `'00000000-0000-4000-8000-000000000001'` (valid v4 UUID shape, all zeros pattern for demo). Confirm in PLAN.
+
+6. **Slot B integration test seed IDs — grep before coding** — Nathan uses testcontainers for integration tests (spins own DB + own fixtures). Grep `src/modules/tickets/__tests__/*.integration.test.ts` + `src/modules/guests/__tests__/*.integration.test.ts` for hotel ID / department ID conventions in fixtures. If Nathan uses specific patterns (e.g., all-A UUIDs, hardcoded department codes), align seed values where possible — reduces friction if Satrio later wants shared seed vs fixture data. If no clear pattern, use your own defaults. Not blocking — just note findings.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T05 → approved
+  - Post roll-up to PARENT §2
+  - Add annotation to PARENT §10 T05 coord Q noting silent-ratification path was taken (S2 shipped as default) — PM B welcome to review/comment retro
+  - Notify PO to merge
+  - Next Slot A queue: T08 multipart upload (main queue per PO strict directive)
+
+Awaiting **PLAN T05** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
