@@ -12,11 +12,13 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **1/10 approved** (T21 APPROVED attempt 1)
-- **Active task**: **T21 Departments CRUD** — APPROVED attempt 1 (2026-07-03 H0), awaiting PO merge of `feat/settings-departments-crud` @ `55887f0`
-- **Branch**: `feat/settings-departments-crud`
+- **Day**: H0 (2026-07-03) — Slot C **1/10 approved**; **T25-slice-1 assigned**
+- **Active tasks**:
+  - **T21 Departments CRUD** — APPROVED attempt 1, awaiting PO merge (`feat/settings-departments-crud` @ `55887f0`)
+  - **T25 WA templates lifecycle (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Slice-1 = 5 public endpoints + log-only Integration relay stub. Meta-callback ingest = slice-2 (needs foundation HMAC plugin + INTEGRATION_SHARED_SECRET env).
+- **Branches**: `feat/settings-departments-crud` (T21, awaiting PO merge) · `feat/wa-templates-lifecycle` (T25, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 approved; T22–T30 backlog (see §8 note) — T26 + T30 hard-blocked at DEV by Opsi C DB deviation (PARENT §4). Next candidate: T25 (WA templates) or T28 (settings/agents) — both fully unblocked, no PO-merge chain dependency
+- **My queue (preview)**: T21 approved; T25 assigned; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C
 
 ---
 
@@ -27,6 +29,7 @@
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-departments-crud` @ `55887f0` — **awaiting PO merge**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); `pnpm test:integration` **83/1/84** (all Slot B suites regression-clean); coverage **96.07% lines** module-wide. Drift 0/9. Q-C-02 rolls up to PARENT §3b (PO ratify pre-staging). Zero-touch `api.ts` (Override #1 held). PM ratified exec's ticket-status enum interpretation (more spec-faithful than my DoD wording — Note #1). |
+| T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T25-slice-1 issued 2026-07-03 H0. Scope: **5 public endpoints only** (`GET/POST /api/wa-templates`, `PATCH/DELETE /:id`, `POST /:id/resubmit`) + `IntegrationRelayPort` + `LogOnlyIntegrationRelayAdapter` MVP stub (matches MVP §W2/W4/W5 pattern). Business rules: approved-lock 422 `WA_TEMPLATE_LOCKED`; global-on-hotel-write 403; resubmit-guard 422; DELETE state-branch (pending→delete, approved/rejected→archive); P2002 → 409 `WA_TEMPLATE_NAME_TAKEN`. **Meta-callback ingest DEFERRED to T25-slice-2** (needs foundation HMAC plugin + `INTEGRATION_SHARED_SECRET` env — foundation/security concern). Zero touch on `api.ts` (T21 Override #1 pattern held). 4 GAPs pre-surfaced (T25-#1..#4). Awaiting Executor C PLAN. |
 
 ---
 
@@ -370,6 +373,148 @@ Step 8 — Verdict: **APPROVED**
 **§1 task tracker updated · §3 Q-C-02 rolls up to PARENT §3b · Short roll-up posted to PARENT §2 · Q-C-01 + Q-C-03 stay slot-scoped (provisional-resolved).**
 
 **PO merge please**: branch `feat/settings-departments-crud` @ `55887f0` ready for main merge. Q-C-02 (`SKIP_CROSS_DB_CHECKS` env flag) needs PO ratification pre-staging — root fix routes via PARENT §4 Opsi A / multi-schema decision (foundation, not this task). Slot C **1/10 approved**.
+
+---
+
+### ASSIGNMENT T25 — WA templates lifecycle (slice-1) — issued by PM C at 2026-07-03 H0
+
+- **Routed from**: `PM-STATUS-PARENT.md §1` T25 (Slot C queue; T21 merged/awaiting, next unblocked Slot C task per PM C selection).
+- **Branch (to create on claim)**: `feat/wa-templates-lifecycle`
+- **Slice ruling**: **slice-1 = 5 public endpoints + status-transition service + stub RPC (log-only adapter for Integration relay)**. **Meta-callback ingest DEFERRED to T25-slice-2** — see PM notes for rationale.
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.9 (endpoints), §2.8 (DDL), §6 RBAC row `/api/wa-templates*`, §7 error catalog (`WA_TEMPLATE_LOCKED`); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C5 (AC) + §4.8 (approved-lock rule) + §W2/W4/W5 pattern for RPC stubs.
+- **Module template**: `docs/MODULE_TEMPLATE.md`. Living reference: `src/modules/departments/` (T21 approved) — same 8-file layout + port/adapter subdirs for the RPC seam.
+
+**Scope — slice-1 (5 public endpoints)**
+
+| Method   | Path                             | Purpose                                                                                     |
+| -------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/wa-templates`              | List global + hotel-specific for `req.tenant.hotelId`                                       |
+| `POST`   | `/api/wa-templates`              | Create hotel-scoped template (`status='pending'`) + call `IntegrationRelayPort.relaySubmit` |
+| `PATCH`  | `/api/wa-templates/:id`          | Edit hotel-scoped template — locked when `status IN ('approved','archived')` → 422          |
+| `DELETE` | `/api/wa-templates/:id`          | `pending` → delete row · `rejected`/`approved` → update `status='archived'`                 |
+| `POST`   | `/api/wa-templates/:id/resubmit` | Only valid when `status='rejected'` → set `pending` + clear `rejection_reason` + relay      |
+
+**Deferred to T25-slice-2 (Meta-callback ingest)**
+- Internal endpoint `POST /internal/wa-templates/:id/status` (Integration → HC) to flip `pending` → `approved`/`rejected` + fill `approved_at`/`template_id_meta`/`rejection_reason`.
+- **Why deferred**: needs HMAC verify plugin (`src/plugins/verify-hmac.ts`) + `INTEGRATION_SHARED_SECRET` env — both are foundation/security cross-cutting per CLAUDE.md §6 WAJIB and PARENT §10; NOT settings-module scope. Building the HMAC helper inline would risk duplicate plugin + drift when foundation eventually ships the canonical one. Slice-2 will bundle: (a) foundation HMAC plugin, (b) `INTEGRATION_SHARED_SECRET` env, (c) internal callback route, (d) status-flip service method (already scaffoldable in slice-1 as an unexported method for slice-2 to wire). **Slice-1 satisfies MVP §C5 AC in full** (5 public endpoints listed; Meta-callback is called out in spec §1.9:289 but NOT in MVP AC bullet).
+
+**Data model** (already migrated via T02, verified `prisma/schema.prisma:343-363` — do NOT touch schema)
+- Table `wa_templates`, DDL at `docs/spec/02-hotel-core.md:601-627`.
+- Prisma model `WaTemplate` fields: `id`, `hotelId (nullable)`, `name`, `body`, `variables JSONB (default '[]')`, `language (default 'id')`, `status (default 'pending')`, `templateIdMeta`, `rejectionReason`, `isGlobal (default false)`, `approvedAt`, timestamps.
+- Migration CHECKs (verified in T02): `status IN ('pending','approved','rejected','archived')` + scope XOR `(is_global=true AND hotel_id IS NULL) OR (is_global=false AND hotel_id IS NOT NULL)` + `UNIQUE (hotel_id, name) NULLS NOT DISTINCT`.
+
+**RBAC** (spec §6:808 — `/api/wa-templates*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **NO** · staff: **NO**.
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])` (super_admin bypass at `rbac.ts:46` — T21 verified pattern).
+- **Global templates (`is_global=true`)**: **read-only at hotel level**. List includes them; POST/PATCH/DELETE/resubmit on `is_global=true` row → **403 FORBIDDEN** (see GAP T25-#1).
+
+**Business rules (all in service; use existing error hierarchy from T07-slice-1 + T04)**
+- POST: `status='pending'`, `hotel_id=ctx.hotelId`, `is_global=false` **hardcoded** — clients cannot elevate to global (spec §1.9:295 — global = "pre-approved by Qooma team", HC hotel-scope endpoint never creates global). Then call `integrationRelay.relaySubmit({templateId, hotelId, name, body, language, variables})`; adapter (log-only for slice-1) writes structured log line.
+- PATCH: `loadOwned` → tenant check → if `row.isGlobal === true`: `throw new ForbiddenError('Global template read-only at hotel level', {...})` → if `row.status IN ('approved','archived')`: `throw new BusinessRuleError('WA template locked', { rule: 'WA_TEMPLATE_LOCKED' })` (422) → apply patch to `name`/`body`/`variables`/`language` only (immutable fields: `status`, `template_id_meta`, `rejection_reason`, `approved_at`, `is_global`, `hotel_id`).
+- DELETE: `loadOwned` → tenant → if `isGlobal`: 403 → if `status='pending'`: `repo.delete(id)` → if `status IN ('approved','rejected')`: `repo.update(id, {status:'archived'})` → if `status='archived'`: 404 (already archived, idempotent-safe or `ConflictError('WA_TEMPLATE_ALREADY_ARCHIVED')` — see GAP T25-#3).
+- RESUBMIT: `loadOwned` → tenant → if `isGlobal`: 403 → if `status !== 'rejected'`: `BusinessRuleError({rule:'WA_TEMPLATE_NOT_REJECTED'})` (422) → `repo.update(id, {status:'pending', rejectionReason:null})` → `integrationRelay.relaySubmit(...)`.
+- UNIQUE(hotel_id, name) violation → 409 `ConflictError({reason:'WA_TEMPLATE_NAME_TAKEN', name})` (P2002 catch pattern from T21).
+
+**Files to create**
+```
+src/modules/wa-templates/
+├── wa-templates.types.ts                             (DomainWaTemplate, WaTemplateWire, DTO types)
+├── wa-templates.schema.ts                            (zod: create body + update body + resubmit param
+│                                                       + list query + id param; WaTemplateStatus enum
+│                                                       type-only; variables[] array of z.string())
+├── wa-templates.serializer.ts                        (Prisma row → snake_case wire)
+├── wa-templates.repository.ts                        (Prisma direct — ADR-0001;
+│                                                       findMany with global-OR-hotel WHERE,
+│                                                       findById, create, update, delete)
+├── wa-templates.service.ts                           (all business rules above; consumes
+│                                                       IntegrationRelayPort via constructor)
+├── wa-templates.routes.ts                            (Fastify plugin: 5 handlers; thin
+│                                                       requireTenant → requireRole → parse
+│                                                       → service → send)
+├── ports/
+│   └── integration-relay.port.ts                     (interface: relaySubmit + relayResubmit)
+├── adapters/
+│   └── log-only-integration-relay.adapter.ts         (MVP stub per MVP §W2/W4/W5 pattern;
+│                                                       winston log with structured payload;
+│                                                       returns { relayedAt: Date, messageId: string })
+├── index.ts                                          (barrel: routes plugin + service class +
+│                                                       buildWaTemplatesService factory +
+│                                                       IntegrationRelayPort + LogOnly adapter class +
+│                                                       public types only)
+└── __tests__/
+    ├── wa-templates.service.test.ts                          (unit; mock repo + mock port;
+    │                                                          branch coverage:
+    │                                                          - approved-lock → 422
+    │                                                          - archived-lock → 422
+    │                                                          - global on hotel → 403
+    │                                                          - resubmit not-rejected → 422
+    │                                                          - delete state-branch (pending vs approved/rejected)
+    │                                                          - is_global=false hardcoded on create
+    │                                                          - relay called on POST + resubmit
+    │                                                          - P2002 → CONFLICT translation
+    │                                                          - cross-tenant 404 leak-safe)
+    ├── wa-templates.routes.test.ts                           (unit; supertest-style Fastify inject;
+    │                                                          happy path + 401 + 403 dept_head/staff
+    │                                                          + 403 global-on-hotel-write
+    │                                                          + 404 cross-tenant
+    │                                                          + 422 lock + 422 name-required)
+    ├── log-only-integration-relay.adapter.test.ts            (unit; verify log payload shape +
+    │                                                          returns { messageId, relayedAt })
+    └── wa-templates.repository.integration.test.ts           (testcontainers real Postgres;
+                                                               CRUD; UNIQUE(hotel_id, name)
+                                                               NULLS NOT DISTINCT; scope-XOR CHECK;
+                                                               status-CHECK; tenant isolation;
+                                                               global-visible-to-hotel list)
+```
+
+**Files to modify**
+- **`src/entrypoints/api.ts`** — zero touch (T21 Override #1 pattern held; barrel-only wiring; DEP-4 registers).
+- **Zero env changes for slice-1** (no INTEGRATION_SHARED_SECRET yet — that's slice-2).
+
+**T25-slice-1 DoD**
+- [ ] 5 public endpoints wired: GET list · POST create · PATCH edit · DELETE · POST resubmit
+- [ ] Zod schemas at boundary: `CreateWaTemplateBodySchema` (name + body + variables[] + language optional) + `UpdateWaTemplateBodySchema.refine(non-empty).strict()` + `WaTemplateIdParamSchema` + `ListWaTemplatesQuerySchema` (status filter optional).
+- [ ] Tenant scope: `hotel_id` sourced from `ctx.hotelId` on create; `hotel_id` never accepted from body. Cross-tenant 404 (leak-safe per spec §7); global templates visible cross-hotel via list only.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on all 5; `dept_head` + `staff` → 403 (verified via routes test). super_admin bypass via `requireRole` (T21 pattern).
+- [ ] `is_global=true` hardcoded to `false` on POST (client cannot elevate); PATCH/DELETE/RESUBMIT on `is_global=true` row → 403 FORBIDDEN per GAP T25-#1 resolution.
+- [ ] Approved-lock: PATCH on `status='approved'` OR `status='archived'` → 422 `WA_TEMPLATE_LOCKED` (spec §7 canonical code); envelope via `BusinessRuleError` (T07-slice-1 merged) → `{code:'BUSINESS_RULE', details:{rule:'WA_TEMPLATE_LOCKED', currentStatus:<status>}}`.
+- [ ] Resubmit-guard: POST resubmit on `status !== 'rejected'` → 422 `BusinessRuleError({rule:'WA_TEMPLATE_NOT_REJECTED'})`.
+- [ ] Delete semantics: `pending` → row deleted; `approved`/`rejected` → `status='archived'` update; `archived` → per GAP T25-#3 resolution.
+- [ ] UNIQUE(hotel_id, name) NULLS NOT DISTINCT: P2002 catch (mirror T21 `isPrismaUniqueViolation` helper) → 409 `ConflictError({reason:'WA_TEMPLATE_NAME_TAKEN', name})`.
+- [ ] `IntegrationRelayPort` port defined; `LogOnlyIntegrationRelayAdapter` MVP stub adapter implements it and logs structured payload via winston (`module:'wa-templates', event:'integration_relay_stub', action:'submit'|'resubmit', templateId, hotelId, name, language`); returns `{ messageId: '<generated-uuid>', relayedAt: new Date() }`. Slice-2 will add HTTP adapter.
+- [ ] Service call sites for relay: POST + resubmit both call `integrationRelay.relaySubmit(...)` (or split `relaySubmit`/`relayResubmit` — exec choice, document in PLAN).
+- [ ] Response envelope: list = `{data: WaTemplateWire[]}` (small N per hotel — no cursor); single = `{data: WaTemplateWire}`; 201 on POST create; 200 on PATCH/RESUBMIT; 204 on DELETE-hard; 200 on DELETE-archive (returns updated row with `status:'archived'`).
+- [ ] Winston logger scoped to handler via `req.log.info({module:'wa-templates', action, correlationId})` (T21 pattern).
+- [ ] Unit tests: full branch coverage per file list above (mock repo + mock port).
+- [ ] Integration test: real Postgres via testcontainers; UNIQUE(hotel_id, name) NULLS NOT DISTINCT proven; scope-XOR CHECK proven (attempt to insert `is_global=true, hotel_id=<uuid>` should fail); status-CHECK proven; tenant isolation + global-visible-cross-hotel-list proven.
+- [ ] Line coverage ≥ 80% on new files (T21 shipped 96.07% — aim comparable).
+- [ ] `make check` (unit only, Docker-free) PASS with baseline = 312/1/313 (T21 merged baseline) OR 278/1/279 (pre-T21 baseline if T21 not yet merged at SUBMIT time) — declare which in SUBMIT.
+- [ ] `pnpm test:integration` PASS; all pre-existing suites regression-clean (departments/tickets/notifications/visits/guests).
+- [ ] Drift scans clean (no `any`, no `console.log`, no `throw new Error`, no default export outside entrypoints, no forbidden imports, no `.skip`, no wrap-Prisma interface, no hardcoded URL/secret, no setTimeout-for-delay).
+- [ ] Named exports only; barrel `index.ts` exposes public API (`waTemplatesRoutes` plugin + `WaTemplatesService` class + `buildWaTemplatesService` factory + `IntegrationRelayPort` interface + `LogOnlyIntegrationRelayAdapter` class + DTO types); NO repository/serializer/schema-parser internal leak.
+- [ ] Zero touch on `src/entrypoints/api.ts` (T21 Override #1 held).
+
+**PM notes for Executor C**
+
+- **Living reference**: `src/modules/departments/` (T21 approved) is the closest layout twin. Mirror service structure (`loadOwned` helper, P2002 `isPrismaUniqueViolation` helper, snake_case serializer, `.strict()` zod bodies, `refine(non-empty)` on update, thin routes, correlationId propagation).
+- **Port + adapter is REQUIRED** (CLAUDE.md §4 "WAJIB port + adapter" for Outbound notification RPC). Do NOT skip the port layer — even the log-only MVP adapter goes through the port. Slice-2 HTTP adapter must be plug-compatible; keep port surface minimal.
+- **Session-context**: import `SessionUser`, `SessionRole`, `TenantContext` from `@plugins/tenant-guard.js` (Slot-A authoritative, Q-B-02 resolved).
+- **Error hierarchy**: `BusinessRuleError` (422 domain rule) · `ConflictError` (409 UNIQUE/state) · `ForbiddenError` (403 global-on-hotel-write) · `NotFoundError` (404 leak-safe cross-tenant) · `ValidationError` (400 auto via error-handler from T07).
+- **No env changes in slice-1** — `INTEGRATION_SHARED_SECRET` is slice-2 concern. If you need any env for the adapter (e.g., a base URL), stub the log-only adapter to not require env → env addition = slice-2 with HTTP adapter.
+- **Fixture alignment**: integration test seed can use 3 of the 8 canonical global template names as `is_global=true` rows (e.g., `qooma_welcome`, `qooma_survey`, `qooma_daily_brief`) — matches spec §1.9 ADD-08.2 list. Hotel-scoped fixtures use hotel-specific names.
+- **Baseline math for SUBMIT**: base your `make check` count on current `main` at submit time; T21 may or may not be merged. State the delta explicitly (T21 +34 + T25 +Δ = final).
+- **Branch + commit**: `feat/wa-templates-lifecycle` · `feat(wa-templates): T25 slice-1 lifecycle + log-only Integration relay stub`.
+- **PLAN expectations**: session-start gate + files list + approach paragraph + GAP responses. Q-B-01/Q-B-02/Q-C-01..-03 already resolved; do NOT re-raise.
+- **Estimated size**: ~6h (slightly larger than T21 due to 5 endpoints + port/adapter + state-machine branching). If crossing ~4h with more than half done, post mid-task CHECKPOINT.
+
+**Expected GAPs — surface in PLAN before coding**
+
+- **T25-#1** — Global template edit-attempt from hotel scope: 403 FORBIDDEN vs 422 `GLOBAL_TEMPLATE_READONLY`? Spec §1.9:295 phrasing "read-only at hotel level" suggests authorization semantic (RBAC-adjacent). **PM lean: 403 FORBIDDEN** — matches spec phrasing + "hotel cannot mutate what Qooma team owns" auth semantic + doesn't overload BusinessRuleError with tenancy concerns. Alternative 422 `GLOBAL_TEMPLATE_READONLY` acceptable if exec finds a strong reason. Confirm choice in PLAN.
+- **T25-#2** — `name` field: enum-lock to the 8 ADD-08.2 canonical names or permissive VARCHAR(80)? Spec §1.9 lists 8 standard names as "8 standard names" AND SQL comment at §2.8:606 says "one of 8 ADD-08.2 names + **hotel-specific**". Migration is permissive VARCHAR(80). **PM lean: permissive** — mirror migration + supports hotel-specific extension per SQL comment. Enum-lock would break custom hotel templates.
+- **T25-#3** — DELETE on `status='archived'`: 404 (idempotent-safe treatment: "not found for delete purposes") or 409 `WA_TEMPLATE_ALREADY_ARCHIVED`? **PM lean: 409 with `ConflictError({reason:'WA_TEMPLATE_ALREADY_ARCHIVED'})`** — preserves "row exists but action invalid" semantic + gives FE a definitive signal. 404 would misrepresent state.
+- **T25-#4** — Port method signature: single `relaySubmit(payload)` used by both POST and resubmit (idempotent from Integration side, differentiated by `templateId` presence in Meta) or split `relaySubmit`/`relayResubmit` (two methods, clearer intent)? **PM lean: single `relaySubmit(payload)` with an `intent: 'create' | 'resubmit'` field on payload** — smaller port surface + slice-2 HTTP adapter easier to wire. Exec welcome to propose split if there's a concrete reason.
+
+Awaiting PM C ACK before coding begins.
 
 <!--
 TEMPLATE — copy untuk task baru:
