@@ -43,15 +43,16 @@
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
-| T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
+| T19 | Notifications CRUD | 🟡 assigned (awaiting PLAN) — new `notifications/` module | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
-| T18 | Manual visit create | ✅ approved (attempt 1) | `feat/visits-manual-create` @ `cccf28b` (merges clean) | ⏳ awaiting PO merge |
+| T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **7/10 merged (T11, T13, T14, T15, T12, T16, T17)** + **T18 approved (awaiting merge)** · 🟢 T19 ready (notifications) · ⚪ T20 (←T19). **8/10 done pending T18 merge. Visits module complete.** Sisa: T19, T20.
+**Counts**: ✅ **8/10 merged (T11, T13, T14, T15, T12, T16, T17, T18)** · 🟡 T19 assigned (notifications) · ⚪ T20 (←T19). Zero foundation blockers (only DEP-4 go-live). **Sisa 2: T19 → T20.** Visits module complete.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 12b — 2026-07-02 — T18 MERGED (PR #8); T19 issued.** Slot B **8/10 merged**, visits module complete. Issued **T19** (notifications CRUD, new `notifications/` module, per-user `ctx.userId` scope). Q-B-07 flagged (envelopes). Remaining: T19 (wip) → T20 (socket, last task). Finish line 2 tasks away.
 - **Loop 12 — 2026-07-02 — T18 APPROVED (visits module complete).** Manual visit create done (PM rerun: make check 230 no-Docker, coverage 96.84%, drift clean, merge dry-run CLEAN, T16/T17 regression clean — visits suite 80 tests, guest-guard cross-tenant 404 no-create). → merge `feat/visits-manual-create`. **8/10 done pending merge.** Visits trio (T16+T17+T18) complete. Remaining: **T19 (notifications) → T20 (socket)** = finish line.
 - **Loop 11b — 2026-07-02 — T17 MERGED (PR #7); T18 issued.** Slot B **7/10 merged**. Issued **T18** (manual visit create `POST /visits`, extends `visits/` — completes the visits trio). Q-B-13 flagged (body + response shape). Remaining: T18 (wip), T19 (notifications, ready), T20 (←T19).
 - **Loop 11 — 2026-07-02 — T17 APPROVED.** Visit reject + failed_3x approve-manual done (PM rerun: make check 219 no-Docker, coverage 96.48%, drift clean, merge dry-run CLEAN, **T16 regression clean** — visits suite 65 tests all green through generalized R3 transition map). → merge `feat/visits-reject-override`. **7/10 done pending merge. T17 merge unblocks T18** (same visits module). Remaining: T18, T19 (ready), T20 (←T19).
@@ -83,9 +84,9 @@
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
-| T18 | Manual visit create                                       | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 230 (no-Docker) + coverage 96.84% + drift clean + merge dry-run CLEAN + T16/T17 regression clean (80 tests). **Merge `feat/visits-manual-create` @ `cccf28b`.** Completes visits module. Awaiting PO merge. |
+| T18 | Manual visit create                                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #8 `5925c48`) 2026-07-02**. make check 230 + coverage 96.84% + T16/T17 regression clean. **Visits module complete.** |
+| T19 | Notifications CRUD + optimistic ops                       | assigned     | —              | Issued §2 (2026-07-02, DEP-5 ready). New `notifications/` module, per-user scope. Awaiting PLAN. Q-B-07 (envelopes). |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
-| T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
@@ -1505,6 +1506,34 @@ Verified by **my own rerun** on `feat/visits-manual-create` @ `cccf28b`.
 - → §1 tracker updated (approved); PARENT §1 T18 → approved; roll-up PARENT §2.
 
 Clean. **T18 closed — visits module fully done.** Remaining Slot B: T19 (notifications) + T20 (socket). 🟢
+
+---
+
+### ASSIGNMENT T19 — Notifications CRUD + optimistic ops — issued by PM B (Nathan) 2026-07-02 (H14)
+- Branch: `feat/notifications-crud` (off latest main) · Routed from PARENT §1 T19 = MVP §1.2 **B9** · Spec: `02-hotel-core.md §1.9` (endpoints L219-222 + optimistic note L240) + §2.5 DDL (`notifications`)
+- Dependency: T02 ✅ + **DEP-5 ✅ merged** (`ctx.userId` on `TenantContext`). **New greenfield module `src/modules/notifications/`** (disjoint — zero collision with any other task).
+- **Inherited floor** (verified at SUBMIT): `AppError` only; correlationId; module layout per `MODULE_TEMPLATE.md`; no cross-module import; zod `.strict()`; ≥80% cov; `make check`+integration green; drift 0. No prisma-generate/Docker workaround.
+
+**Scope (4 endpoints, role = ALL authenticated — NOT gm_admin-only)**
+- `GET /api/notifications` — current user's list, filter `?is_read`, pagination.
+- `GET /api/notifications/unread-count` — badge count.
+- `PATCH /api/notifications/:id/read` — mark one read.
+- `POST /api/notifications/mark-all-read` — mark all current-user unread → read.
+
+**DoD**
+- [ ] NT1 — **per-user scope on EVERY endpoint**: `WHERE user_id = ctx.userId AND hotel_id = ctx.hotelId` (super_admin does NOT bypass user-scope here — a notification is personal; super_admin still only sees their own). This is the crux of the task — a user must never see or mutate another user's notifications.
+- [ ] NT2 — `GET /notifications`: `?is_read` filter (bool), pagination (cursor keyset `created_at DESC, id` — reuse the T11/T15 codec *pattern*, **module-local** codec; T-CLEAN-02 consolidates later). Serializer snake_case (`id, type, title, body, link, metadata, is_read, read_at, created_at`).
+- [ ] NT3 — `GET /unread-count` → `{ data: { count } }` (or per Q-B-07) — count `is_read=false` for the current user.
+- [ ] NT4 — `PATCH /:id/read`: set `is_read=true`, `read_at=now`; **ownership** — a notification not owned by `ctx.userId` → `NotFoundError` 404 (anti-enumeration, not 403). Idempotent (already-read → still 200).
+- [ ] NT5 — `POST /mark-all-read`: mark all current-user unread → read in one `updateMany`; idempotent; return count or `{ data: { updated } }` (Q-B-07).
+- [ ] NT6 — tests: unit (scope build, read/unread) + integration (seed notifications for **≥2 users** → assert user A can't see/mark user B's; unread-count accuracy; mark-all idempotency; cross-tenant isolation). ≥80% cov. `make check`+integration green.
+
+**Open Q (raise in PLAN, don't guess):**
+- **Q-B-07** — (a) list envelope (cursor `{data,pageInfo:{nextCursor,hasMore}}` per §2.7?); (b) `unread-count` shape (`{data:{count}}` vs `{count}`); (c) `mark-all-read` response (count vs empty 200). Propose against §1.9 + FE MSW.
+
+**Session-start gate**: identity, read §1.9 + §2.5 `notifications` DDL, `make typecheck`/`make lint` clean. Then PLAN. **No code before PM B ACK.**
+
+Awaiting exec-B PLAN for T19.
 
 ---
 
