@@ -86,3 +86,11 @@ export type VerifyManualInput =
       readonly roomNumber: string;
       readonly nights: number;
     };
+
+// approve-manual (failed_3x override) payload. nights OPTIONAL (Q-B-12): derive
+// checkout when present. guest_name validate-only (Q-B-08, no cross-write to guests).
+export interface ApproveManualInput {
+  readonly guestName: string;
+  readonly roomNumber: string;
+  readonly nights?: number;
+}

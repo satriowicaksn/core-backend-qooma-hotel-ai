@@ -9,7 +9,7 @@ import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.
 
 import { deriveCheckout } from './visits.checkout.js';
 import type { VisitsRepository } from './visits.repository.js';
-import { parseListQuery, parseVerifyManual } from './visits.schema.js';
+import { parseApproveManual, parseListQuery, parseVerifyManual } from './visits.schema.js';
 import { serializeVisit } from './visits.serializer.js';
 import type {
   VerifyManualInput,
@@ -20,13 +20,22 @@ import type {
 } from './visits.types.js';
 
 const PENDING: VisitStatus = 'pending_verification';
+const FAILED: VisitStatus = 'failed_verification';
 
-// verify-manual only acts on a pending_verification visit. failed_verification
-// (approve-manual) is T17; every other current status is an invalid transition.
-// Visits own their status set — no shared state-machine import (per PM NUDGE).
-function assertPendingVerification(from: string, to: VisitStatus): void {
-  if (from !== PENDING) {
-    throw new BusinessRuleError(`Visit cannot transition ${from} → ${to} via verify-manual`, {
+// Module-local manual-verification transition map (R3, single source). Covers ONLY
+// the manual (GM-driven) transitions — checkin/checkout/cancel are system-driven and
+// out of scope. Visits own their status set — no shared state-machine import.
+const VISIT_TRANSITIONS: Readonly<Record<string, readonly VisitStatus[]>> = {
+  pending_verification: ['checked_in', 'rejected'],
+  failed_verification: ['checked_in'],
+};
+
+// Pre-tx guard: a truly-invalid target throws BEFORE any write. Per-endpoint source
+// is additionally enforced by the fixed `from` passed to verifyManualTx (a map-valid
+// but wrong-source transition → count===0 → re-resolve → 422).
+export function assertVisitTransition(from: string, to: VisitStatus): void {
+  if (!(VISIT_TRANSITIONS[from] ?? []).includes(to)) {
+    throw new BusinessRuleError(`Visit cannot transition ${from} → ${to}`, {
       rule: 'INVALID_VISIT_TRANSITION',
       from,
       to,
@@ -115,7 +124,7 @@ export class VisitsService {
     assertHotelOwnership(ctx, row.hotelId, 'Visit');
 
     const to = input.mode === 'approve' ? 'checked_in' : 'rejected';
-    assertPendingVerification(row.status, to);
+    assertVisitTransition(row.status, to);
 
     const data = this.buildTransitionData(input, row.checkIn, to);
     const count = await this.repo.verifyManualTx({ id, hotelId: row.hotelId, from: PENDING, data });
@@ -133,6 +142,91 @@ export class VisitsService {
     }
 
     this.deps.recordVisitAudit?.({ visitId: id, from: PENDING, to, actorUserId: ctx.userId });
+    this.deps.onVerificationResolved?.({ visitId: id, status: to });
+
+    const updated = await this.repo.findById(id);
+    if (!updated) {
+      throw new NotFoundError('Visit', id);
+    }
+    return { data: serializeVisit(updated) };
+  }
+
+  // Dedicated reject: pending_verification → rejected (Q-CONTRACT-15 coexists with
+  // verify-manual's { action: 'reject' }). No body — no persistable reason column
+  // yet (Q-B-09/Q-B-12); the request body is ignored.
+  async reject(ctx: TenantContext, id: string): Promise<VisitDetailResponse> {
+    return this.transition(ctx, id, PENDING, 'rejected', { status: 'rejected' });
+  }
+
+  // failed_3x override: failed_verification → checked_in. nights optional (Q-B-12);
+  // if present, derive checkout. guest_name validate-only (no cross-write to guests).
+  async approveManual(
+    ctx: TenantContext,
+    id: string,
+    rawBody: unknown,
+  ): Promise<VisitDetailResponse> {
+    const input = parseApproveManual(rawBody);
+    const row = await this.repo.findById(id);
+    if (!row) {
+      throw new NotFoundError('Visit', id);
+    }
+    assertHotelOwnership(ctx, row.hotelId, 'Visit');
+    assertVisitTransition(row.status, 'checked_in');
+
+    const data: Prisma.VisitUpdateManyMutationInput = {
+      status: 'checked_in',
+      roomNumber: input.roomNumber,
+      ...(input.nights !== undefined
+        ? {
+            nights: input.nights,
+            checkOut: deriveCheckout(row.checkIn, input.nights, this.deps.timezone ?? DEFAULT_TZ),
+          }
+        : {}),
+    };
+    return this.runTransition(ctx, id, row.hotelId, FAILED, 'checked_in', data);
+  }
+
+  // Shared transition path for the no-derivation cases (reject). Loads + guards, then
+  // delegates to runTransition. Kept separate so approve-manual can build derived data.
+  private async transition(
+    ctx: TenantContext,
+    id: string,
+    expectedFrom: VisitStatus,
+    to: VisitStatus,
+    data: Prisma.VisitUpdateManyMutationInput,
+  ): Promise<VisitDetailResponse> {
+    const row = await this.repo.findById(id);
+    if (!row) {
+      throw new NotFoundError('Visit', id);
+    }
+    assertHotelOwnership(ctx, row.hotelId, 'Visit');
+    assertVisitTransition(row.status, to);
+    return this.runTransition(ctx, id, row.hotelId, expectedFrom, to, data);
+  }
+
+  // Executes the status-guarded tx + count===0 re-resolve + seams + reload. The
+  // fixed `expectedFrom` is the per-endpoint source guard (reused across V2/T17).
+  private async runTransition(
+    ctx: TenantContext,
+    id: string,
+    hotelId: string,
+    expectedFrom: VisitStatus,
+    to: VisitStatus,
+    data: Prisma.VisitUpdateManyMutationInput,
+  ): Promise<VisitDetailResponse> {
+    const count = await this.repo.verifyManualTx({ id, hotelId, from: expectedFrom, data });
+    if (count === 0) {
+      const fresh = await this.repo.findById(id);
+      if (!fresh) {
+        throw new NotFoundError('Visit', id);
+      }
+      throw new BusinessRuleError('Visit status changed concurrently', {
+        rule: 'INVALID_VISIT_TRANSITION',
+        from: fresh.status,
+        to,
+      });
+    }
+    this.deps.recordVisitAudit?.({ visitId: id, from: expectedFrom, to, actorUserId: ctx.userId });
     this.deps.onVerificationResolved?.({ visitId: id, status: to });
 
     const updated = await this.repo.findById(id);

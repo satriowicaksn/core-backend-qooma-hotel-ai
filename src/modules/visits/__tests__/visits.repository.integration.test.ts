@@ -232,3 +232,66 @@ describe('VisitsService.verifyManual (integration)', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+describe('VisitsService.reject (integration)', () => {
+  it('should reject a pending visit → rejected (dedicated endpoint, no body)', async () => {
+    const res = await service.reject(gmA, visitId(0));
+    expect(res.data.status).toBe('rejected');
+    const row = await db.visit.findUnique({ where: { id: visitId(0) } });
+    expect(row?.status).toBe('rejected');
+  });
+
+  it('should 422 rejecting a non-pending visit and not mutate it', async () => {
+    // visit 2 = checked_in.
+    await expect(service.reject(gmA, visitId(2))).rejects.toBeInstanceOf(BusinessRuleError);
+    const row = await db.visit.findUnique({ where: { id: visitId(2) } });
+    expect(row?.status).toBe('checked_in');
+  });
+
+  it('should 404 a cross-tenant reject and leave it untouched', async () => {
+    await expect(service.reject(gmA, visitId(99))).rejects.toBeInstanceOf(NotFoundError);
+    const row = await db.visit.findUnique({ where: { id: visitId(99) } });
+    expect(row?.status).toBe('pending_verification');
+  });
+});
+
+describe('VisitsService.approveManual (integration)', () => {
+  // visit 3 = failed_verification, check_in 2026-06-11T03:00:00Z.
+  it('should approve a failed_verification visit → checked_in with derived checkout', async () => {
+    const res = await service.approveManual(gmA, visitId(3), {
+      guest_name: 'Budi Santoso',
+      room_number: '1210',
+      nights: 2,
+    });
+    expect(res.data.status).toBe('checked_in');
+    expect(res.data.room_number).toBe('1210');
+    expect(res.data.check_out).toBe('2026-06-13T11:00:00.000Z');
+    const row = await db.visit.findUnique({ where: { id: visitId(3) } });
+    expect(row?.status).toBe('checked_in');
+  });
+
+  it('should approve without nights (checkout stays null)', async () => {
+    const res = await service.approveManual(gmA, visitId(3), {
+      guest_name: 'Budi Santoso',
+      room_number: '1210',
+    });
+    expect(res.data.status).toBe('checked_in');
+    expect(res.data.check_out).toBeNull();
+    expect(res.data.nights).toBeNull();
+  });
+
+  it('should 422 approve-manual on a non-failed source and not mutate it', async () => {
+    // visit 0 = pending_verification (must use verify-manual, not approve-manual).
+    await expect(
+      service.approveManual(gmA, visitId(0), { guest_name: 'B', room_number: '1' }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+    const row = await db.visit.findUnique({ where: { id: visitId(0) } });
+    expect(row?.status).toBe('pending_verification');
+  });
+
+  it('should 404 a cross-tenant approve-manual', async () => {
+    await expect(
+      service.approveManual(gmA, visitId(99), { guest_name: 'B', room_number: '1' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
