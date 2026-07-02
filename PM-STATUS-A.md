@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-02 APPROVED (`feat/foundation-userid-tenant-context` @ `d0a0bcc`, awaiting PO merge). PM A pauses + awaits PO direction. Nathan self-corrected his DEP-5 misclaim in `438664d`, coordination clean.
-- **Branch (last active task)**: `feat/foundation-userid-tenant-context` @ `d0a0bcc` — awaiting PO merge.
-- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1, T06 (all merged to main) · **T-INFRA-02** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T-INFRA-03 (GAP-T11-3 test-glob split) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T-INFRA-02 merged (PO commit `e95a23d`). Nathan already claimed T12 + PLAN (`4ffd12f`); his Q-B-11 auto-resolves via T-INFRA-02.
+- **Branch (current active task)**: `feat/foundation-testglob-split` (per PO branch-per-task policy)
+- **Completed**: T01–T04, T-INFRA-01, T07-slice-1, T06, T-INFRA-02 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · **T-INFRA-02 ✅** · T-INFRA-03 (GAP-T11-3 test-glob, next candidate) · T05 seed (Opsi C — solicit PM B input) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01–T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · T06 ✅ · T-INFRA-02 ✅ · **T-INFRA-03 (assigned, next)** · T05 seed (Opsi C coord question posted PARENT §10, awaiting PM B input) · DEP-4 api.ts bootstrap (big go-live) · T07-slice-2+ (deferred) · T08–T10 backlog
 
 ---
 
@@ -34,7 +34,8 @@
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
 | T06 | Ticket state-machine helper + unit-test the transition table | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `4f4a5d0`)**. 2 files (helper 61 LOC + test 137 LOC, 40 tests, 100% coverage). T12 unblocked. |
-| T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-userid-tenant-context` @ `d0a0bcc` — **awaiting PO merge**. 10 files (3 Slot A + 7 Slot B test fixtures, PM A GAP-1 Path B scope override, all guardrails verified). 191/193 tests pass on branch (+1 vs 190 baseline). 100% coverage on `tenant-guard.ts`. Drift 0/6 clean. Slot B production untouched. Cherry-pick transparency clean (3rd instance + adopted mitigation). Nathan self-corrected his DEP-5 misclaim in `438664d`. |
+| T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
+| T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | assigned | — | Addresses PARENT §3b GAP-T11-3. ~1 LOC change in `package.json:25` `test:unit` script (add `--testPathIgnorePatterns='\.integration\.test\.ts$'`). Non-blocking hygiene; benefits everyone's `make check` speed. |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -2458,6 +2459,91 @@ Per CLAUDE.md §12, **please merge `feat/foundation-userid-tenant-context` → `
 PM A pauses + awaits PO next-task direction.
 
 Ship it.
+
+### ASSIGNMENT T-INFRA-03 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-testglob-split` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T-INFRA-03 + §3b GAP-T11-3 (escalated by PM B / Nathan during T11 close-out; non-blocking hygiene deferred until now)
+- Depends on: T-INFRA-01 ✓ merged (foundation healthy), T-INFRA-02 ✓ merged
+- Downstream benefits: **everyone's `make check` speed** — post-fix, `make check` runs unit-only, no Docker/testcontainers startup, faster CI + faster local dev feedback. Nathan/Satrio/future-devs.
+- Spec / reference (WAJIB read before PLAN):
+  - `package.json:25-27` — current `test:unit` / `test:integration` / `test:coverage` script definitions
+  - `jest.config.ts:8` — `testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.integration.test.ts']` (the config itself is broad by design; fix is at script layer, not config layer)
+  - `Makefile:148` — `check: prisma-generate lint format-check typecheck test-unit` (help text says "unit test" — post-fix becomes accurate)
+  - PARENT §3b GAP-T11-3 line — original ask + proposed fix from PM B
+  - `CLAUDE.md §8` — testing rules (unit vs integration split)
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Single-line change in `package.json:25`. Current:
+```json
+"test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts",
+```
+
+Target:
+```json
+"test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts --testPathIgnorePatterns='\\.integration\\.test\\.ts$'",
+```
+
+Effect: `test:unit` now excludes `*.integration.test.ts` files. Since `.integration.test.ts` ends with `.test.ts`, the current `--testPathPattern` regex catches BOTH — `--testPathIgnorePatterns` filters out the integration subset.
+
+**No other files change.** Not touching `jest.config.ts` (`testMatch` stays broad by design — `test:integration` script relies on it). Not touching `Makefile`. Not touching any test files.
+
+**Design decision — script layer over config layer**
+
+Alternative was to add `testPathIgnorePatterns` to `jest.config.ts` as a top-level config field. Rejected because:
+- Config-level ignore would affect ALL jest invocations including `test:integration` (which explicitly targets integration tests)
+- Script-level lets each script (`test:unit`, `test:integration`, `test:coverage`) have independent glob rules
+- Fewer moving parts; easier to reason about which script runs what
+- Reversible: if we later add `test:e2e`, we can define its own script without conflict
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — no new dev dependencies (jest CLI flag is built-in)
+- **No `any` / `console.log` / `throw new Error(` / default export** — N/A (config file, no code changes)
+- **Do NOT modify `jest.config.ts`** — leave `testMatch` broad; the split is at script layer
+- **Do NOT modify Makefile** — `check` target stays as-is; the semantic changes (test-unit now truly unit-only)
+- **Do NOT modify any test files** — no test-logic changes
+- **Do NOT modify `src/`** — this is pure config
+- **`test:integration` must still work** — `pnpm test:integration` should still discover and run integration tests
+
+**Files to modify** (1 total, 0 create)
+- `package.json` — line 25 `test:unit` script (add `--testPathIgnorePatterns` flag)
+
+**T-INFRA-03 DoD**
+- [ ] `package.json:25` `test:unit` script now includes `--testPathIgnorePatterns='\\.integration\\.test\\.ts$'`
+- [ ] `make check` PASSES without spinning Docker/testcontainers — evidence in SUBMIT: no "Started PostgreSQL container..." log lines from `make check` output (only present when integration tests run)
+- [ ] Test count on `make check` drops from **191/193** (T-INFRA-02 baseline) to **~146** unit-only (delta = ~45 integration tests: ~11 tickets integration + ~5 guests integration + ~29 others per current baseline) — exact count TBD in SUBMIT
+- [ ] `pnpm test:integration` still runs integration tests (verify count matches the delta)
+- [ ] `pnpm test:coverage` still runs all tests (verify count matches full baseline)
+- [ ] Zero regression: all pre-fix passing tests still pass on their appropriate runner
+- [ ] Drift scan clean on `package.json` diff (no TS-rule categories apply; sanity check no accidental `console.log` or other insertion via editor)
+- [ ] `git diff main -- package.json` = single-line change (add flag to test:unit only)
+- [ ] `git diff main -- src/ jest.config.ts Makefile pnpm-lock.yaml` = empty (no unintended changes)
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **JSON string escape sanity** — `--testPathIgnorePatterns` value in JSON must double-escape backslashes. Target string in package.json: `'\\.integration\\.test\\.ts$'` (which is regex `\.integration\.test\.ts$` after JSON parse). Verify the escape count is right for both JSON parser AND jest regex compiler. Recommend using `pnpm test:unit --listTests` post-fix to confirm the regex matches expected files (integration ignored, unit kept).
+
+2. **Baseline test-count reconciliation** — before fix, run `pnpm test:unit` and count. Should be **191 pass / 2 skip / 193 total** (T-INFRA-02 baseline on main). After fix, run `pnpm test:unit` again — should be ~146 pass / 2 skip / 148 total (unit-only). Then run `pnpm test:integration` — should be ~45 pass / 45 total (integration-only). Sum should equal baseline. Include all 3 numbers in SUBMIT.
+
+3. **Verify `make check` no-Docker signal** — primary DoD verification. Post-fix, run `make check` in a shell where Docker is NOT already running (or with `docker ps` state noted). Expected: no testcontainers startup messages, `make check` completes in ~1-2 seconds vs current ~9 seconds. If Docker still spins → regex isn't excluding integration → REVISE regex.
+
+4. **`test:coverage` script — verify unchanged behavior** — `test:coverage` script at line 27 is `jest --coverage` (no path pattern). It should still discover ALL tests (unit + integration) via jest.config.ts `testMatch`. Verify post-fix: `pnpm test:coverage` counts = full baseline. If coverage dropped, `test:coverage` was accidentally inheriting `test:unit` — investigate.
+
+5. **CI implications** — GitHub Actions (or wherever CI runs) probably calls `make check` today. Post-fix, `make check` won't run integration tests. **This is a CI regression concern** — integration test coverage drops from CI unless CI is updated to also run `make check` + `pnpm test:integration` OR a new `make check-full` target is added. **This is OUT OF T-INFRA-03 scope** (Makefile / CI config is a separate concern that needs its own coord decision — maybe T-INFRA-04?). Note in SUBMIT as a follow-up hygiene item so PO can decide the CI strategy separately.
+
+6. **Nathan's dev-flow guidance** — post-fix, Nathan (and future devs) need to explicitly `pnpm test:integration` before pushing branches that touched integration test files. Otherwise regressions in integration land silently. Suggest adding a note to PARENT §10 or `docs/TESTING.md` post-merge: "run `pnpm test:integration` alongside `make check` before pushing integration-touching changes". Exec-A: **do NOT update docs/TESTING.md in this PR** (out of scope, planning doc); just flag in SUBMIT.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T-INFRA-03 → approved
+  - Update PARENT §3b GAP-T11-3 → resolved
+  - Post roll-up to PARENT §2
+  - Notify PO to merge
+  - Flag the CI-strategy follow-up (T-INFRA-04 candidate?) in PARENT §10 for PO decision
+
+Awaiting **PLAN T-INFRA-03** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
