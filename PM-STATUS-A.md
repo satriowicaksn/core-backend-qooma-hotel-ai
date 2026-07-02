@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T05 (seed scripts) — awaiting PM A to draft ASSIGNMENT. T-INFRA-01 APPROVED (`583d324` on `feat/foundation-prisma-ci`, awaiting PO merge).
-- **Branch (last active task)**: `feat/foundation-prisma-ci` — awaiting PO merge. Next branch TBD for T05.
-- **Completed**: T01, T02, T03, T04 (merged to main) · T-INFRA-01 (approved, awaiting merge)
+- **Active task**: T07-slice-1 (`BusinessRuleError` 422 — DEP-6 fix) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T-INFRA-01 merged (PO commit `9a50c6d`). Triage rationale: T07-slice-1 unblocks Nathan's T12 + T16-V2..5 chain (5 tasks) with a smaller PR than T05 seed which blocks nobody today.
+- **Branch (current active task)**: `feat/foundation-business-rule-error` (per PO branch-per-task policy)
+- **Completed**: T01, T02, T03, T04, T-INFRA-01 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T05 (next) · T06 (parallel-friendly) · T07–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · **T07-slice-1 (assigned, next)** · T05 seed · T06 (parallel-friendly) · T07-slice-2+ (deferred on demand) · T08–T10 backlog
 
 ---
 
@@ -38,7 +38,8 @@
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
-| T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). 2 files (Makefile 1-line + prisma-client.ts body rewrite). Fresh-checkout acceptance PASS on **simulated post-merge state** (144 tests incl. T13/T14/T15 all green). Branch `feat/foundation-prisma-ci` @ `583d324` — PO merge pending. Adv-#1 fallback not triggered. PARENT §3b GAP-T11-1 resolved. |
+| T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
+| T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | assigned | — | Addresses PARENT §10 DEP-6. Envelope shape ratified by PM B (`code = 'BUSINESS_RULE'` + `details.rule`). Small: extend `src/core/errors/app-errors.ts` + new test file. Unblocks T12 + T16-V2..5 (5 Slot B tasks). |
 
 ---
 
@@ -1105,6 +1106,108 @@ Under `.npmrc` `node-linker=isolated` + `shamefully-hoist=false`, pnpm 9 does NO
 3. **T07** common error handlers (HC-specific codes per spec §7)
 
 Ship it.
+
+### ASSIGNMENT T07-slice-1 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-business-rule-error` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T07-slice-1 + §10 DEP-6 (escalated by PM B / Nathan during T16 wip)
+- Depends on: T-INFRA-01 (merged ✓ — real Prisma singleton not consumed here, but foundation is healthy)
+- Downstream unblocks: **T12** (ticket status transition — invalid transition = `BUSINESS_RULE`) + **T16-V2..T16-V5** (visits verify-manual family — pending/failed_3x/manual verification rule violations). 5 Slot B tasks total.
+- Spec / reference (WAJIB read before PLAN):
+  - `src/core/errors/app-errors.ts` — existing `AppError` hierarchy + subclass pattern (ValidationError/AuthError/ForbiddenError/NotFoundError/ConflictError/RateLimitError/ExternalServiceError/TenantError/BillingRequiredError). New class must match this style.
+  - `docs/spec/02-hotel-core.md §7` — HC error catalog. Lists 5 specific 422 codes: `INVALID_TICKET_TRANSITION`, `MIN_AGENTS_VIOLATION`, `FEATURE_FLAG_DEPENDENCY_VIOLATION`, `WA_TEMPLATE_LOCKED`, `TIER_GATE`.
+  - `CLAUDE.md §5.4` — service must throw `AppError` subclass; plugin-error-handler translates to HTTP.
+  - `PARENT §10 row 317` — DEP-6 escalation + PM B's ratified envelope shape.
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Single-class addition to `src/core/errors/app-errors.ts` plus a fresh unit-test file. **Intentionally scoped as slice-1** — ships ONE class (the one Nathan needs today) rather than all 8 spec §7 codes. Rationale: Satrio (Slot C) hasn't started coding; his error codes can be shipped in slice-2+ on-demand without holding up Nathan's chain.
+
+Class shape (aligned with existing subclass pattern):
+```ts
+/**
+ * BusinessRuleError — HTTP 422 for domain rule violations
+ * (invalid state transitions, business invariant breaks).
+ *
+ * Wire contract per PARENT §10 DEP-6 (PM B ratified):
+ *   envelope `code = 'BUSINESS_RULE'` (generic category)
+ *   + `details.rule` = specific rule identifier
+ *     (e.g. 'INVALID_TICKET_TRANSITION', 'PENDING_VERIFICATION_ONLY')
+ *
+ * Consumer pattern:
+ *   throw new BusinessRuleError('Cannot transition closed → open', {
+ *     rule: 'INVALID_TICKET_TRANSITION',
+ *     from: 'closed',
+ *     to: 'open',
+ *   });
+ */
+export class BusinessRuleError extends AppError {
+  readonly statusCode = 422;
+  readonly code = 'BUSINESS_RULE';
+}
+```
+
+That's it — 2-line body + JSDoc, matches `ValidationError` / `ConflictError` / `RateLimitError` style (no custom constructor needed; base class handles `(message, details)`).
+
+**Envelope design note — WAJIB acknowledge in PLAN**
+
+Spec `docs/spec/02-hotel-core.md §7` lists 5 specific 422 codes at envelope level (`INVALID_TICKET_TRANSITION`, `MIN_AGENTS_VIOLATION`, etc.). PM B's ratified envelope for DEP-6 uses generic `BUSINESS_RULE` at envelope + specific rule in `details.rule`. **This is an intentional design divergence, not a bug** — categorization pattern chosen for cleaner consumer error handling (one `catch (BusinessRuleError)` block, discriminate on `details.rule`).
+
+- If PLAN wants to push back (e.g. propose per-rule subclasses `InvalidTicketTransitionError extends BusinessRuleError`), route via PLAN GAP → PM A will consult with PM B before ACK.
+- If PLAN accepts the envelope-generic + details-rule design (recommended, matches PM B's ruling), sertakan 1-line acknowledgment in PLAN referencing PARENT §10 DEP-6.
+- **This slice does NOT need to refactor spec §7's other 422 codes**. Class supports any `rule` string in details; when T12 lands it passes `rule: 'INVALID_TICKET_TRANSITION'`, when T28 lands (later) it passes `rule: 'MIN_AGENTS_VIOLATION'`, etc.
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No `throw new Error(`** — well-formed AppError subclass ✓
+- **No `any`** — class extends AppError which types details as `Record<string, unknown>`; keep it
+- **No default export** — named export only (`BusinessRuleError`)
+- **No new deps** — `@core/errors/app-errors.ts` needs no imports beyond what's already there
+- **Do NOT modify existing error classes** — AuthError/NotFoundError/etc. stay untouched (avoids merge-conflict risk with any Slot B in-flight branches referencing them)
+- **Do NOT touch other files** in this PR — `src/plugins/`, `src/modules/`, `src/core/config/`, `src/core/prisma/` all out of scope
+- **Do NOT wire error-handler HTTP mapping** — error-handler plugin is out of scope (may be stub per DEP-4). `toJson()` on base class + `statusCode` on subclass already give error-handler everything it needs when it gets wired; verify no active error-handler needs update
+
+**Files to modify** (1) + **create** (1)
+- Modify: `src/core/errors/app-errors.ts` — append `BusinessRuleError` class after `BillingRequiredError` (last existing subclass; keeps semantic ordering by HTTP status ascending: 400 → 401 → 402 → 403 → 404 → 409 → 422 → 429 → 500 → 502)
+- Create: `src/core/errors/__tests__/app-errors.test.ts` — first test file for this module. Sets a precedent — write cleanly.
+
+**T07-slice-1 DoD**
+- [ ] `BusinessRuleError` exported from `@core/errors/app-errors.js`
+- [ ] `statusCode === 422` (readonly)
+- [ ] `code === 'BUSINESS_RULE'` (readonly)
+- [ ] `extends AppError` — verified via `instanceof AppError` test
+- [ ] JSDoc documents Nathan's `details.rule` convention with the consumer example above
+- [ ] `toJson()` returns `{ code: 'BUSINESS_RULE', message, details }` — verified via test
+- [ ] Unit test suite for `BusinessRuleError`: (a) constructs with message + details.rule; (b) statusCode/code/name correct; (c) toJson shape matches Nathan's envelope; (d) instanceof AppError + instanceof Error
+- [ ] Bonus (optional but nice): 1-2 sanity tests for existing classes (e.g. AuthError statusCode=401, code=`AUTH_ERROR`) — establishes coverage for the hierarchy in this new test file. Exec-A discretion.
+- [ ] `make check` PASS (lint + format + typecheck + test:unit)
+- [ ] T03/T04/T-INFRA-01/T11/T13/T14/T15 tests all still green — verified via full test suite pass (should be ~146+ total post-slice-1)
+- [ ] Drift scans clean on both files (0 `any`, 0 `console.log`, 0 `throw new Error(`, 0 default export)
+- [ ] `git diff package.json` empty (no dep add)
+
+**Advisory PLAN checks (proactive gotcha flags)**
+
+1. **Test file location**: I did NOT find `src/core/errors/__tests__/` — this test file will be the first in that directory. Verify jest picks it up via existing `jest.config.ts` patterns (`__tests__/*.test.ts` should be auto-globbed; T03/T04 tests live at `src/plugins/__tests__/*.test.ts` and work). Sanity-check the test file is discovered by running `pnpm test:unit` and confirming the new test suite appears in the output — flag in SUBMIT if not.
+
+2. **`AppError` is abstract** — cannot directly `new AppError(...)` in test. Test via `BusinessRuleError` instance and cast to `AppError` for base-class behavior verification. Don't try to test the abstract class directly.
+
+3. **`Error.captureStackTrace` availability** — `AppError` uses optional chaining `Error.captureStackTrace?.(this, this.constructor)` (line 19). Works on V8 (Node/Chrome), undefined on other engines. Node 20 has it — no concern in this repo. Do NOT need to test stack trace shape.
+
+4. **Consumer verification (grep for existing Nathan usage)** — before coding, `grep -r "BusinessRuleError" src/modules/` to check if any Slot B branch (unmerged) has already referenced the class in expectation. If yes, verify shape matches. If exec-A finds an already-imported `BusinessRuleError` in Slot B code, the shape shipped MUST match — otherwise Nathan's next merge breaks. Note in PLAN what grep found.
+
+5. **HTTP status ordering in file** — existing classes are ordered by status: 400 → 401 → 402 → 403 → 404 → 409 → 429 → 500 → 502 (currently jumbled: BillingRequiredError 402 sits after ExternalServiceError 502). Options: (a) append `BusinessRuleError` at end regardless (matches current jumble — fine), (b) insert at 422 slot between 409 and 429 (cleaner). Exec-A choice; note rationale in PLAN. Not blocking either way.
+
+6. **`readonly` + subclass pattern** — TypeScript `readonly` class field on subclass must satisfy the abstract signature from parent. Verify via typecheck; should just work per existing 8-subclass proof.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T07-slice-1 → approved
+  - Post roll-up to PARENT §2
+  - Update PARENT §10 DEP-6 → resolved (or partially resolved if error-handler wiring pending)
+  - Notify PO to merge `feat/foundation-business-rule-error` → main
+  - After merge, ping PM B via cross-dev coord note that unblock is live
+
+Awaiting **PLAN T07-slice-1** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
