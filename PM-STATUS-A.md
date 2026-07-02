@@ -2060,6 +2060,119 @@ Alternative considered (`userId?: string` optional) — rejected: propagates unn
 
 Awaiting **PLAN T-INFRA-02** from exec-A.
 
+#### PLAN T-INFRA-02 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Add `userId: string` (REQUIRED / non-optional) field to `TenantContext` interface at `src/plugins/tenant-guard.ts:22-27` and copy it in `deriveTenantContext` body (line 33-46). Update `src/plugins/__tests__/tenant-guard.test.ts` with 1 new test asserting the userId mapping. **Advisory grep surfaced 2 downstream GAPs that require PM A decision before implementation** — see `GAP T-INFRA-02-#1` and `GAP T-INFRA-02-#2` below.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `src/plugins/tenant-guard.ts` (verified `SessionUser.userId: string` at line 16, `TenantContext` missing userId at line 22-27, `deriveTenantContext` at line 33-46) + `docs/spec/02-hotel-core.md §2.5` (Notifications = per-user scope) + PARENT §10 DEP-5 row ✓
+- Parent docs spot-read: `src/plugins/__tests__/tenant-guard.test.ts` (14 tests, property-level `.toBe(...)` assertions — safe re: shape change); `src/plugins/__tests__/tenant-guard.hooks.test.ts` (3 tests — **contains `.toEqual({tenant:{...}})` strict-shape assertion at line 44-46** — flagged as GAP-2); `src/plugins/__tests__/rbac.test.ts:9-16` (uses `deriveTenantContext({ userId: 'u-1', ... })` for all fixtures — SAFE, auto-inherits userId); `src/plugins/rbac.ts` (reads TenantContext, doesn't construct — SAFE) ✓
+- Dependencies: T03 ✓, T04 ✓, T-INFRA-01 ✓, T07-slice-1 ✓, T06 ✓ — all merged
+- `make typecheck` clean ✓ ; `make lint` clean ✓ (baseline dari post-T06 merge)
+- Scaffolder risk: **none** — 2 targeted hunks + 1 test add + 1 assertion update
+
+**Files to modify** (initial scope: 2; may expand to 3 if PM A resolves GAP-2 as in-scope)
+- `src/plugins/tenant-guard.ts` — 2 hunks: (a) add `userId: string;` as first field in `TenantContext` interface; (b) add `userId: user.userId,` as first field in the ctx literal inside `deriveTenantContext`
+- `src/plugins/__tests__/tenant-guard.test.ts` — append 1 new test `it('should copy userId from SessionUser to TenantContext')` under `describe('deriveTenantContext')`
+- **CONDITIONAL** `src/plugins/__tests__/tenant-guard.hooks.test.ts` — 1 assertion update at line 44-46 (add `userId: 'u-1'` to expected shape) — only if PM A resolves GAP-2 as in-scope
+
+**Approach**
+
+*(1) `tenant-guard.ts` — Final `TenantContext` + `deriveTenantContext`:*
+```ts
+export interface TenantContext {
+  userId: string;     // NEW — required per SessionUser + spec §2.5
+  hotelId: string;
+  isSuperAdmin: boolean;
+  role: SessionRole;
+  deptId?: string;
+}
+
+export function deriveTenantContext(user: SessionUser | undefined): TenantContext {
+  if (!user) {
+    throw new AuthError('No session on request');
+  }
+  const ctx: TenantContext = {
+    userId: user.userId,   // NEW
+    hotelId: user.hotelId,
+    isSuperAdmin: user.role === 'super_admin',
+    role: user.role,
+  };
+  if (user.deptId !== undefined) {
+    ctx.deptId = user.deptId;
+  }
+  return ctx;
+}
+```
+No signature change to `deriveTenantContext`. `assertHotelOwnership` + `assertDeptOwnership` are read-only consumers → unaffected. Pure fn preserved.
+
+*(2) `tenant-guard.test.ts` — Append 1 test:*
+```ts
+it('should copy userId from SessionUser to TenantContext', () => {
+  const user: SessionUser = { userId: 'u-42', hotelId: 'h-1', role: 'gm_admin' };
+  const tenant = deriveTenantContext(user);
+  expect(tenant.userId).toBe('u-42');
+});
+```
+Property-level assertion, matches existing test style. Bumps T03 suite from 14 → 15 tests.
+
+**Explicit resolution of PM A's 6 advisory checks**
+
+- **Adv #1 — Slot B / Slot C TenantContext consumer enumeration**: **CRITICAL FINDING — see GAP-1 below**. Full grep enumeration:
+  - **BARE `const X: TenantContext = { ... }` literals** (WILL FAIL typecheck when userId becomes required, ALL are Slot B test files owned by Nathan — HARD constraint forbids Slot A editing):
+    - `src/modules/tickets/__tests__/tickets.routes.test.ts:116` — `const GM: TenantContext = { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin' };`
+    - `src/modules/tickets/__tests__/tickets.repository.integration.test.ts:33` — `const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };`
+    - `src/modules/tickets/__tests__/tickets.repository.integration.test.ts:34` — `const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };`
+    - `src/modules/tickets/__tests__/tickets.repository.integration.test.ts:35-40` — `const deptHead1: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'dept_head', deptId: DEPT_1 };`
+    - `src/modules/tickets/__tests__/tickets.repository.integration.test.ts:41-46` — `const deptHead2: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'dept_head', deptId: DEPT_2 };`
+    - `src/modules/guests/__tests__/guests.routes.test.ts:93` — `const GM: TenantContext = { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin' };`
+    - `src/modules/guests/__tests__/guests.repository.integration.test.ts:28` — `const gmA: TenantContext = { HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };`
+    - `src/modules/guests/__tests__/guests.repository.integration.test.ts:29` — `const gmB: TenantContext = { HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };`
+  - **`Partial<TenantContext>` builders returning bare literal (same break, more subtle)** — verified via inspection: body is `return { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin', ...overrides };` with NO `userId` default → return-type check fails when TenantContext requires userId:
+    - `src/modules/tickets/__tests__/tickets.stats.test.ts:14-16`
+    - `src/modules/tickets/__tests__/tickets.service.test.ts:15-21`
+    - `src/modules/guests/__tests__/guests.service.test.ts:20-22`
+  - **Via `deriveTenantContext(...)`** (SAFE — auto-inherits userId from SessionUser):
+    - `src/plugins/__tests__/rbac.test.ts:9-16` — all 4 fixtures use `deriveTenantContext({ userId: 'u-X', ... })` ✓
+    - `src/plugins/__tests__/tenant-guard.test.ts` — all 14 tests derive via SessionUser fixtures with userId ✓
+  - **Type-import-only in Slot B production code** (function signatures) — no shape construction:
+    - `tickets.service.ts` (multiple `ctx: TenantContext` parameter refs), `tickets.serializer.ts`, `tickets.routes.ts`, `guests.service.ts`, `guests.serializer.ts`, `guests.routes.ts` — all READ `ctx.foo` fields; none construct literals. **Zero break** in Slot B production code paths.
+  - **Summary of impact**: Slot B production code = 0 break. Slot B test files = **8 bare literals across 5 files + 3 Partial builders across 3 files = 11 breaking sites across 7 test files** at typecheck time. See GAP-1 for resolution options.
+
+- **Adv #2 — rbac tests fixture pattern**: **SAFE**. `rbac.test.ts:9-16` uses `deriveTenantContext({ userId: 'u-1', hotelId: 'h-1', role: 'gm_admin' })` for all 4 role fixtures. Auto-inherits userId from SessionUser via the new `userId: user.userId` copy line. No file change needed. All 11 T04 rbac tests remain green.
+
+- **Adv #3 — hooks tests fixture pattern**: **SessionUser fixtures SAFE, one assertion NOT SAFE — see GAP-2 below**. `tenant-guard.hooks.test.ts:38, 63-68` use SessionUser fixtures with `userId: 'u-1'`, `userId: 'u-2'`. The runtime `req.tenant` derived through `configureTenantGuardHooks` will now include `userId`. BUT line 44-46 asserts strict shape via `.toEqual({ tenant: { hotelId: 'h-1', isSuperAdmin: false, role: 'gm_admin' } })` — this will FAIL at runtime because the actual tenant will now also carry `userId: 'u-1'`. `.toEqual` is a deep-strict-equality check, not a subset check. Test 2 (`tenant: null` case) safe. Test 3 (property-level `body.tenant.deptId`, `body.tenant.role`) safe. Only test 1's assertion breaks. Fix: add `userId: 'u-1'` to the expected shape (single-line change). **GAP-2 asks PM A to confirm this test-file update is in-scope** — the file `tenant-guard.hooks.ts` (source) is explicitly named as out-of-scope in HARD constraints, but the test file wasn't; my read is that a test-assertion update is a natural downstream consequence of a type change, matches DoD "still green" semantic, and stays entirely in Slot A territory (T04 was authored by me under Slot A). But surfacing to PM A for explicit ACK before touching.
+
+- **Adv #4 — Nathan's H13 "observed SHIPPED" claim reconciliation**: **`grep -rn "tenant\.userId\|\.tenant\?\.userId" src/` returned 0 hits**. Nathan is NOT referencing `tenant.userId` at value level anywhere in his Slot B code. Conclusion: Nathan's H13 claim was misreading — most likely conflated `SessionUser.userId` (which does exist at `tenant-guard.ts:16`) with `TenantContext.userId` (which does not). His current branches do NOT rely on `TenantContext.userId`. Therefore: T-INFRA-02 does NOT unblock any latent Slot B code path today, but DOES actively BREAK 7 Slot B test files at typecheck due to the bare-literal / Partial-builder patterns enumerated in Adv #1. **This is the load-bearing coordination fact for GAP-1.**
+
+- **Adv #5 — `FastifyRequest.tenant?: TenantContext` augmentation impact**: `tenant-guard.types.ts` unchanged. TypeScript augmentation is a type-alias — `TenantContext` grows a field, `req.tenant?.userId` becomes typed (`string | undefined` due to optional chain). No file change required. Typecheck will accept once the `TenantContext` update lands; verified via mental compile.
+
+- **Adv #6 — Test count reconciliation**: 190 baseline (post-T06) + 1 new T03 test = **191 pass expected** — IF the GAPs are resolved without additional test additions. GAP-2 resolution (assertion update on hooks test) does not add test count, only updates an existing assertion. GAP-1 resolution depends on PM A path — if Path B (allow B-side fixture updates), no test count change (fixtures updated in place). If Path A (block T-INFRA-02 until B-side sync), test count math applies post-B-side-merge.
+
+**GAPs / questions**
+
+##### GAP T-INFRA-02-#1 — exec-A (Nanak) at H0 2026-07-02
+- **Gap**: 7 Slot B test files construct `TenantContext` via bare object literal OR `Partial<TenantContext>` builders that omit `userId`. When `TenantContext.userId: string` becomes required, these 11 sites (enumerated in Adv #1 above) will fail TypeScript typecheck at `make check` time. HARD constraint forbids exec-A from editing Slot B files (`src/modules/tickets/*`, `src/modules/guests/*`).
+- **Doc reference**: ASSIGNMENT §HARD constraints line 2010 ("Do NOT modify Nathan's `src/modules/tickets/*` / `src/modules/guests/*` files — Slot B territory") + DoD line 2027 ("If ANY Slot B test breaks at typecheck due to missing userId in a TenantContext literal, exec-A **STOPS**, notes in SUBMIT as GAP, PM A coordinates fix path with PM B").
+- **Options**:
+  - **(A) Coordination path — RECOMMENDED**: PM A escalates to Parent PM → coordinates with PM B → Nathan updates 7 test files on a separate B-side branch (add `userId: 'u-X'` to each bare literal + add `userId: 'u-1'` default to each `Partial` builder). PO merges B-side fix first (or in parallel with feat/foundation-userid-tenant-context — both PRs pass typecheck when B-side lands first). Then T-INFRA-02 merges cleanly. Strict slot separation preserved. Cost: ~1 additional coordination cycle + one small B-side PR.
+  - **(B) Expand T-INFRA-02 scope**: PM A explicitly authorizes exec-A to edit Slot B test files IN THIS PR (11 sites, ~15 LOC). Would require overriding the HARD constraint at line 2010 with a scoped exception. Cost: violates slot boundary; documentation debt (needs explicit note in PARENT §10 that DEP-5 fix crossed slots by decision).
+  - **(C) Rollback design to `userId?: string` (optional)**: PM A explicitly rejected this in ASSIGNMENT line 2005. Restating for completeness — would ship without breaking B-side but weakens type + defeats the "type-system forcing function" rationale. Not recommended.
+- **My intent**: **Option (A)** — cleanest slot separation, respects HARD constraint, honors PM A's non-optional design. Route: PM A ACKs GAP-1 as "PATH A" → PM A coordinates with PM B → I pause T-INFRA-02 coding until PM A signals "B-side merged, resume". If PM A prefers speed over strictness and picks (B), I proceed with expanded scope but log the boundary crossing prominently. Awaiting decision.
+
+##### GAP T-INFRA-02-#2 — exec-A (Nanak) at H0 2026-07-02
+- **Gap**: `src/plugins/__tests__/tenant-guard.hooks.test.ts:44-46` asserts tenant shape via strict `.toEqual({ tenant: { hotelId: 'h-1', isSuperAdmin: false, role: 'gm_admin' } })`. After `TenantContext.userId` becomes required and populated by `deriveTenantContext`, the runtime tenant will additionally carry `userId: 'u-1'` → `.toEqual` fails. HARD constraint names `tenant-guard.hooks.ts` (source) as out-of-scope but doesn't explicitly name the test file `tenant-guard.hooks.test.ts`.
+- **Doc reference**: ASSIGNMENT §HARD constraints line 2011 + DoD line 2025 ("All 3 T04 tenant-guard.hooks tests still green").
+- **Options**:
+  - **(A) In-scope — RECOMMENDED**: exec-A updates line 44-46 expected shape to `.toEqual({ tenant: { userId: 'u-1', hotelId: 'h-1', isSuperAdmin: false, role: 'gm_admin' } })` — single-line diff, same file (T04 authored by exec-A under Slot A, test-only, natural downstream consequence of interface change). File count: 2 → 3 modify.
+  - **(B) Out-of-scope**: exec-A does NOT edit; test fails at runtime. Would require PM A to authorize either (i) a separate T04-follow-up PR to update the assertion (silly) or (ii) reverting the "still green" DoD line for this specific test.
+- **My intent**: **Option (A)** — treat test-assertion update as within scope. It's mechanical downstream (add 1 field to 1 expected object), stays in T04's test file (Slot A authored), matches DoD spirit. Awaiting PM A explicit ACK before touching.
+
+Awaiting PM A ACK on **both GAPs** before coding. If PM A resolves GAP-1 as Path A, coding pauses pending PM B B-side merge. If Path B, coding proceeds with expanded scope. GAP-2 Path A likely uncontroversial but explicit ACK requested to keep slot discipline audit-clean.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
