@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T07-slice-1 (`BusinessRuleError` 422 — DEP-6 fix) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T-INFRA-01 merged (PO commit `9a50c6d`). Triage rationale: T07-slice-1 unblocks Nathan's T12 + T16-V2..5 chain (5 tasks) with a smaller PR than T05 seed which blocks nobody today.
-- **Branch (current active task)**: `feat/foundation-business-rule-error` (per PO branch-per-task policy)
-- **Completed**: T01, T02, T03, T04, T-INFRA-01 (all merged to main)
+- **Active task**: T07-slice-1 APPROVED (`feat/foundation-business-rule-error` @ `b214743`, awaiting PO merge). PM A pauses + awaits PO direction on next task (T05 seed vs T06 state-machine vs monitor Nathan for next unblock).
+- **Branch (last active task)**: `feat/foundation-business-rule-error` @ `b214743` — awaiting PO merge. Next branch TBD.
+- **Completed**: T01, T02, T03, T04, T-INFRA-01 (all merged to main) · **T07-slice-1** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · **T07-slice-1 (assigned, next)** · T05 seed · T06 (parallel-friendly) · T07-slice-2+ (deferred on demand) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · **T07-slice-1 ✅** · T05 seed · T06 (parallel-friendly, feeds T12) · T07-slice-2+ (deferred on demand) · T08–T10 backlog
 
 ---
 
@@ -39,7 +39,7 @@
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
-| T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | assigned | — | Addresses PARENT §10 DEP-6. Envelope shape ratified by PM B (`code = 'BUSINESS_RULE'` + `details.rule`). Small: extend `src/core/errors/app-errors.ts` + new test file. Unblocks T12 + T16-V2..5 (5 Slot B tasks). |
+| T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-business-rule-error` @ `b214743` — **awaiting PO merge**. 2 files (app-errors.ts append + fresh test file, 6 new tests). 150 tests pass on branch (+6 vs 144 baseline). Drift clean. 9 existing classes untouched (verified via git diff = pure `+`). Cherry-pick transparency clean (origin/main never touched by code). PARENT §10 DEP-6 resolved. |
 
 ---
 
@@ -1401,6 +1401,105 @@ Notes / operational
 - Sequencing note (transparency for PM A audit): my initial commit landed on local `main` accidentally after a branch-context slip during interactive session; corrected via `cherry-pick 5cb83c8` onto `feat/foundation-business-rule-error` (new hash `b214743` — same tree), then `git reset origin/main` to rewind local `main` (non-destructive default `--mixed`). `origin/main` was never touched with code; PM A + PO see only PLAN/ACK/SUBMIT commits on `main`, all code on the feature branch. Left as end-of-session cleanup with zero side effects to shared state.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T07-slice-1 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-business-rule-error` @ commit `b214743`. All gates green. Transparency claim on cherry-pick recovery independently verified.
+
+**Transparency verification (per PO validation request)**
+- `git log origin/main -- src/core/errors/app-errors.ts` → 1 commit (`5ce7f86 chore: initial backend service boilerplate`). No T07-slice-1 code ever touched `origin/main`. ✓
+- `git log faa05c8..origin/main --oneline` (since PM A ACK) → 1 commit `74c9cd4 exec A: SUBMIT T07-slice-1 attempt 1` (docs-only). No source commits leaked. ✓
+- Cherry-pick recovery clean. Exec-A's self-disclosure was accurate and complete.
+
+**DoD verification (10 items)** — all ✓
+- `BusinessRuleError` exported from `@core/errors/app-errors.js`: verified `app-errors.ts:105-108` ✓
+- `statusCode === 422`: verified line 106 (readonly) ✓
+- `code === 'BUSINESS_RULE'`: verified line 107 (readonly) ✓
+- `extends AppError`: verified line 105, plus test at `app-errors.test.ts:47-49` (`instanceof AppError` prototype-chain check) ✓
+- JSDoc documents Nathan's `details.rule` convention with consumer example: verified `app-errors.ts:88-103` (JSDoc block includes PARENT §10 DEP-6 reference + consumer pattern verbatim from ASSIGNMENT template) ✓
+- `toJson()` returns `{ code, message, details }`: verified `app-errors.test.ts:30-42` (asserts exact envelope shape with realistic payload — `{ rule, ticketId }`) ✓
+- Unit test suite: 4 BusinessRuleError tests (`app-errors.test.ts:5-52`) + 2 bonus sanity (`AuthError` 401 + `NotFoundError` bare+with-id) ✓
+- `make check` PASS: independent PM rerun on branch → 150 tests / 2 skipped / 152 total ✓
+- Drift scans clean on both files ✓
+- `git diff main -- package.json pnpm-lock.yaml` empty ✓
+
+**HARD constraint verified: 9 existing classes UNTOUCHED**
+`git diff main -- src/core/errors/app-errors.ts | grep -E "^[-+]"` shows ONLY `+` additions — zero `-` deletions/modifications to any existing class. 21 lines appended verbatim after `BillingRequiredError` (line 86 → 108). Verified proof of Adv #5 append-at-end discipline: zero merge-conflict window for any Slot B/C in-flight branch that touches this file.
+
+**Independent `make check` re-run on branch**
+```
+pnpm prisma:generate  → PASS (Prisma Client regenerated per T-INFRA-01)
+pnpm lint             → PASS (0 errors, 0 warnings, --max-warnings 0)
+pnpm format:check     → PASS
+pnpm typecheck        → PASS
+pnpm test:unit        → PASS
+Test Suites: 2 skipped, 11 passed, 11 of 13 total
+Tests:       2 skipped, 150 passed, 152 total
+Time:        8.589 s
+```
+
+**Adv #1 confirmation signal ✓** — jest output includes `PASS src/core/errors/__tests__/app-errors.test.ts` on the very first run. Auto-discovery via existing `testMatch` glob confirmed live; no config change was needed.
+
+**Test delta verification**: 150 pass (this branch) vs 144 pass baseline (main pre-slice) = **+6 tests** matching SUBMIT claim exactly (4 BusinessRuleError + 2 bonus sanity).
+
+**Drift scans** (PM-AGENT §3 Step 2, on both `app-errors.ts` + `app-errors.test.ts`)
+- `any` types: **0 hits**
+- `console.log/info/debug`: **0 hits**
+- `throw new Error(`: **0 hits** (test file uses AppError subclass instantiation via `new BusinessRuleError(...)`)
+- Forbidden imports: **0 hits** (`@jest/globals` + `../app-errors.js` only)
+- Default export: **0 hits**
+- `.skip` in tests: **0 hits** (6 real tests)
+- Hardcoded URL: **0 hits**
+
+**Coverage — BusinessRuleError 100% (2-line class body trivially exercised)**
+File-level `app-errors.ts` reports 58.97% stmts, 100% branch, 75% funcs — dominated by pre-existing untested classes (ValidationError/ForbiddenError/ConflictError/RateLimitError/ExternalServiceError/TenantError/BillingRequiredError). This slice deliberately did NOT touch those per HARD constraint "Do NOT modify existing error classes". BusinessRuleError itself (the DoD scope) is 100% covered — 2 readonly declarations + JSDoc are exercised by every test. Bonus sanity coverage lands on AuthError + NotFoundError. Note: `make check` PASS confirms no global coverage-threshold enforcement in the standard `test:unit` path; threshold only surfaces on explicit `--coverage` run (jest config concern, not this slice's).
+
+**Envelope shape verification (PM B's ratified contract)**
+Test at `app-errors.test.ts:30-42`:
+```ts
+expect(err.toJson()).toEqual({
+  code: 'BUSINESS_RULE',
+  message: 'Ticket already resolved',
+  details: { rule: 'INVALID_TICKET_TRANSITION', ticketId: 't-1' },
+});
+```
+Matches PARENT §10 DEP-6 ratified envelope exactly: envelope-generic `code = 'BUSINESS_RULE'` + specific rule in `details.rule` + freeform extra details. When T12 lands with `rule: 'INVALID_TICKET_TRANSITION'` and T16-V2..V5 with their own rules, the shape holds.
+
+**Spot-check** (PM-AGENT §3 Step 5)
+- File naming: kebab-case ✓
+- Explicit return type: N/A (class fields, not fns) — but `readonly statusCode = 422` correctly satisfies base's `abstract readonly statusCode: number` ✓
+- JSDoc verbatim from ASSIGNMENT template (WHY documented, not WHAT — PARENT §10 DEP-6 rationale + consumer pattern) ✓
+- Test naming: `it('should <expected> ...')` — 6 tests conform ✓
+- No what-comments in test file ✓
+- Append-at-end ordering (Adv #5) — verified via git diff, pure `+` lines ✓
+- LOC: `app-errors.ts` 108 (was 87) + test file 76 — well under 300 rule-of-thumb ✓
+- Import direction: test imports from `../app-errors.js` (same layer, sibling); source imports nothing new — leaf module ✓
+
+**Security floor** — N/A. No auth/webhook/crypto/PII surface. `BusinessRuleError.details` will carry rule-specific payload (e.g. ticket state transition context) but that's caller responsibility to keep sanitized; the class itself has no logging or secret handling.
+
+**Transparency discipline — high-value pattern from exec-A**
+Cherry-pick slip disclosure in SUBMIT notes was proactive, complete, and verifiable. Sequence exec-A followed: (1) recognize the slip mid-session, (2) cherry-pick to correct branch (new hash, same tree — auditable), (3) rewind local main via `git reset origin/main` (default `--mixed`, non-destructive), (4) verify `origin/main` untouched by code, (5) self-disclose in SUBMIT with exact commit hashes. **This is the model recovery pattern for git-context slips** — much better than silent recovery or unverified assertion. Worth memorializing (PO also flagged this). PM A will save to memory as durable feedback.
+
+**Follow-ups actioned in same commit**
+- → §1 T07-slice-1 → approved
+- → §0 Active task refreshed → T05 seed OR next DEP triage (Nathan's queue check)
+- → PARENT §1 T07-slice-1 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §10 DEP-6 → **RESOLVED** (unblocks Nathan's T12 + T16-V2..V5 chain)
+
+**PO action item — branch merge**
+`feat/foundation-business-rule-error` @ `b214743` on `origin`; PM A verified: `make check` PASS on branch (150 tests), drift clean, 9 existing classes untouched, transparency verified. Per CLAUDE.md §12, **please merge `feat/foundation-business-rule-error` → `main`**. PM A will not auto-merge. Post-merge: Nathan's T12 (invalid ticket transition) + T16-V2..V5 (visits verify-manual family) chain unblocked — 5 Slot B tasks can proceed.
+
+**Next Slot A queue**
+Triage between:
+1. **T05** seed scripts (Opsi C twist: Auth API stub design)
+2. **T06** ticket state-machine helper (parallel-friendly; feeds T12)
+3. **T07-slice-2** additional spec §7 codes (`INVALID_TICKET_TRANSITION` as specific class? — currently rolled into `details.rule`; per envelope design, no additional classes needed until a downstream module needs a wire-level discriminator)
+4. Watch for new DEP-N escalations from Nathan/Satrio
+
+PM A will pause here + await PO next-task direction (T05 vs T06 vs "wait for Nathan's next unblock").
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
