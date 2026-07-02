@@ -46,7 +46,7 @@
 | T19 | Notifications CRUD | ✅ approved | `feat/notifications-crud` | ✅ **merged (PR #9)** |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
-| T20 | Socket emitters | 🟡 assigned (awaiting PLAN) — LAST task, cross-cutting | `feat/socket-emitters` | — |
+| T20 | Socket emitters | 🟡 wip (PLAN ACK'd) — LAST task | `feat/socket-emitters` | — |
 
 **Counts**: ✅ **9/10 merged (T11,T13,T14,T15,T12,T16,T17,T18,T19)** · 🟡 T20 assigned (socket emitters, LAST). **1 task from Slot B complete.** Foundation: only DEP-4 (`api.ts` bootstrap + Socket.io server) remains for go-live.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
@@ -1737,6 +1737,21 @@ src/shared/socket/__tests__/socket-io-emitter.adapter.test.ts  adapter unit (emi
 
 Awaiting PM B ACK — especially **Q-B-14 (location: A `shared/socket/` recommended)** + **DEP-7 boundary** + the **4-of-8-events producer scoping**. Not creating any files before ACK.
 
+##### PM B ACK — T20 PLAN APPROVED (2026-07-02, H14)
+Best-reasoned PLAN of the slot — you pre-empted every concern. **ACK — create `feat/socket-emitters`, implement.** All three rulings:
+
+- **★ Q-B-14 → Option A `src/shared/socket/` APPROVED.** Right call: the port is consumed by 3 modules (cross-module infra), and `shared/` is **Slot-B-ownable** (sits with `shared/utils`/`shared/types`) → **no `core/*` foundation gate, no Parent escalation needed.** (Had it gone to `core/`, I'd have escalated — but it doesn't, so we're clear.) Confirmed no duplicate: I checked, `shared/socket/` doesn't exist yet.
+- **★ DEP-7 boundary — CONFIRMED.** Live Socket.io `Server` + cookie-auth room-join = foundation (DEP-4 family), NOT T20. The **structural `SocketServerLike { to(room).emit(event, payload) }`** is exactly right — verified **socket.io is NOT in package.json**, so this **avoids a dep add** (which would need PO approval per §11). Ship port + adapter + wiring; live emission is DEP-7. Registered DEP-7 → PARENT §10 for foundation.
+- **★ 4-of-8 producer scoping — APPROVED (honest scoping, do NOT fabricate stub producers).** I verified: the 4 seams with producers exist (`onTicketUpdated`, `onTicketRerouted`, `onVerificationPending`, `onVerificationResolved`). The other 4 genuinely have no Slot-B producer — `ticket:created` (AI inserts), `ticket:escalated` (escalation worker, deferred MVP §2), `verification:failed_3x` (worker, deferred), `notification:new` (T19 is read/mark — no create path). **Wire the 4; ship port + payload builders for the other 4.** REQUIREMENT (no silent cap): the SUBMIT must **explicitly list which 4 are wired-live vs the 4 builder-only** so PO/FE/AI/Integration know the emit surface. Note: a manual status→escalated via T12 emits `ticket:updated` (changed:['status']) — the dedicated `ticket:escalated` stays worker-only, correct.
+
+**Endorsed:**
+- Consolidate the per-module no-op callbacks into a single injected **`emitter?: SocketEmitterPort`** (default `NoopSocketEmitter`) — clean. **T11–T19 behavior unchanged when emitter absent**; update the affected service unit tests to assert `emitToHotel(hotelId, event, payload)`.
+- Payloads reuse existing serializers (`serializeTicketListItem`→`TicketSummary`, `serializeNotification`→`AppNotification`), snake_case scalars, room `hotel:${hotelId}` — no new shapes.
+
+**At SUBMIT I verify:** S1–S4, port+adapter (fake-`io` room-emit test), the 4 live wirings emit correct `(hotelId, event, payload)`, **T11–T19 regression green** (the callback→port consolidation must not change existing behavior), the wired-vs-builder-only manifest, no dep added, no `core/`/`api.ts` edit, drift, `make check`+integration, ≥80% cov.
+
+Proceed — land the finale. 🟢
+
 ---
 
 <!--
@@ -1866,6 +1881,8 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-B-13        | T18 `POST /visits` body + response shape + special_request + nights range. | T18 · §1.3 / MVP §5 AC | **RESOLVED (PM ratify) 2026-07-02** | (a) body `{guest_id,check_in,nights?,room_number?,booking_source?,special_request?}`. (b) response `{data: VisitWire}` (created Visit) — **AC discrepancy noted** (§5 says "guest+visit"); FE MSW tiebreaker → serializer swap if needed (no guests-module import). (c) persist special_request. (d) nights 1–30 on create. |
 | Q-B-05        | Canonical `Visit` wire shape (T14 embeds, T16 owns). | T14/T16 · §2.3 DDL | **RESOLVED (PM ratify) 2026-07-01** | Pinned in §2 (13 fields from DDL §2.3). T16 owns serializer; T14 embeds same shape module-local. Unblocks T14 ∥ T16 parallel. Provisional on FE MSW. |
 | Q-B-07        | Notifications list + `unread-count` + mark-all + markRead envelopes + field-list. | T19 · §1.6 | **RESOLVED (PM ratify) 2026-07-02** | list `{data,pageInfo:{nextCursor,hasMore}}`; unread-count `{data:{count}}`; mark-all `{data:{updated}}`; markRead `{data:NotificationWire}`. Field-list INCLUDES `user_id`+`hotel_id` (match §1.6 example). Provisional on FE MSW. |
+| Q-B-14        | T20 `SocketEmitterPort` + adapter location. | T20 · CLAUDE §4 | **RESOLVED (PM ratify) 2026-07-02** | Option A `src/shared/socket/` (Slot-B-ownable, avoids `core/*` foundation gate → no Parent escalation). |
+| DEP-7         | Live Socket.io `Server` (attached to Fastify + cookie-auth room-join `hotel:${hotelId}`) — go-live for socket emission. | T20 · README §2.5 | **open — foundation/DEP-4 family** (flagged PARENT §10) | T20 ships port + adapter (structural `SocketServerLike`, no `socket.io` dep) + wiring, testable via mock. Foundation bootstraps the real `io` + room-join. |
 
 ---
 
