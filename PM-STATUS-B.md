@@ -1002,6 +1002,56 @@ The blocker is gone: **`BusinessRuleError` (422) is now on main** (`core/errors/
 - For the V3 invalid-transition throw, use `throw new BusinessRuleError('...', { rule: 'INVALID_VISIT_TRANSITION', from, to })` — the wire shape I ruled (envelope `code='BUSINESS_RULE'`, specific rule in `details`). Visits have their own status set, so **don't** import the tickets state-machine — a small module-local transition guard for `pending_verification → checked_in/rejected` is right.
 - All other T16-#1/#2/#3 rulings stand. Post the full **SUBMIT** when V2–V6 are complete + green.
 
+#### SUBMIT T16 — exec-B (Nathan) at H14 (2026-07-02) (attempt 1)
+
+Task: Visits list + verify-manual (approve/reject) — `GET /api/visits` + `PATCH /api/visits/:id/verify-manual`
+Branch: **`feat/visits-list-verify`** @ `1c502f3` (rebased onto latest main per NUDGE; **PO merges to main manually** — code NOT on main). 11 files, +1230, all in `src/modules/visits/` (0 core/prisma/api.ts edits).
+  - visits.types.ts (domain + wire DTOs + VerifyManualInput + offset envelope)
+  - visits.schema.ts (zod list-query + `:id` param + dual-mode verify-manual body)
+  - visits.serializer.ts (canonical 13-field Visit shape — Q-B-05, owns it)
+  - visits.checkout.ts (pure checkout derivation, dayjs+tz — GAP T16-#3 seam)
+  - visits.repository.ts (Prisma direct; offset paged list + status-guarded verifyManualTx)
+  - visits.service.ts (scope + offset paging + verify-manual approve/reject + transition guard)
+  - visits.routes.ts (Fastify plugin: GET /visits + PATCH /visits/:id/verify-manual)
+  - index.ts (barrel: visitsRoutes + buildVisitsService(db, deps))
+  - __tests__/visits.service.test.ts (unit, 30) · visits.routes.test.ts (component, 4) · visits.repository.integration.test.ts (integration, 12)
+
+DoD self-check
+- [x] **V1** — `GET /visits` tenant-scoped list (`WHERE hotelId=ctx.hotelId`, explicit super_admin bypass; visits not dept-scoped), `?status` CSV over the 6-enum, **offset** paging (`page`/`pageSize` clamp ≤100), `orderBy createdAt desc,id desc`. Envelope = ratified **Q-B-04** `{data,pageInfo:{page,pageSize,total,hasMore}}`, `hasMore=page*pageSize<total`.
+- [x] **V2** — verify-manual **atomic**: status-guarded `updateMany({where:{id,hotelId,status:'pending_verification'},data})` inside `$transaction`; `count===1` wins, `0` → re-resolve (404 if gone / 422 concurrency). No partial state (integration asserts DB unchanged on 422/404). **Audit trail** = `recordVisitAudit` **no-op seam** (GAP T16-#1, approach A — no visit audit table exists; Q-B-09 pending; a row moves into this same tx when the table lands). **Socket** `verification:resolved` = `onVerificationResolved` no-op seam (T20). Neither wired here.
+- [x] **V3** — valid transitions only: `pending_verification → checked_in` (approve) / `→ rejected` (reject); any other current status → **`BusinessRuleError` (422)**, envelope `code='BUSINESS_RULE'` + `details:{rule:'INVALID_VISIT_TRANSITION',from,to}` (your DEP-6 wire ruling). **Module-local guard — no tickets state-machine import** (per NUDGE). failed_verification/others left to T17.
+- [x] **V4** — checkout derivation: `check_out` = check-in calendar date **+ nights @ 11:00 local** via `dayjs.tz(config.TZ)`; `nights` zod **1–7** (stricter than DDL 1–30). Unit-verified UTC + Asia/Jakarta; integration asserts persisted `2026-06-13T11:00:00Z` for a 2-night approve.
+- [x] **V5** — tenant guard + gm_admin surface; cross-tenant `:id` → `NotFoundError` 404 via `assertHotelOwnership` (integration: hotel-B visit invisible + untouched from gmA). `hotel_id` never from URL/body. (Endpoint-level RBAC "who may call" = T04 preHandler, not hand-rolled here — seam noted.)
+- [x] **V6** — unit (transition guard, checkout derivation, status-filter build, offset math, super_admin bypass, verify-manual approve/reject/422/404/concurrency, seam firing with ctx.userId) + integration (seed 6 statuses across 2 hotels; verify-manual tx atomicity; invalid→422 no-mutate; cross-tenant→404 no-mutate; list filter/paging/tenant-isolation). No Prisma mock.
+
+Quality gate (my rerun on the branch)
+- `make check`: **PASS** (prisma-generate + lint + format-check + typecheck + unit; 205 passed, 1 skip = `_template` placeholder — 0 `.skip` in visits).
+- `make test-integration` (visits): **PASS** — 12 tests, real Postgres via testcontainers (~6.5s).
+- Coverage (changed files): checkout/repository/serializer/schema/types **100%** line · service **96.15%** · routes **95.65%** — all ≥80% (V6).
+- Rebase picked up T-INFRA-01 → **dropped the `pnpm prisma:generate` workaround** (`make check` generates now).
+
+Drift scans (src/modules/visits)
+- `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports (express/typeorm/moment/node-fetch) 0 · default export 0 · `.skip` 0 · cross-module internal import 0.
+
+Security check
+- Tenant scope on every query; cross-tenant masked 404 (anti-enumeration §7). No PII in the Visit wire shape (guest_id only) → §4.5 masking N/A here. No secrets. HMAC/crypto N/A (no webhook). verify-manual mutates only within-tenant, status-guarded.
+
+Sample (verify-manual approve, from integration)
+```
+PATCH /api/visits/:id/verify-manual  { "guest_name":"Budi Santoso", "room_number":"1204", "nights":2 }
+→ 200 { "data": { "id":"…", "status":"checked_in", "room_number":"1204", "nights":2,
+                  "check_out":"2026-06-13T11:00:00.000Z", … } }   // check_in 2026-06-11T00:00Z
+invalid (visit already checked_in) → 422 { "error": { "code":"BUSINESS_RULE",
+  "message":"…", "details": { "rule":"INVALID_VISIT_TRANSITION", "from":"checked_in", "to":"rejected" } } }
+```
+
+Notes / open items for PM
+- **Merge gate (same as T11/T14)**: routes answer 401 until T04 wires the `req.tenant` preHandler (DEP-1 runtime) — not a code-quality blocker; service+repo fully tested by injecting `TenantContext`. Not mergeable to main until T04 (PO gate).
+- **GAP T16-#1 / Q-B-09**: shipped approach A (`recordVisitAudit` no-op seam). When Parent rules Q-B-09 (visit audit table), the audit insert moves inside `verifyManualTx`'s `$transaction` — one-spot change.
+- **Q-B-08 (guest_name)**: validate-only, no cross-write to `guests` — confirmed in code.
+
+Requesting PM B VERDICT.
+
 ---
 
 ### ASSIGNMENT T12 — Ticket status transition + reroute — issued by PM B (Nathan) 2026-07-02 (H14)
