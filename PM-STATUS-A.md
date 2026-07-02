@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T06 (ticket state-machine helper) — ASSIGNMENT posted §2, awaiting exec-A PLAN. Direct dependency of Nathan's T12 (imminent post-T07-slice-1 merge). T07-slice-1 merged (PO commit `8ebdb9a`).
-- **Branch (current active task)**: `feat/foundation-ticket-state-machine` (per PO branch-per-task policy)
-- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1 (all merged to main)
+- **Active task**: T06 APPROVED (`feat/foundation-ticket-state-machine` @ `0e6d211`, awaiting PO merge). PM A pauses + awaits PO direction on next task.
+- **Branch (last active task)**: `feat/foundation-ticket-state-machine` @ `0e6d211` — awaiting PO merge.
+- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1 (all merged to main) · **T06** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · **T06 (assigned, next)** · T05 seed (Opsi C twist pending) · T07-slice-2+ (deferred) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · **T06 ✅** · T05 seed (Opsi C twist pending) · T07-slice-2+ (deferred) · T08 multipart · T09 CSV · T10 workers
 
 ---
 
@@ -33,7 +33,7 @@
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
-| T06 | Ticket state-machine helper + unit-test the transition table | assigned | — | Direct dependency of Nathan's T12. Codifies spec §5 (8 states, ~15 transitions, 2 terminal). Uses T07-slice-1 `BusinessRuleError` + `rule: 'INVALID_TICKET_TRANSITION'`. Home: `src/shared/utils/ticket-state-machine.ts` (pure fn). |
+| T06 | Ticket state-machine helper + unit-test the transition table | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-ticket-state-machine` @ `0e6d211` — **awaiting PO merge**. 2 files (helper 61 LOC + test 137 LOC, 40 tests). 100% coverage. `make check` PASS 190/192 on branch. Nullish coalesce Adv #6 verified as TS+runtime necessity. Envelope shape matches PM B ratified. All Slot B tests preserved green. Cherry-pick transparency clean (2nd instance). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -1860,6 +1860,98 @@ Notes / operational
 - Sequencing note (transparency for PM A audit, mirroring T07-slice-1 SUBMIT): initial commit landed on local `main` accidentally due to interactive-session branch context slip; corrected via `cherry-pick 81b3c99` onto `feat/foundation-ticket-state-machine` (new hash `0e6d211` — same tree), then `git reset origin/main` (non-destructive `--mixed`) + `git stash --include-untracked && git stash drop` to rewind and clean local `main`. `origin/main` never received code — only PLAN/ACK/SUBMIT docs commits. Zero side effect to shared state. Repeat of the T07-slice-1 pattern — will look for a shell-prompt or session workflow tweak to prevent recurrence.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T06 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-ticket-state-machine` @ commit `0e6d211`. All gates green. Transparency claim independently verified (2nd emergence of the pattern — memorializing to memory).
+
+**Transparency verification (2nd emergence)**
+- `git log 04d76a3..origin/main --oneline` (since PM A ACK) → 1 commit `b6bf56e exec A: SUBMIT T06` (docs-only). No source leaked.
+- `git log origin/main -- src/shared/utils/ticket-state-machine.ts src/shared/utils/__tests__/ticket-state-machine.test.ts` → EMPTY. Target files have zero history on main. ✓
+- Cherry-pick recovery clean. Same pattern as T07-slice-1 (`b214743`).
+
+**DoD verification (10 items)** — all ✓
+- `TicketStatus` union (8 states per spec §5) — verified `ticket-state-machine.ts:28-36` ✓
+- `TICKET_TRANSITIONS` map with exact spec §5 transitions — verified `ticket-state-machine.ts:38-47`: `open→[in_progress,cancelled]`, `in_progress→[awaiting_late_reason,done_pending,escalated,cancelled]`, `awaiting_late_reason→[done_pending]`, `done_pending→[closed,high_alert,cancelled]`, `high_alert→[in_progress]`, `escalated→[in_progress,cancelled]`, `closed→[]`, `cancelled→[]` ✓
+- `isValidTicketTransition` — verified `ticket-state-machine.ts:49-51`, explicit `boolean` return type ✓
+- `assertValidTicketTransition` — verified `ticket-state-machine.ts:53-61`, throws `BusinessRuleError` with exact envelope (`statusCode=422`, `code='BUSINESS_RULE'`, `details={rule,from,to}`) via delegation to `isValidTicketTransition` ✓
+- Test suite exhaustive (40 tests): 13 valid `it.each` + 16 terminal outbound `it.each` + 3 individual invalid + 5 assert behavior + 2 boundary + 2 terminal state map — verified in test file ✓
+- Terminal states encoded as `[]` — verified `ticket-state-machine.ts:45-46` + tests at `test.ts:48-54` (isolated map assertions) ✓
+- **100% coverage on `ticket-state-machine.ts`** — PM independent re-run:
+  ```
+  File                     | % Stmts | % Branch | % Funcs | % Lines
+  ticket-state-machine.ts  |     100 |      100 |     100 |     100
+  ```
+- `make check` PASS — PM independent rerun on branch: 190 tests / 2 skipped / 192 total ✓
+- Drift scans clean on both files (0/7 categories) ✓
+- `git diff main -- package.json pnpm-lock.yaml` empty ✓
+
+**Adv #6 verification (in-code)**
+- Nullish coalesce at `ticket-state-machine.ts:50`: `return (TICKET_TRANSITIONS[from] ?? []).includes(to);` ✓
+- `assertValidTicketTransition` delegates to `isValidTicketTransition` at `ticket-state-machine.ts:54` → unknown `from` cascades: `undefined` → `[] ` → `.includes` returns `false` → throws `BusinessRuleError` (never `TypeError`). Delegation pattern is elegant — one guarded implementation covers both call sites.
+- Test proof at `test.ts:121-136`: caught error is `instanceof BusinessRuleError` AND `not.toBeInstanceOf(TypeError)`; `details.from === 'bogus_state'` (raw value preserved for observability).
+- **Independently verified TS constraint**: `tsconfig.json:29` has `"noUncheckedIndexedAccess": true` → `TICKET_TRANSITIONS[from]` is typed `readonly TicketStatus[] | undefined`. Without the `?? []`, `.includes()` doesn't compile. Runtime insurance + typecheck compliance in one 4-char idiom.
+
+**Adv #3 confirmation signal ✓** — jest output line 1: `PASS src/shared/utils/__tests__/ticket-state-machine.test.ts`. Auto-discovery works out of the box (same precedent as T07-slice-1's `src/core/errors/__tests__/`).
+
+**Test count reconciliation**: 190 pass = 150 baseline + 40 new. Matches PLAN/ACK expectation exactly.
+
+**Drift scans** (PM-AGENT §3 Step 2, on both `ticket-state-machine.ts` + `ticket-state-machine.test.ts`)
+- `any`: **0** · `console.log/info/debug`: **0** · `throw new Error(`: **0** (uses `BusinessRuleError`) · Forbidden imports: **0** (only `@core/errors/app-errors.js` + `@jest/globals`) · Default export: **0** · `.skip`: **0** · Hardcoded URL: **0**
+
+**Spot-check** (PM-AGENT §3 Step 5)
+- Naming ✓; explicit return types on public fns (`boolean` / `void`) ✓; file-level JSDoc documents authoritative spec, terminal states, wire behavior, runtime-defense rationale, consumer usage — no what-comments ✓; test naming `it('should <expected> when/for <condition>')` throughout ✓; imports leaf-only ✓; LOC (helper 61, test 137) well under 300 ✓
+
+**Envelope shape verification (PM B's ratified contract from T07-slice-1 DEP-6)**
+Test at `test.ts:106-110`:
+```ts
+expect(err.details).toEqual({
+  rule: 'INVALID_TICKET_TRANSITION',
+  from: 'open',
+  to: 'closed',
+});
+```
+Matches spec §5 line 74 requirement (`422 BUSINESS_RULE code INVALID_TICKET_TRANSITION`) via `BusinessRuleError.code = 'BUSINESS_RULE'` + `details.rule = 'INVALID_TICKET_TRANSITION'`. Test at `test.ts:105` also verifies exact message format `'Invalid ticket transition: open → closed'`. Full envelope proof.
+
+**Slot B preservation ✓** — all Nathan tests still green in the run:
+- tickets.service.test.ts, tickets.stats.test.ts, tickets.routes.test.ts, tickets.repository.integration.test.ts
+- guests.service.test.ts, guests.routes.test.ts, guests.repository.integration.test.ts
+Confirmed via full test-suite output. Nathan's `TicketStatus` at `tickets.types.ts:3-11` remains untouched (structurally identical duplicate; TS unifies at type level → zero regression).
+
+**Security floor** — N/A. No auth/webhook/crypto/PII surface. `BusinessRuleError.details.from` carries the caller's raw value (potentially unknown string on the boundary path) — useful for observability at the error-handler layer, no sensitive data leak concern.
+
+**Transparency pattern — 2nd emergence, memorializing per ≥2 rule**
+This is the 2nd occurrence of the "initial commit lands on local main due to interactive-session branch context slip → cherry-pick + reset + verify + self-disclose" recovery pattern (1st: T07-slice-1 `b214743`; 2nd: T06 `0e6d211`). Both recoveries were:
+- Complete + verifiable (target-file history on origin/main empty)
+- Self-disclosed in SUBMIT with exact hashes (cherry-pick source + destination)
+- Zero side effect to shared state
+Per PM A's ≥2 emergences rule, updating existing memory `feedback_git_slip_transparency.md` (originally saved after T07-slice-1) to reflect the 2nd datapoint + strengthen the "how to apply" wording. Exec-A's own SUBMIT note "will look for a shell-prompt or session workflow tweak to prevent recurrence" is worth capturing as a follow-up hygiene concern.
+
+**Follow-ups actioned in same commit**
+- → §1 T06 → approved
+- → §0 Active task refreshed → PM A awaits PO next-task direction (T05 seed vs monitor Nathan)
+- → PARENT §1 T06 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §10: **T12 dependency chain FULLY UNBLOCKED** (T06 + T07-slice-1 both landed) — coord note updated
+
+**PO action item — branch merge**
+`feat/foundation-ticket-state-machine` @ `0e6d211` on `origin`; PM A verified: `make check` PASS (190 tests), drift clean, 100% coverage on target, all Slot B tests preserved, transparency verified (2nd instance). Per CLAUDE.md §12, **please merge `feat/foundation-ticket-state-machine` → `main`**. PM A will not auto-merge. Post-merge: Nathan can `import { assertValidTicketTransition } from '@shared/utils/ticket-state-machine.js'` in T12 service layer — the last foundation-side blocker for his T12 chain drops.
+
+**Next Slot A queue**
+1. **T05** seed scripts (Opsi C twist: Auth API stub design still deserves a proper thinking pass)
+2. **T07-slice-2+** additional spec §7 codes (deferred — envelope-generic + `details.rule` means no urgent need)
+3. **T08** multipart upload utility
+4. Watch for new DEP-N escalations from Nathan (T12 wip may surface something) or Satrio (if he onboards)
+
+PM A pauses + awaits PO next-task direction.
+
+Ship it.
+
+<!--
+TEMPLATE — copy untuk task baru:
+
+### ASSIGNMENT T## — claimed by exec-A (Nathan) at H{N} HH:MM
+- Branch: feat/<modul>-<short>
 
 <!--
 TEMPLATE — copy untuk task baru:
