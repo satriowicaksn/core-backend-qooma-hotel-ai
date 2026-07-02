@@ -4156,6 +4156,44 @@ JSDoc includes this consumer sample verbatim.
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T09 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+Zero-rebuttal quality. All 6 advisories resolved with concrete pre-PLAN evidence — `feedback_verify_before_act.md` discipline continuing routine.
+
+**Verified in PLAN**:
+- **Adv #1** ✓ — hand-rolled trade-off acknowledged with slice-2 escape hatch documented (`csv-parse` ~50KB, RFC-compliant, PO ratification when consumer edge case emerges). Excel/Google Sheets output stays within practical subset — spec conformance for T23/T24 confirmed.
+- **Adv #2** ✓ — explicit "supports / does NOT support" block in file JSDoc. Consumers reading the JSDoc will know when to escalate to slice-2. This is the right documentation discipline — makes the scope boundary a contract, not tribal knowledge.
+- **Adv #3** ✓ — env.ts:14-27 zod pattern mirrored, full consumer example (`MenuRowSchema` with `.string().min(1).max(120)` + `.coerce.number().int().nonnegative()`) baked into JSDoc. Type inference verified: `result.valid` = `readonly z.infer<typeof Schema>[]`.
+- **Adv #4** ✓ — test #15 uses **exactly** the scenario I flagged as real UX edge case: headered CSV with blank at file line 2, data at line 3 (rowIndex 0), blank at line 4, invalid at line 5 (rowIndex 1). Asserts `errors[0].line === 5` + `errors[0].rowIndex === 1`. Proves both counters advance correctly across skipped blanks + skipped header. Exemplary test design.
+- **Adv #5** ✓ — 4-state machine (`FieldStart`/`Unquoted`/`Quoted`/`QuoteInQuoted`) is minimal + covers RFC 4180 subset. LF-in-quoted-field limitation properly framed as intentional slice-1 boundary (documented as feature not bug — column-count error surfaces to consumer for graceful handling). Defensive resets on malformed input (silent partial-quote tolerance) are reasonable UX choice over throwing.
+- **Adv #6** ✓ — all 3 consumer-facing shapes as `interface` (mergeable for future non-breaking extensions), all fields `readonly`, deconstruction pattern noted in JSDoc.
+
+**Design decisions accepted**:
+- **4-stage pipeline** (normalize → split-lines → row-to-cells state machine → zod-validate) — clean separation, each stage pure + deterministic
+- **Line-ending normalization order** (`\r\n` before lone `\r`) — correct, else `\r\n` would double-normalize to `\n\n`
+- **QuoteInQuoted defensive reset** — better UX than throwing on malformed input; acceptable defensive-tolerance pattern
+- **EOL unterminated Quoted tolerance** — emit buffered content as final cell rather than throw; matches defensive philosophy
+
+**Test plan (15 cases)** — comprehensive coverage of every DoD item. Test #15 is particularly well-designed (Adv #4 UX edge case). Realistic 100% coverage expected on the pure-fn surface.
+
+**Scope match** ✓ — 2 file create (~140 LOC parser + ~200 LOC test), 0 modify. HARD constraints all upheld. Zero touch to sibling `src/shared/utils/*.ts` files (crypto/masking/test-setup/ticket-state-machine untouched — single-concern PR pattern preserved).
+
+**Continued efficacy datapoint (feedback_verify_before_act.md, mental tracking, no new memory)**: **7th consecutive PLAN with clean ACK** (T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03, T05, T08, T09). Zero REJECT-PLAN cycle needed. Pattern is empirically durable now — verifying assumptions pre-artifact is routine practice, not exceptional discipline. PO's "cross-task pattern application is now routine" ratification from T09 ASSIGNMENT confirms this is stable state.
+
+**Proceed to implementation on branch `feat/foundation-csv-import`.**
+
+**SUBMIT expectations (reminders)**:
+- Post-code: `pnpm test:unit` verify 15 new tests pass (baseline shifted per Nathan's ongoing merges — reconcile like T08 baseline shift math)
+- Coverage on `csv-parser.ts` ≥ 90% (realistically 100% on pure-fn surface)
+- `make check` PASS — expect ~227+/1/~228+ total unit (baseline may shift from Nathan T18/T19/T20 merges; count both baseline + delta cleanly)
+- Drift scans clean on both files (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export)
+- `git diff main` empty on all restricted paths (other utils, plugins, modules, shared/types, core, prisma, docs, config, deps)
+- Branch-slip mitigation: **4th consecutive task** — `git branch --show-current` verify pre-commit
+- JSDoc must include: (a) "supports/does NOT support" block, (b) consumer usage example with zod schema
+- If Nathan's baseline shift materially affects test count reporting, capture cleanly per T08 discipline (baseline + delta math both stated in SUBMIT)
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
