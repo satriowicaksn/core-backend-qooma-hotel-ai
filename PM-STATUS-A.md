@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T09 CSV import utility — ASSIGNMENT posted §2, awaiting exec-A PLAN. T08 merged (PO commit `cfcb695`). PO direct straight-line direction (no triage cycle).
-- **Branch (current active task)**: `feat/foundation-csv-import` (per PO branch-per-task policy)
-- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08 (all merged to main)
+- **Active task**: T09 APPROVED (`feat/foundation-csv-import` @ `814a5f5`, awaiting PO merge). PM A pauses + awaits PO direction. Two durable-pattern mitigations continue holding — branch-slip 4th consecutive not-recurring + verify-before-act 8th consecutive clean-ACK PLAN.
+- **Branch (last active task)**: `feat/foundation-csv-import` @ `814a5f5` — awaiting PO merge.
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03, T08 (all merged to main) · **T09** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · **T09 CSV (assigned, active)** · T10 workers (next main-queue) · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
+- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · T08 ✅ · **T09 ✅** · T10 workers (LAST main-queue task, expected next) · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
 
 ---
 
@@ -38,7 +38,7 @@
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-multipart-upload` @ `50ec906` — **awaiting PO merge**. 5 new files under `src/core/storage/` (port + S3Adapter + InMemoryAdapter + 2 tests) + env.ts additive + `@aws-sdk/client-s3` dep. `make check` **212/1/213** (Nathan baseline shift 160→205 caught cleanly by exec-A). InMemoryAdapter 100% coverage; S3Adapter fail-lazy paths only per hexagonal principle. Modular imports verified (3 named). Drift 0 (2 false positives verified). Branch-slip mitigation held 3rd consecutive. |
-| T09 | CSV import utility (used by menu + knowledge)              | assigned | — | Main-queue continuation per PO direct direction. Ships `parseCsvWithSchema<T>` at `src/shared/utils/csv-parser.ts` (mirrors T06 pattern). Hand-rolled parser (no new deps), zod schema-driven per-row validation, batched error surface. Streaming deferred to slice-2. |
+| T09 | CSV import utility (used by menu + knowledge)              | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-csv-import` @ `814a5f5` — **awaiting PO merge**. 2 new files (csv-parser.ts 196 LOC + test 178 LOC, 15 tests). csv-parser.ts **97.18% coverage** (exceeds ≥ 90% DoD). `make check` **278/1/279** (baseline 263 + 15 new — Nathan +51 delta since T08 caught cleanly by exec-A). Test #15 Adv #4 UX edge case: exact `errors[0].line === 5` + `rowIndex === 1` assertion. Uncovered lines 126-127 verified as defensive QuoteInQuoted lenient-recovery (NOT silent bug). Drift 0. Branch-slip mitigation 4th consecutive not-recurring. |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
 | T07-slice-1 | Foundation: `BusinessRuleError` (422) — first slice of T07 error hierarchy build-out (DEP-6 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-business-rule-error` @ `b214743` — **awaiting PO merge**. 2 files (app-errors.ts append + fresh test file, 6 new tests). 150 tests pass on branch (+6 vs 144 baseline). Drift clean. 9 existing classes untouched (verified via git diff = pure `+`). Cherry-pick transparency clean (origin/main never touched by code). PARENT §10 DEP-6 resolved. |
@@ -4326,6 +4326,129 @@ Notes / operational
 - Consumer wiring reminder for Satrio T23/T24 (future): construct zod schema per-row shape; call `parseCsvWithSchema` with column names in order; deconstruct `{ valid, errors }` and render partial-success UX. `errors[N].line` is human-facing (1-based file line including header + blanks); `errors[N].rowIndex` is programmatic (0-based data row).
 
 Requesting PM A VERDICT.
+
+##### VERDICT T09 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-csv-import` @ commit `814a5f5`. All gates green with independent baseline math verification + line-by-line design decision confirmation.
+
+**Transparency verification**
+- `git log 34e84b5..origin/main --oneline` (since ACK) → 1 exec-A SUBMIT docs commit (`d36cd07`). No T09 source leaked.
+- `git log origin/main -- src/shared/utils/csv-parser.ts` → **empty**. Zero T09 code on main. ✓
+
+**DoD verification (16 items)** — all ✓
+- `parseCsvWithSchema<T>` exported from `csv-parser.ts:135-196` with signature `(input, schema, opts) → CsvParseResult<T>` ✓
+- Quoted fields with embedded commas — verified state machine `:108-115` + test #2 ✓
+- Escaped quotes `""` — verified `:118-120` QuoteInQuoted → append `"` + return to Quoted + test #3 ✓
+- LF/CRLF/CR normalization — verified `:74-77` (CRLF before lone CR, correct order) + tests #4/#5/#6 ✓
+- UTF-8 BOM strip — verified `:70` constant + `:75` conditional slice + test #7 ✓
+- `hasHeader: true` skips first line — verified `:157-160` + test #11 ✓
+- Whitespace-only rows silently skipped — verified `:153-155` (does NOT increment rowIndex — pure skip) + test #8 ✓
+- Column-count mismatch as `CsvRowError` — verified `:164-173` + test #9 (both too-few + too-many) ✓
+- Zod validation happy path — verified `:181-183` + test #1 ✓
+- Zod validation error path — verified `:184-190` + test #13 (partial success) ✓
+- All-rows-invalid case — verified test #14 ✓
+- Empty input case — verified test #10 ✓
+- **Test coverage ≥ 90%**: independent targeted rerun shows **97.18% stmts / 85.71% branch / 100% funcs / 97.10% lines** ✓ (exceeds ≥ 90% DoD by comfortable margin)
+- `make check` PASS on branch: **278/1/279** independently verified ✓
+- Drift scans clean (0 `any` / 0 `console.log/info/debug` / 0 `throw new Error(` / 0 default export / 0 `.skip`) on both files ✓
+- Sibling utils untouched (crypto/masking/test-setup/ticket-state-machine) ✓
+- `git diff main` empty on all restricted paths (prisma/docs/config/deps/all other src/) ✓
+
+**Baseline reconciliation math independently verified**
+- **Main-only re-run** (checkout + `pnpm test:unit`): **263/1/264** total
+- **T09 branch re-run**: **278/1/279** total
+- **Delta**: 278 − 263 = **+15 T09 tests** ✓ (matches PLAN commitment exactly)
+- **Nathan velocity delta**: 263 − 212 (T08-time baseline) = **+51 Nathan tests** since T08 merge ✓ (matches SUBMIT claim)
+- Math is airtight and independently reproducible. Exec-A's baseline shift reporting continues model discipline (T08 was 160→205, T09 is 212→263 — pattern of catching-and-reconciling holds).
+
+**Coverage — uncovered lines 126-127 verified as defensive, NOT silent bug**
+Reading `csv-parser.ts:117-128` (QuoteInQuoted state):
+```
+} else {           // line 125
+  buffer += ch;    // line 126 (UNCOVERED)
+  state = 'Unquoted';  // line 127 (UNCOVERED)
+}
+```
+This is the defensive lenient-recovery branch when the character after `"` inside `Quoted` is neither `"` (escape) nor `,` (cell terminator). Excel/Google Sheets never produce this pattern (they always close quotes before non-comma non-quote chars). The parser recovers by appending the char + treating the rest as unquoted. Per PLAN Adv #5: "defensive; real CSVs shouldn't hit this". **Documented tolerance, not silent bug**. Uncovered = intentional (would need a hand-crafted malformed CSV to exercise; adding such a test just for coverage would be low-value).
+
+**Test #15 (Adv #4 UX edge case) — assertion verified line-by-line**
+Test at `csv-parser.test.ts:163-177` implements exactly the scenario I flagged in Adv #4:
+- Input: `'name,price_idr,category\n\nNasi Goreng,45000,breakfast\n\nKopi,invalid,beverages'`
+- Line 1: header (skipped by hasHeader)
+- Line 2: blank (skipped, rowIndex unchanged)
+- Line 3: data → `valid[0]` (rowIndex 0)
+- Line 4: blank (skipped, rowIndex unchanged)
+- Line 5: data with zod error → `errors[0]` (rowIndex 1)
+
+Assertions verified:
+- `:174` `expect(errors[0]?.line).toBe(5)` ✓
+- `:175` `expect(errors[0]?.rowIndex).toBe(1)` ✓
+- `:176` `expect(errors[0]?.raw).toEqual(['Kopi', 'invalid', 'beverages'])` ✓
+
+**Exemplary test design** — proves both counters advance correctly across skipped-header + 2 skipped-blanks + 1 valid + 1 invalid. This kind of test is what separates "checked the boxes" from "verified the contract".
+
+**JSDoc verification (3 required sections all present)**
+- **Consumer usage example** (`:9-26`): `MenuRowSchema` with `.string().min(1).max(120)` + `.coerce.number().int().nonnegative()` + `.enum(...)` — mirrors env.ts convention exactly. Type inference example `readonly MenuRow[]` shown.
+- **Deconstruction pattern** (`:28-30`): explicit note that consumers may deconstruct `{ valid, errors }` at call sites; `readonly interface` shape allows non-breaking future extensions.
+- **"Slice-1 supports" block** (`:34-40`): 6 supported features enumerated with example syntax.
+- **"Slice-1 does NOT support" block** (`:42-48`): 4 deferred features enumerated with slice-2 escalation path (`csv-parse` dep + PO ratification for multi-line quoted values).
+
+All 3 required sections present + well-formatted + informative.
+
+**State machine transitions — full coverage confirmed**
+100% function coverage + explicit tests exercise all 4 states and transitions:
+- **FieldStart → Unquoted**: test #1 (simple CSV) — first char is not `"` or `,`
+- **FieldStart → Quoted**: test #2 (embedded comma) — first char is `"`
+- **FieldStart empty cell**: test #9 (column mismatch tests include trailing commas)
+- **Unquoted → FieldStart (via `,`)**: test #1 (multi-column parse)
+- **Quoted → QuoteInQuoted (via `"`)**: test #2 + #3
+- **QuoteInQuoted → Quoted (via `""` escape)**: test #3
+- **QuoteInQuoted → FieldStart (via `,` after close-quote)**: test #2
+- **QuoteInQuoted defensive → Unquoted**: uncovered lines 126-127 (documented)
+
+**Scope discipline — three-dot branch diff**
+```
+src/shared/utils/__tests__/csv-parser.test.ts
+src/shared/utils/csv-parser.ts
+```
+Exactly 2 files. Sibling utils (crypto/masking/test-setup/ticket-state-machine) unchanged. Zero touch to any other src/ path or config/schema/deps. Single-concern PR pattern preserved (7th task in a row: T04/T-INFRA-01/T07-slice-1/T06/T-INFRA-02/T-INFRA-03/T05/T08/T09).
+
+**Design decisions independently verified in code line-by-line**
+- **4-stage pipeline** (normalize → split → row-to-cells → zod-validate) — clean, each stage pure + deterministic ✓
+- **Line-ending order** `\r\n` before lone `\r` at `:76` (correct — CRLF handled first prevents `\n\n` double-conversion) ✓
+- **`readonly` fields** on all 3 interfaces (immutability contract) ✓
+- **`type` import for zod** at `:51` (`import type { ZodType }` — zero runtime cost) ✓
+- **Nullish coalescing defensive access**: `:150` (`lines[i] ?? ''`), `:177` (`opts.columns[c] ?? ''`), `:178` (`cells[c] ?? ''`) — proper defense against `noUncheckedIndexedAccess: true` (per T06 Adv #6 pattern). Cross-task consistency: same idiom as T06's `?? []` on `TICKET_TRANSITIONS[from]`.
+- **`headerSkipped` state**: `:147` initialized as `!opts.hasHeader` — clever inversion: if no header expected, treat as already-skipped. Elegant.
+- **`rowIndex++` only on data rows** (not blanks, not header): verified `:171`/`:192` — matches Adv #4 UX contract.
+
+**Security floor** — N/A. CSV parser is a pure fn (no I/O, no side effects, no PII surface). Consumers control what data goes into the CSV. Batched error surface prevents information leaks (errors carry only zod issues, not internal parser state).
+
+**Two durable-pattern mitigations held under continued load**
+1. **Branch-slip mitigation** — **4th consecutive task NOT recurring** (T-INFRA-03 1st, T05 2nd, T08 3rd, **T09 4th**). Pattern is empirically durable across broader scope diversity (config change, seed script, adapter+port, CSV parser). `feedback_git_slip_transparency.md` mitigation adoption is now confirmed durable behavior change.
+2. **Verify-before-act** — **8th consecutive PLAN with clean ACK** (T-INFRA-01, T07-slice-1, T06, T-INFRA-02, T-INFRA-03, T05, T08, T09). Zero REJECT-PLAN cycle needed across the arc. Pattern is empirically stable.
+
+**Cross-team pace awareness — continued discipline signal**
+Exec-A caught Nathan velocity delta cleanly (T08 baseline 212 → T09 baseline 263 = +51 Nathan tests via T18/T19/T20 or similar merges). Independent PM verification confirms the delta. This is the same discipline family as T08's baseline shift catch — exec-A is treating cross-team pace as first-class context to reconcile, not noise to hide.
+
+**Follow-ups actioned in same commit**
+- → §1 T09 → approved
+- → §0 Active task refreshed → next triage (T10 workers next main-queue)
+- → PARENT §1 T09 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top with Nathan velocity delta note)
+
+**PO action item — branch merge**
+`feat/foundation-csv-import` @ `814a5f5` on `origin`; PM A verified: `make check` **278/1/279** (independent rerun), csv-parser.ts **97.18% coverage** exceeds ≥ 90% DoD, all 16 DoD verified, uncovered lines 126-127 confirmed defensive-not-bug, test #15 Adv #4 UX edge case exact assertion match, drift 0 across 5 categories, out-of-scope diff empty across all restricted paths, JSDoc 3 required sections all present, state machine full-transition coverage, baseline math airtight. Per CLAUDE.md §12, **please merge `feat/foundation-csv-import` → `main`**. Post-merge: Satrio T23 (menu bulk CSV) + T24 (KB CSV import) have foundation ready — construct zod row schema, deconstruct `{ valid, errors }`, render partial-success UX.
+
+**Slot A ledger post-merge**: **12 approved** — T01, T02, T03, T04, T05, T06, T07-slice-1, T-INFRA-01, T-INFRA-02, T-INFRA-03, T08, **T09**. Main-queue T01-T06 + T08 + T09 done + T07 partial. **Only T10 workers harness remaining in main-queue T01-T10 chain**. After T10 lands, focus shifts to electives (T-INFRA-04 CI PO decision, DEP-4 api.ts bootstrap per PO defer-until-T10-done, docs/TESTING.md planning territory) or T07-slice-2+ on consumer demand.
+
+**Next Slot A queue** (per PO open-triage guidance, main-queue preferred)
+1. **T10 workers harness** — completes main-queue T01-T10 chain. Bull + Redis foundation. Consumers: Nathan's future notification worker + Satrio's daily brief + escalation worker. Bigger scope than T09 (Bull queue setup + graceful shutdown + monitoring + concurrency config).
+2. THEN electives per PO's earlier queue prioritization (T-INFRA-04 CI, DEP-4 api.ts).
+
+PM A pauses + awaits PO next-task direction. Straight-line **T10 workers** expected per numeric queue order.
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
