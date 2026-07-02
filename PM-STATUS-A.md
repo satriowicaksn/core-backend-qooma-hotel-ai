@@ -2614,6 +2614,37 @@ JSON string decoding: `\\` → `\`, so runtime shell receives `jest --testPathPa
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T-INFRA-03 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+All 6 advisories resolved with concrete pre-PLAN evidence. Two adopted discipline patterns from prior sessions visible in this PLAN — high-value follow-through.
+
+**Verified in PLAN**:
+- **Adv #1 (escape form)** ✓ — **empirically verified pre-PLAN via `--listTests`**. Ran actual jest CLI with the target regex and confirmed exactly 11 unit files listed + 3 integration excluded. No guessing on JSON escape → shell → jest regex chain. Post-edit verification plan: same `--listTests` invocation should return identical file list.
+- **Adv #2 (baseline math)** ✓ — precise counts captured pre-PLAN: current `test:unit` (buggy) 191/193, `test:integration` 31/32. Expected post-fix: `test:unit` 160/161, `test:integration` unchanged. Sum verifies: 161 + 32 = 193 total ✓, 160 + 31 = 191 pass ✓, 1 + 1 = 2 skip ✓. Arithmetic proof clean.
+- **Adv #3 (no-Docker signal)** ✓ — evidence plan has 3 concrete checkpoints: (i) absence of `PASS *.integration.test.ts` lines, (ii) absence of testcontainers duration `(8.786 s)` signals, (iii) time delta measurement (~10.98s → ~1-2s for unit-only). Right approach.
+- **Adv #4 (test:coverage unchanged)** ✓ — pass-through analysis correct (script has no path filter, relies on config `testMatch`). Verification plan solid: `pnpm test:coverage` post-fix should return 193 baseline.
+- **Adv #5 (CI implications)** ✓ — acknowledged out-of-scope + names 3 concrete T-INFRA-04 candidate options for PO decision: (a) new `make check-full = check + test-integration` target, (b) separate CI job for `pnpm test:integration`, (c) do-nothing if CI already handles it. PO/PM A decide separately per single-concern PR pattern.
+- **Adv #6 (dev-flow guidance)** ✓ — acknowledged out-of-scope (planning-doc territory per EXECUTOR-PROTOCOL §10). Will flag in SUBMIT as follow-up.
+
+**Two adopted discipline patterns visible in this PLAN** (worth calling out):
+1. **`git branch --show-current` mitigation** — from T-INFRA-02 branch-slip pattern instance #3. Exec-A explicitly adopted the personal hygiene guard from the memorialized `feedback_git_slip_transparency.md`. Follow-through discipline visible.
+2. **Empirical `--listTests` pre-PLAN verification** — this is emergence #2 of the *"verify assumption before committing to it in the artifact"* pattern (instance #1 was PM A file-read of `tenant-guard.ts` before trusting Nathan's DEP-5 misclaim in T-INFRA-02 triage). Per PM A's ≥2-emergence rule, **memorializing to memory now as `feedback_verify_before_act.md`** — will land in same commit as this ACK. Rule extends across executor + PM roles.
+
+**Scope match** ✓ — 1 file modify (`package.json`), 0 create. Zero touch to `jest.config.ts` / `Makefile` / test files / `src/` / `pnpm-lock.yaml`. HARD constraints all upheld.
+
+**Design fidelity** ✓ — script-layer split (not config-layer). Final `test:unit` value matches ASSIGNMENT-proposed syntax + reuses existing `\\.` convention from adjacent `test:integration` script (consistency).
+
+**Proceed to implementation on branch `feat/foundation-testglob-split`.**
+
+**SUBMIT expectations (reminders)**:
+- Post-edit `pnpm test:unit --listTests` should return identical file list to pre-PLAN verification (11 unit files)
+- `make check` output: no testcontainers startup lines, no `(N.NNs)` integration suite durations, faster completion (~1-2s vs ~9s for unit portion)
+- Test counts in SUBMIT: `test:unit` = 160/161, `test:integration` = 31/32, `test:coverage` = 191/193 (full baseline). All 3 numbers reported.
+- `git diff main -- package.json` = single-line change; `git diff main -- src/ jest.config.ts Makefile pnpm-lock.yaml` = empty
+- Flag T-INFRA-04 candidate + docs/TESTING.md follow-up in SUBMIT "Notes / operational" section
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
