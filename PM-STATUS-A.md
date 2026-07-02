@@ -2941,6 +2941,130 @@ Per PARENT §10 T05 coord Q, PM A defaulted to **S2 (runtime Prisma upsert)** af
 
 Awaiting **PLAN T05** from exec-A.
 
+#### PLAN T05 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Replace stub body of `prisma/seeds/index.ts` with a real S2 (runtime Prisma upsert) seed implementation: 1 hotel row + 5 departments + 3 menu categories + 10 menu items + 6 KB entries. Own `PrismaClient` (NOT the T-INFRA-01 singleton — dev-only script, needs only `DATABASE_URL`, avoids env fail-fast on secret fields). Deterministic UUIDs make re-runs land the same rows; `upsert({ where:{id}, create:{...}, update:{} })` on every operation guarantees idempotency. Env-configurable hotel ID via `process.env.SEED_HOTEL_ID ?? '00000000-0000-4000-8000-000000000001'`. `hotel_core_dev` DB (Opsi C) — isolated from Nathan's testcontainer integration tests.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT T05 (full) + spec refs ✓
+- Parent docs spot-read: `prisma/seeds/index.ts` current stub (33 LOC, commented template + `console.warn`); `prisma/schema.prisma:40-63` Hotel (id-only stub Opsi C), `:82-102` Department, `:284-299` MenuCategory, `:301-323` MenuItem, `:325-341` KnowledgeEntry — all field shapes captured (see Adv #1 below); `prisma/migrations/20260701112000*/migration.sql` — 19 CHECK constraints, 3 relevant to seed scope enumerated (see Adv #2); `package.json:32` — `"seed": "tsx prisma/seeds/index.ts"` (tsx runtime, no build step); Slot B integration test fixture ID conventions in `tickets.repository.integration.test.ts` + `guests.repository.integration.test.ts` (see Adv #6) ✓
+- Dependencies: T02 ✓, T-INFRA-01 ✓, T-INFRA-02 ✓, T06 ✓, T07-slice-1 ✓, T-INFRA-03 ✓ — all merged, foundation healthy
+- `make typecheck` clean ✓ ; `make lint` clean ✓
+- Scaffolder risk: **none** — 1-file rewrite (in-place edit of stub), no CLI generator
+
+**Files to modify** (1, 0 create)
+- `prisma/seeds/index.ts` — replace stub body with real implementation (~130-150 LOC estimated with JSDoc + data literals)
+
+**Files NOT touched** (per HARD constraints)
+- `@core/prisma/prisma-client.ts` (singleton), `prisma/schema.prisma`, `prisma/migrations/*`, `package.json`, `pnpm-lock.yaml`
+- All `src/`, all `docs/`, all test files, all Slot B modules
+
+**Approach**
+
+Single file, top-level `main()` async pattern per Prisma seed convention. Own `PrismaClient` instance. All operations `upsert({ where:{id}, create:{...}, update:{} })` with hardcoded deterministic UUIDs. `main()` runs upserts in dependency order (hotel → departments → menu categories → menu items → KB entries).
+
+*(1) UUID scheme* — v4-shape deterministic patterns, distinct prefixes per model for readability:
+- Hotel: `SEED_HOTEL_ID` env OR `'00000000-0000-4000-8000-000000000001'` (Adv #5 default; also matches PM A suggestion for memorability + v4 shape).
+- Departments: `'d0000000-0000-4000-8000-00000000000{1..5}'`
+- Menu categories: `'ca000000-0000-4000-8000-00000000000{1..3}'`
+- Menu items: `'11000000-0000-4000-8000-00000000000{1..a}'` (10 items, hex-1..a suffix)
+- KB entries: `'ee000000-0000-4000-8000-00000000000{1..6}'`
+All prefixes chosen to be non-clashing with Nathan's testcontainer fixtures (`aaaa/bbbb/1111/2222`) — see Adv #6.
+
+*(2) Data plan* (satisfies all CHECK constraints per Adv #2):
+
+**Departments** (5 rows, codes uppercase 2-8 chars satisfying `code ~ '^[A-Z]{2,8}$'`):
+| # | name             | code |
+|---|------------------|------|
+| 1 | Concierge        | CON  |
+| 2 | Housekeeping     | HSK  |
+| 3 | Food & Beverage  | FNB  |
+| 4 | Engineering      | ENG  |
+| 5 | Front Office     | FO   |
+(HSK + FO deliberately align with Nathan's testcontainer fixture codes so cross-repo consistency is easier if Satrio later reuses seed data — see Adv #6.)
+
+**Menu categories** (3): Breakfast, Lunch, Beverages (sortOrder 0/1/2).
+
+**Menu items** (10 spread across categories, all `price_idr` integer ≥ 0):
+- Breakfast (3): Nasi Goreng (45000), Bubur Ayam (35000), Pancakes (55000)
+- Lunch (4): Ayam Bakar (85000), Ikan Kakap (120000), Sate Ayam (65000), Vegetarian Bowl (60000)
+- Beverages (3): Kopi Tubruk (25000), Es Teh (15000), Fresh Juice (35000)
+
+**KB entries** (6): mix of policy + Q&A per PM A guidance:
+1. "Check-in / check-out hours" (policy, tags `['front-office','policy']`)
+2. "Late check-out charges" (policy, tags `['billing','front-office']`)
+3. "Wi-Fi password location" (Q&A, tags `['guest-service']`)
+4. "Room service ordering hours" (policy, tags `['f-and-b','room-service']`)
+5. "Housekeeping request procedure" (Q&A, tags `['housekeeping']`)
+6. "Emergency contact numbers" (policy, tags `['safety','emergency']`)
+
+*(3) File structure*:
+```ts
+/**
+ * Hotel Core dev seed (T05).
+ *
+ * S2 (runtime Prisma upsert) per silent-ratification of PARENT §10 T05 coord Q.
+ * 1 hotel + 5 depts + 3 menu categories + 10 items + 6 KB entries. Deterministic
+ * UUIDs → idempotent re-runs. Own PrismaClient (avoids env fail-fast on unrelated
+ * secret fields; seed only needs DATABASE_URL).
+ *
+ * Run: `pnpm seed` (or `make db-seed`). Env: SEED_HOTEL_ID optional.
+ */
+
+import { PrismaClient } from '@prisma/client';
+
+const HOTEL_ID = process.env.SEED_HOTEL_ID ?? '00000000-0000-4000-8000-000000000001';
+// ...UUID constants for depts / categories / items / KB entries...
+
+const db = new PrismaClient();
+
+async function main(): Promise<void> {
+  await db.hotel.upsert({ where: { id: HOTEL_ID }, create: { id: HOTEL_ID }, update: {} });
+  // departments loop
+  // menu categories loop
+  // menu items loop
+  // KB entries loop
+  console.warn(`✓ Seed complete: hotel ${HOTEL_ID}, 5 depts, 3 categories, 10 items, 6 KB entries`);
+}
+
+main()
+  .catch((err) => { console.error(err); process.exit(1); })
+  .finally(() => void db.$disconnect());
+```
+
+Note: `void db.$disconnect()` — `$disconnect()` returns `Promise<void>`; wrapping in `void` satisfies `@typescript-eslint/no-floating-promises` in `.finally()` callback (same pattern used in T-INFRA-01's signal handler).
+
+**Explicit findings + resolution for each of PM A's 6 advisory checks**
+
+- **Adv #1 — Schema field verification (verified pre-PLAN)**:
+  - **Hotel** (`schema.prisma:40-63`): id-only stub per Opsi C. `id: String @id @default(uuid()) @db.Uuid`. My upsert supplies id, no other fields.
+  - **Department** (`:82-102`): required = `hotelId`, `name` (VarChar 80), `code` (VarChar 8 — **hard limit**). Optional/defaulted = `operatingHours` (Json default `{}`), `escalationChain` (Json default `{}`), `telegramChatId?`, `supervisorTelegramId?`, `isActive` (default true). Unique constraint `@@unique([hotelId, code])`. My 5 depts all ≤ 3-char codes → well under 8-char limit; JSON defaults left to schema (`{}`).
+  - **MenuCategory** (`:284-299`): required = `hotelId`, `name` (VarChar 80). Defaulted = `sortOrder: 0`, `isActive: true`. Unique `@@unique([hotelId, name])`. Straightforward.
+  - **MenuItem** (`:301-323`): required = `hotelId`, `categoryId`, `name` (VarChar 120), `priceIdr` (**Decimal(12,2)** — Prisma accepts number literal / string / `Prisma.Decimal`; I'll use plain integer literals in IDR since values are whole-thousand rupiah, e.g. `45000`, Prisma coerces to Decimal without precision loss for integers ≤ 12 digits). Optional = `description?`, `imageUrl?`, `prepMinutes?`, `isAvailable` (default true), `availableWindowFrom?`, `availableWindowTo?`. My 10 items skip optionals.
+  - **KnowledgeEntry** (`:325-341`): required = `hotelId`, `title` (VarChar 255), `content` (Text — unbounded). Optional = `category?` (VarChar 80). Defaulted = `tags: String[] default []`, `isActive: true`. My 6 entries include `tags` explicitly.
+
+- **Adv #2 — CHECK constraints (verified pre-PLAN via grep on `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql`)**. 19 CHECK constraints total; 3 relevant to seed scope:
+  1. Line 11: `Department.code CHECK (code ~ '^[A-Z]{2,8}$')` — codes must be 2-8 UPPERCASE Latin letters ONLY (no digits, no dashes, no lowercase). My 5 codes (`CON`, `HSK`, `FNB`, `ENG`, `FO`) all satisfy: alphabetic, 2-3 chars, all caps.
+  2. Line 67: `MenuItem.price_idr CHECK (price_idr >= 0)` — zero or positive. My 10 prices (15000–120000) all ≥ 0.
+  3. Line 71: `MenuItem.prep_minutes CHECK (prep_minutes IS NULL OR prep_minutes >= 0)` — I don't set prep_minutes → NULL → passes.
+  - Other 16 constraints (guest privacy/vip, visit status/nights/satisfaction, ticket status/priority/complaint/resolved, ticket_updates.type, ticket_messages.sender, notifications.type, wa_templates.status, feature_flags scoping, billing_invoices.status) — irrelevant to seed's 5-table scope (no Guest/Visit/Ticket/Notification/WaTemplate/FeatureFlag/Billing rows in this seed).
+  - **No seed value violates any CHECK constraint.** No design change needed.
+
+- **Adv #3 — Own PrismaClient (design decision confirmed)**: my final file will `import { PrismaClient } from '@prisma/client'` and `const db = new PrismaClient()` at module top. Zero references to `@core/prisma/prisma-client`. Verified by structure. `.finally(() => void db.$disconnect())` per Prisma template + no-floating-promises satisfaction.
+
+- **Adv #4 — Idempotent upsert design**: I'll use `update: {}` (no-op on re-run) as the conservative default across all 5 model types (hotel, department, menu category, menu item, KB entry). Rationale: re-running `pnpm seed` should not silently overwrite manually-edited demo data (e.g., a developer tweaked a menu price locally to test UI). If future needs require re-run to refresh prices, that's a follow-up (either explicit `pnpm seed:refresh` script or PM A can direct a scope change here). Zero-config idempotency is safer than smart-merge on a dev-only script.
+
+- **Adv #5 — Env variable convention**: `const HOTEL_ID = process.env.SEED_HOTEL_ID ?? '00000000-0000-4000-8000-000000000001';` — no zod validation (seed context; permissive default acceptable per ASSIGNMENT). Default value is a well-formed v4 UUID (`4` at position 13, `8` at position 17), memorable pattern for demo use.
+
+- **Adv #6 — Slot B integration test fixture IDs (verified pre-PLAN via grep)**: Nathan's `tickets.repository.integration.test.ts:25-28` uses `HOTEL_A = 'aaaaaaaa-...'`, `HOTEL_B = 'bbbbbbbb-...'`, `DEPT_1 = '11111111-dddd-...'`, `DEPT_2 = '22222222-dddd-...'`. `guests.repository.integration.test.ts:17-18` uses same `HOTEL_A/HOTEL_B` UUIDs. **Nathan uses these ONLY inside testcontainers** (ephemeral per-suite Postgres via `PostgreSqlContainer`) — a completely isolated DB from `hotel_core_dev` where my seed lands. **Zero collision risk.** Design implication: I can freely choose my seed IDs; I picked `d0000000-.../ca000000-.../11000000-.../ee000000-...` prefixes to be visually distinct from Nathan's `aaaa/bbbb/1111/2222` patterns. **However**, Nathan's Slot B fixture uses department codes `HSK` (Housekeeping) and `FO` (Front Office) — I deliberately reuse both codes in my seed (with matching names) so any future Satrio use of shared seed data + shared code conventions is friction-free. Non-blocking alignment gesture.
+
+**GAPs / questions**: none. All 6 advisories concretely resolved pre-PLAN; schema + CHECK verified via file reads; UUID scheme + data plan satisfy every constraint; Slot B compat non-issue (different DB, aligned dept codes as friction-reducer).
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
