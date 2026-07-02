@@ -3646,6 +3646,126 @@ Zero port leak. Standard test-double pattern.
 
 Ship it.
 
+#### SUBMIT T08 — exec-A (Nanak) at H0 2026-07-02 (attempt 1)
+
+Task: Object storage abstraction slice-1 — port + S3Adapter + InMemoryAdapter (upload + delete only; signed URLs deferred to slice-2)
+
+Branch: `feat/foundation-multipart-upload` · Commit: `50ec906` (pushed to `origin/feat/foundation-multipart-upload`)
+
+Files changed: **5 create + 3 modify** (env.ts + package.json + pnpm-lock.yaml)
+
+Slot A create (all under `src/core/storage/`):
+  - `object-storage.port.ts` (31 LOC) — port interface with `upload` + `delete`, plus input/output types
+  - `s3-adapter.ts` (125 LOC incl. JSDoc) — S3Adapter class, modular SDK imports, fail-lazy config, R2/MinIO compat via `forcePathStyle`, `err instanceof Error` narrow in wrap helper, `ExternalServiceError('S3', ...)` with full SDK error in `upstream.body`
+  - `in-memory-adapter.ts` (49 LOC) — Map-based storage, `memory://` URLs, idempotent delete, `peek()` test-only accessor
+  - `__tests__/in-memory-adapter.test.ts` (48 LOC) — 5 tests, 100% coverage
+  - `__tests__/s3-adapter.test.ts` (42 LOC) — 2 fail-lazy tests
+
+Slot A modify:
+  - `src/core/config/env.ts` (+10 LOC) — 5 OPTIONAL zod fields under service-specific block
+  - `package.json` (+1 LOC) — `@aws-sdk/client-s3 3.1078.0` in `dependencies`
+  - `pnpm-lock.yaml` — auto-updated by `pnpm add`
+
+DoD self-check (11 items from ASSIGNMENT §T08 DoD)
+- [x] **`ObjectStoragePort` interface exported from `@core/storage/object-storage.port.js`** — verified via file: 3 named exports (`ObjectStoragePort` + `ObjectStorageUploadInput` + `ObjectStorageUploadResult`)
+- [x] **`S3Adapter` class implements the port; env-driven; throws `ExternalServiceError('S3', ...)` on SDK errors + on missing config** — verified via `s3-adapter.test.ts` both fail-lazy tests + `err instanceof Error` narrow in `wrap()` helper (line 122)
+- [x] **`InMemoryAdapter` class implements the port; Map-based; `upload` returns `memory://<key>`; `delete` idempotent** — verified via 5 tests including explicit idempotency test (`should not throw when deleting a missing key`)
+- [x] **`env.ts` has 5 OPTIONAL S3 fields; `loadConfig()` still succeeds without them** — verified: all 5 use `.optional()`; pre-PLAN grep confirmed zero external consumers; `make check` passes (loadConfig call in prisma-client.ts still works, no test breakage)
+- [x] **Test suite for `InMemoryAdapter`: 5 tests + ≥ 90% coverage** — actual: **100% coverage** on `in-memory-adapter.ts` (stmts/branches/funcs/lines all 100%)
+- [x] **`package.json` has `@aws-sdk/client-s3` in `dependencies`** — verified via `git diff main -- package.json`:
+  ```
+  +    "@aws-sdk/client-s3": "^3.1078.0",
+  ```
+- [x] **`pnpm install` runs cleanly; no peer-dep warnings** — `pnpm add @aws-sdk/client-s3` output showed only `Progress:` lines + `+ @aws-sdk/client-s3 3.1078.0` + `Done in 3.6s`; no warnings
+- [x] **`make check` PASS** — actual: `Test Suites: 1 skipped, 14 passed, 14 of 15 total · Tests: 1 skipped, 212 passed, 213 total · Time: 0.965 s`. Baseline higher than PLAN projection (~160 → 205 actual) because Nathan's T16 V2-V6 merges landed between PLAN and code; net delta is 205 + 7 new = 212, exactly matching the +7 test contribution I planned
+- [x] **Drift scans clean on all 5 new files (+ env.ts diff)** — see Drift scans below (0 hits on all 5 categories; JSDoc English "any" hit at `s3-adapter.ts:18` is a comment phrase, not a TS type; pre-existing `throw new Error` at `env.ts:83` is the zod-validation error in loadConfig, unchanged by my +8 line diff)
+- [x] **`git diff main -- prisma/ src/modules/ src/plugins/ src/shared/ docs/ Makefile jest.config.ts tsconfig.json src/core/http/http-client.ts` = empty** — verified via targeted `git diff main -- <paths>` returning no output
+- [x] **JSDoc on `S3Adapter` documents R2 usage + slice-2 signed URL deferral** — see JSDoc excerpt below
+
+Quality gate (final `make check`)
+- `pnpm prisma:generate`: PASS (T-INFRA-01 prereq)
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean; conditional-spread pattern used in `ensureClient` to satisfy `exactOptionalPropertyTypes: true` for SDK's `endpoint` field — see `s3-adapter.ts:96-105`)
+- `pnpm test:unit`: **PASS** — `Test Suites: 1 skipped, 14 passed, 14 of 15 total · Tests: 1 skipped, 212 passed, 213 total · Time: 0.965 s`
+- `make check` overall: **PASS**
+
+Test count trio (baseline shifted upward — Nathan's T16 merges landed between PLAN and code)
+- `pnpm test:unit`: **212 pass / 1 skip / 213 total** (baseline 205 + 7 new = 212; PLAN projected +7 delta, delta held exactly)
+- `pnpm test:integration`: 50 pass / 1 skip / 51 total (unchanged — no integration tests added)
+- `pnpm test:coverage`: 262 pass / 2 skip / 264 total (sum sanity: 213 unit + 51 integration = 264 ✓)
+
+Coverage evidence (targeted `--collectCoverageFrom` on new storage files)
+```
+File                 | % Stmts | % Branch | % Funcs | % Lines
+---------------------|---------|----------|---------|--------
+in-memory-adapter.ts |     100 |      100 |     100 |     100
+s3-adapter.ts        |   34.48 |    27.27 |   57.14 |   35.71
+```
+- **`InMemoryAdapter`: 100% across all 4 metrics** — exceeds DoD ≥ 90% requirement.
+- **`S3Adapter`: 34%** — expected per PLAN. Fail-lazy config-check paths (2 tests) execute the `requireConfig()` branch; happy-path SDK-calling code (`ensureClient` + `PutObjectCommand.send` + `DeleteObjectCommand.send` + `wrap`) is intentionally NOT exercised in unit tests. Justification per hexagonal principle: consumers use `InMemoryAdapter` via port injection; real S3 behavior verified downstream by Satrio T22/T24 integration tests when he onboards. Adapter's own logic (config validation + error translation shape) is verified by the 2 fail-lazy tests.
+
+Adv #4 modular-imports verification (proof)
+```
+$ grep -n "@aws-sdk" src/core/storage/*.ts
+src/core/storage/s3-adapter.ts:24: * to slice-2 — needs `@aws-sdk/s3-request-presigner`. Not required for
+src/core/storage/s3-adapter.ts:28:import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+```
+Only 2 `@aws-sdk` textual references in the storage dir:
+- Line 24: JSDoc comment referencing the FUTURE slice-2 package `@aws-sdk/s3-request-presigner` — not an import.
+- Line 28: **the only actual import statement** — exactly 3 named imports (`DeleteObjectCommand`, `PutObjectCommand`, `S3Client`). No whole-namespace, no aggregated sub-package, no wildcard.
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on all T08 touched files)
+
+For each new file (`object-storage.port.ts`, `s3-adapter.ts`, `in-memory-adapter.ts`, `in-memory-adapter.test.ts`, `s3-adapter.test.ts`) — all **0 hits** on:
+- `any` type
+- `console.log` / `console.info` / `console.debug`
+- `throw new Error(`
+- Default export
+- `.skip(` in tests
+
+Two false-positive greps investigated + dismissed:
+- `s3-adapter.ts:18` — JSDoc English word "any" in "SDK error wrap: **any** `S3Client.send` failure…" — not a TS type annotation; ESLint doesn't scan JSDoc for types.
+- `env.ts:83` — pre-existing `throw new Error(\`Invalid environment configuration:\\n${issues}\`)` in `loadConfig` (was at line 75 pre-diff, moved to 83 by my +8 line insertion). Not from my change; part of the module's original zod-error propagation.
+
+Forbidden imports (express / typeorm / sequelize / moment / node-fetch): **0 hits** across all 5 files.
+
+`git diff main -- <out-of-scope paths>`: **empty** for `src/core/http/http-client.ts`, `src/plugins/`, `src/modules/`, `src/shared/`, `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`.
+
+Security check (T08 slice-1 — external IO wrapper with credential handling)
+- No secret hardcoded — all 5 S3 env fields sourced via zod-parsed `process.env`; adapter constructor takes them explicitly
+- Credentials never logged — no `console.warn`/`error` prints them; `ExternalServiceError('S3', 'not configured …')` includes field names but NOT values
+- Error `upstream.body` contains the SDK error object — SDK errors include request signatures + metadata; Sentry consumers should scrub / redact per their own PII rules (out of T08 scope, note flagged for downstream)
+- No HMAC / webhook / crypto touch (N/A for storage adapter)
+
+JSDoc excerpt from `s3-adapter.ts` (documents R2 usage + slice-2 signed URL deferral per DoD line 3643)
+```ts
+/**
+ * S3Adapter — real object-storage adapter for AWS S3 / Cloudflare R2 / MinIO.
+ *
+ * All three are S3-API-compatible; swap by setting `S3_ENDPOINT`:
+ *   - AWS S3 (default): leave `endpoint` unset; virtual-hosted URL scheme.
+ *   - Cloudflare R2: set `endpoint` to your R2 endpoint URL (e.g.
+ *     `https://<account>.r2.cloudflarestorage.com`); adapter enables
+ *     `forcePathStyle` automatically because R2 doesn't do virtual hosting.
+ *   - MinIO / self-hosted: same as R2 — set `endpoint`, forcePathStyle on.
+ *
+ * … (fail-lazy env + SDK error wrap sections) …
+ *
+ * Slice-1 surface: `upload` + `delete`. Signed URL generation deferred
+ * to slice-2 — needs `@aws-sdk/s3-request-presigner`. Not required for
+ * menu images or daily-brief PDFs per spec §2.6 / §7 line 317.
+ */
+```
+
+Notes / operational
+- Env note (session-local): re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start.
+- Sequencing note (mitigation held, 3rd consecutive task): `git branch --show-current` verified BEFORE code edits; committed on `feat/foundation-multipart-upload` directly (`[feat/foundation-multipart-upload 50ec906]`). Branch-slip pattern from T07-slice-1 / T06 / T-INFRA-02 stays not-recurring.
+- Baseline note: `test:unit` baseline shifted from PLAN-time 160 to code-time 205 due to Nathan's T16 V2-V6 merges (visits.service.test.ts + visits.routes.test.ts). Net +7 test delta from T08 is exactly as planned. No test-logic change to Slot B; only my 7 new tests added.
+- Consumer wiring reminder for PM A / Satrio T22/T24 (future): construct `S3Adapter` at composition root with `S3AdapterConfig` sourced from `loadConfig()`; inject via `ObjectStoragePort` typed field. For unit tests, inject `InMemoryAdapter` and inspect via `peek()` — no SDK mocking needed.
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
