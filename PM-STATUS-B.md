@@ -43,15 +43,16 @@
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
-| T19 | Notifications CRUD | 🟡 wip (PLAN ACK'd) — new `notifications/` module | `feat/notifications-crud` | — |
+| T19 | Notifications CRUD | ✅ approved (attempt 1) | `feat/notifications-crud` @ `f35e7a2` (merges clean) | ⏳ awaiting PO merge |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
-| T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
+| T20 | Socket emitters | 🟢 unblocks on T19 merge (T11✓+T16✓+T19) — LAST task | — | — |
 
-**Counts**: ✅ **8/10 merged (T11, T13, T14, T15, T12, T16, T17, T18)** · 🟡 T19 assigned (notifications) · ⚪ T20 (←T19). Zero foundation blockers (only DEP-4 go-live). **Sisa 2: T19 → T20.** Visits module complete.
+**Counts**: ✅ **8/10 merged** + **T19 approved (awaiting merge)** · ⚪ T20 (socket, LAST — unblocks on T19 merge). **9/10 done pending T19 merge.** Only T20 left = Slot B finish line.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 13 — 2026-07-02 — T19 APPROVED (last CRUD module).** Notifications done (PM rerun: make check 249 no-Docker, coverage 97.39%, drift clean, merge dry-run CLEAN, **per-user isolation test present** — USER_A vs USER_B, the crux; markRead idempotency + 404). → merge `feat/notifications-crud`. **9/10 done pending merge.** Only **T20 (socket emitters)** remains = Slot B finish line.
 - **Loop 12b — 2026-07-02 — T18 MERGED (PR #8); T19 issued.** Slot B **8/10 merged**, visits module complete. Issued **T19** (notifications CRUD, new `notifications/` module, per-user `ctx.userId` scope). Q-B-07 flagged (envelopes). Remaining: T19 (wip) → T20 (socket, last task). Finish line 2 tasks away.
 - **Loop 12 — 2026-07-02 — T18 APPROVED (visits module complete).** Manual visit create done (PM rerun: make check 230 no-Docker, coverage 96.84%, drift clean, merge dry-run CLEAN, T16/T17 regression clean — visits suite 80 tests, guest-guard cross-tenant 404 no-create). → merge `feat/visits-manual-create`. **8/10 done pending merge.** Visits trio (T16+T17+T18) complete. Remaining: **T19 (notifications) → T20 (socket)** = finish line.
 - **Loop 11b — 2026-07-02 — T17 MERGED (PR #7); T18 issued.** Slot B **7/10 merged**. Issued **T18** (manual visit create `POST /visits`, extends `visits/` — completes the visits trio). Q-B-13 flagged (body + response shape). Remaining: T18 (wip), T19 (notifications, ready), T20 (←T19).
@@ -85,7 +86,7 @@
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
 | T18 | Manual visit create                                       | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #8 `5925c48`) 2026-07-02**. make check 230 + coverage 96.84% + T16/T17 regression clean. **Visits module complete.** |
-| T19 | Notifications CRUD + optimistic ops                       | assigned     | —              | Issued §2 (2026-07-02, DEP-5 ready). New `notifications/` module, per-user scope. Awaiting PLAN. Q-B-07 (envelopes). |
+| T19 | Notifications CRUD + optimistic ops                       | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 249 (no-Docker) + coverage 97.39% + drift clean + merge dry-run CLEAN + per-user isolation test present. **Merge `feat/notifications-crud` @ `f35e7a2`.** Last CRUD module. Awaiting PO merge. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
@@ -1634,6 +1635,29 @@ Notes
 - Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(notificationsRoutes)` (DEP-4, foundation — untouched). **Only T20 (socket) remains in Slot B.**
 
 Requesting PM B VERDICT.
+
+##### VERDICT T19 — APPROVED (attempt 1) by PM B (2026-07-02, H14)
+Verified by **my own rerun** on `feat/notifications-crud` @ `f35e7a2`.
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: **249 passed + 1 skipped**, 1.37s (no-Docker).
+- `make test-integration` → **PASS** (real PG).
+- Coverage (PM rerun) — notifications lines **97.39%**: service 100 / repository 100 / serializer 100 / routes 96.96 / schema 94.28. Every file ≥80% ✓ NT6.
+- **Drift** (notifications): all 0; **cross-module import 0**.
+- **File inventory**: 10 files, all in `src/modules/notifications/`, 0 outside. **Merge dry-run into latest main: CLEAN ✓.**
+
+**DoD spot-verified in code:**
+- NT1 ✓ **per-user scope** `{ userId: ctx.userId, hotelId: ctx.hotelId }` on every endpoint (`service.ts:30`), **NO super_admin bypass** (grep clean — personal data). `hotel_id`/`user_id` never from URL/body.
+- **Isolation integration test PRESENT** (the make-or-break): seeds USER_A1/A2/B1, asserts "user A must never see/mutate user B's rows" (`notifications.repository.integration.test.ts:3,22,54`).
+- NT2 ✓ list + `?is_read` + cursor keyset (`createdAt desc, id`) + module-local codec. NT3 ✓ unread-count (`isRead:false`). NT4 ✓ markRead guarded `updateMany` + ownership `findFirst` → 404, idempotent. NT5 ✓ mark-all `updateMany`, idempotent.
+- Envelopes = ratified Q-B-07 (`{data,pageInfo}` / `{data:{count}}` / `{data:{updated}}` / `{data:NotificationWire}`); field-list includes `user_id`+`hotel_id` (§1.6).
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/notifications-crud` @ `f35e7a2`. Attempt 1, zero rejects. **Merges CLEAN into latest main.**
+- **→ PO: merge `feat/notifications-crud`.** This is the **last CRUD module** — after merge, only **T20 (socket emitters)** remains in Slot B.
+- → §1 tracker updated (approved); PARENT §1 T19 → approved; roll-up PARENT §2.
+
+Clean — per-user isolation properly proven. **T19 closed. 9/10 done pending merge.** 🟢
 
 ---
 
