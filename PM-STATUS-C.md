@@ -12,11 +12,11 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — first Slot C activity
-- **Active task**: **T21 Departments CRUD** — PLAN ACK'd 2026-07-03 H0 with 1 override (no `api.ts` touch); Executor C coding on `feat/settings-departments-crud`
+- **Day**: H0 (2026-07-03) — Slot C **1/10 approved** (T21 APPROVED attempt 1)
+- **Active task**: **T21 Departments CRUD** — APPROVED attempt 1 (2026-07-03 H0), awaiting PO merge of `feat/settings-departments-crud` @ `55887f0`
 - **Branch**: `feat/settings-departments-crud`
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 wip; T22–T30 backlog (see §8 note) — T26 + T30 hard-blocked at DEV by Opsi C DB deviation (PARENT §4)
+- **My queue (preview)**: T21 approved; T22–T30 backlog (see §8 note) — T26 + T30 hard-blocked at DEV by Opsi C DB deviation (PARENT §4). Next candidate: T25 (WA templates) or T28 (settings/agents) — both fully unblocked, no PO-merge chain dependency
 
 ---
 
@@ -26,7 +26,7 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T21 | Departments CRUD (escalation tree + operating hours) | wip (PLAN ACK'd with 1 override) | — | PLAN ACK'd 2026-07-03 H0. Files scope: `src/modules/departments/*` (8 files) + `src/core/config/env.ts` additive (`SKIP_CROSS_DB_CHECKS` per Q-C-02). Zero touch on `src/entrypoints/api.ts` (Slot B convention: barrel-only wiring; DEP-4 will register at foundation ship). 3 GAPs registered §3 (Q-C-01/-02/-03). Awaiting Executor C SUBMIT. |
+| T21 | Departments CRUD (escalation tree + operating hours) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-departments-crud` @ `55887f0` — **awaiting PO merge**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); `pnpm test:integration` **83/1/84** (all Slot B suites regression-clean); coverage **96.07% lines** module-wide. Drift 0/9. Q-C-02 rolls up to PARENT §3b (PO ratify pre-staging). Zero-touch `api.ts` (Override #1 held). PM ratified exec's ticket-status enum interpretation (more spec-faithful than my DoD wording — Note #1). |
 
 ---
 
@@ -320,6 +320,57 @@ DELETE /settings/departments/:id (with 1 open ticket)
 
 Requesting PM C VERDICT.
 
+##### VERDICT T21 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 16 DoD boxes verified, independent PM validation on `feat/settings-departments-crud` @ `55887f0`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/core)                     : 0 (env.ts:91 pre-existing boilerplate — `5ce7f867` initial commit; not this task)
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+```
+Step 3 — File inventory: 11 files listed = 11 files touched (`git diff --stat main..feat/settings-departments-crud`); serializer + routes test additions consistent with Slot B convention (`notifications/`, `tickets/`, `guests/`, `visits/` all use identical layout) ✓
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 312/1/313** (baseline 278/1/279 + **+34 net**: 24 service + 10 routes); Docker-free (T-INFRA-03 mitigation held); 1.211s
+- `pnpm test:integration` **PASS 83/1/84** (all 5 module suites green including cross-slot regression: tickets 25, notifications 15, visits 20, guests 10; departments 13 new) — 24.123s
+- `make typecheck` + `make lint` + `make format-check` all PASS
+Step 5 — Spot-check 3 random files:
+- `departments.service.ts`: comments explain WHY (Q-C-02 rationale L54-57, cross-tenant leak-safe L177, Opsi C deferral L164-167) — not what-comments; public methods have explicit return types; `assertHotelOwnership` correctly reused (not reinvented); P2002 catch in both create + update paths ✓
+- `departments.routes.ts`: thin handlers per Slot B convention; `requireTenant → requireRole → parse → service → send` chain; correlationId propagated via helper; 201 on create, 204 on delete correct; `requireRole(ctx, ['gm_admin'])` correct — verified rbac.ts:46 super_admin bypass (`if (tenant.isSuperAdmin) return;`) ✓
+- `departments.repository.ts`: Prisma direct (ADR-0001 compliant); `count` queries not `findMany` for delete-conflict (PM reminder honored); comment L9-14 explains spec-vs-migration semantic ✓
+- Bonus: `index.ts` barrel exposes only public surface (routes + service class + factory + DTO types); `DepartmentsRepository` imported for factory but NOT re-exported (internal) ✓
+- Bonus: `departments.schema.ts` Q-C-01/-03 impl matches ACK exactly; `.strict()` on all body schemas rejects unknown fields; boundary-mirror of DB `^[A-Z]{2,8}$` CHECK (400 not 500) ✓
+Step 6 — Security floor: no webhook (HMAC N/A); no token store (crypto N/A); no PII (masking N/A); `hotel_id` sourced from `ctx.hotelId` — verified `service.ts:83`; no secret hardcoded ✓
+Step 7 — Test coverage: line **96.07%** across `departments/**` (exceeds ≥ 80% DoD); repo/serializer/index at 100%; routes 97.67; schema 97.43; service 92.59 — uncovered lines are the P2002 non-happy branches (tested via mocked repo throw, coverage counter miss on the untaken side) ✓
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (spec vs migration status divergence) — PM ratifies exec's interpretation**: My ASSIGNMENT DoD line `status IN ('pending','assigned','in_progress','escalated')` cited stale/incorrect status enum. The actual T02 migration CHECK enumerates `('open','in_progress','awaiting_late_reason','done_pending','closed','high_alert','escalated','cancelled')`. Exec's `notIn ['closed','cancelled']` is **more spec-faithful** ("any non-terminal ticket blocks delete") + matches the partial-index guard at `20260701112000_add_hc_check_constraints_and_partial_indexes:111`. This is a PM-side DoD wording error, not exec drift — the shipped code is correct. Memorializing as PM operating note for future task DoD-writing (verify current migration enums, not spec draft enums).
+- **Note #2 (closed-ticket FK Restrict raw Prisma surface) — accepted as future refinement**, not required by T21 DoD. Log for potential T21-slice-2 or PO-driven ticket-lifecycle harmonization. Left un-registered in §3 since no immediate consumer surface.
+- **Note #3 (Q-C-02 `countAssignedUsers` deferred)** — matches Q-C-02 constraint #3 exactly; `service.ts:164-167` comment discoverable to future reader; startup WARN unit-tested at prod+flag=true. ✓
+- **Note #4 (`api.ts` untouched)** — Override #1 held; barrel factory shape `buildDepartmentsService(db, { skipCrossDbChecks, nodeEnv, logger? })` matches DEP-4 composition-root expectations. ✓
+- **Note #5 (fixture alignment)** — HOTEL_A CON/HSK/FNB/ENG/FO (T05 seed match) + HOTEL_B HSK (per-hotel UNIQUE(hotel_id, code) proof) — matches PM ACK reminder. ✓
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files or Slot A owned surface (barrel-only wiring; env.ts additive, non-breaking).
+- `SKIP_CROSS_DB_CHECKS=true` default preserves current DEV behavior — no cross-slot regression risk.
+- All Slot B integration suites (tickets/notifications/visits/guests) green in independent PM rerun.
+
+**§1 task tracker updated · §3 Q-C-02 rolls up to PARENT §3b · Short roll-up posted to PARENT §2 · Q-C-01 + Q-C-03 stay slot-scoped (provisional-resolved).**
+
+**PO merge please**: branch `feat/settings-departments-crud` @ `55887f0` ready for main merge. Q-C-02 (`SKIP_CROSS_DB_CHECKS` env flag) needs PO ratification pre-staging — root fix routes via PARENT §4 Opsi A / multi-schema decision (foundation, not this task). Slot C **1/10 approved**.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -438,6 +489,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Run | Touched files | `any` | console.log | `throw new Error(` | forbidden imports | default export (di luar entry) | `.skip` | hardcoded URL | webhook tanpa HMAC | wrap-Prisma interface |
 | --- | ------------- | ----- | ----------- | ------------------ | ----------------- | ------------------------------ | ------- | ------------- | ------------------ | --------------------- |
 | H0 baseline | (no src/ touched) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2026-07-03 T21 SUBMIT | src/modules/departments/** (10) + src/core/config/env.ts (+7 lines additive) | 0 | 0 | 0 (env.ts:91 pre-existing boilerplate `5ce7f867`, not this task) | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
