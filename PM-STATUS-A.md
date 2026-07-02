@@ -4012,6 +4012,150 @@ export function parseCsvWithSchema<T>(
 
 Awaiting **PLAN T09** from exec-A.
 
+#### PLAN T09 — exec-A (Nanak) at H0 2026-07-02
+
+**Scope recap**
+- Ship a single pure-fn CSV utility at `src/shared/utils/csv-parser.ts` — `parseCsvWithSchema<T>(input, schema, opts): CsvParseResult<T>` — hand-rolled (no new dep), zod-schema-driven per-row validation, batched error surface. Slice-1 handles Excel/Google Sheets "practical CSV" subset (quoted fields with embedded commas, escaped quotes `""`, mixed LF/CRLF/CR, UTF-8 BOM strip, empty-row skip, column-count mismatch reported). Full RFC 4180 (multi-line quoted values with embedded newlines) explicitly deferred to slice-2 (would need `csv-parse` dep + PO ratification). Load-bearing consumer-facing types (`CsvParseResult` + `CsvRowError` + `CsvParseOptions`) exported as `readonly interface`s for future non-breaking extensions.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot A (Nanak) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: ASSIGNMENT T09 (full) + `CLAUDE.md §3` (`src/shared/utils/` = pure helpers) + `CLAUDE.md §5` (TS strict + zod patterns) + `docs/spec/02-hotel-core.md §2.4/§2.6` (menu bulk + KB CSV import consumer contracts confirmed) ✓
+- Parent docs spot-read: `src/shared/utils/ticket-state-machine.ts` (T06 precedent for single-file pure-fn utility in this dir — 4 named exports, JSDoc header, no default export); `src/shared/utils/` dir listing (crypto.ts / masking.ts / test-setup.ts / ticket-state-machine.ts + `__tests__/` — all untouched by T09); `src/core/config/env.ts:14-27` (zod `z.object({...})` pattern with `.string()` / `.coerce.number()` / `.enum()` — consumers will mirror for `MenuRowSchema`/`KbRowSchema`); jest config auto-discovers `src/shared/utils/__tests__/csv-parser.test.ts` per T06 precedent ✓
+- Dependencies: T01–T08 + T-INFRA-01/02/03 ✓ all merged; foundation healthy
+- `make typecheck` clean ✓ ; `make lint` clean ✓
+- Scaffolder risk: **none** — 2 file creates, zero generator
+
+**Files to create** (2, 0 modify)
+- `src/shared/utils/csv-parser.ts` — parser + validator + result types (~140 LOC + JSDoc)
+- `src/shared/utils/__tests__/csv-parser.test.ts` — comprehensive suite (~200 LOC, 15 test cases)
+
+**Files NOT touched** (per HARD constraints)
+- `src/shared/utils/{crypto,masking,test-setup,ticket-state-machine}.ts` — sibling helpers unchanged
+- `src/shared/types/`, `src/core/*`, `src/plugins/*`, `src/modules/*`, all Slot B / Slot C code
+- `prisma/`, `docs/`, `Makefile`, `jest.config.ts`, `tsconfig.json`, `package.json`, `pnpm-lock.yaml`
+
+**Approach**
+
+*(1) Public surface* — 5 named exports, all `readonly` where applicable:
+```ts
+export interface CsvRowError {
+  readonly rowIndex: number;    // 0-based data row (excludes header + skipped blanks)
+  readonly line: number;         // 1-based FILE line (includes header + blanks)
+  readonly issues: readonly string[];
+  readonly raw: readonly string[];
+}
+export interface CsvParseResult<T> {
+  readonly valid: readonly T[];
+  readonly errors: readonly CsvRowError[];
+}
+export interface CsvParseOptions {
+  readonly columns: readonly string[];
+  readonly hasHeader?: boolean;
+}
+export function parseCsvWithSchema<T>(
+  input: string,
+  schema: z.ZodType<T>,
+  opts: CsvParseOptions,
+): CsvParseResult<T> { … }
+```
+
+*(2) Parse pipeline* — 4 stages, each pure + deterministic:
+1. **Normalize**: strip UTF-8 BOM (`﻿` if present at index 0), then replace `\r\n` and lone `\r` with `\n` (in that order — CRLF must be handled before lone CR to avoid double-conversion).
+2. **Split lines**: `.split('\n')` after normalization. Track 1-based `line` number for each raw line.
+3. **Parse row → cells** via state machine (see below). Empty/whitespace-only lines skipped BEFORE state-machine invocation. `hasHeader: true` skips the first non-blank line from validation (still counted in `line`).
+4. **Validate row**: build `Record<string, string>` from `opts.columns` + cell values; run `schema.safeParse()`. Column-count mismatch → skip zod, push `CsvRowError` with `raw` cells + `issues: ['column count mismatch: expected N, got M']`. Zod error → push `CsvRowError` with `issues` mapped from `err.issues` (`path.join('.')` + `.message`). Success → push into `valid`.
+
+*(3) State machine for row → cells* (Adv #5 covered):
+- States: `FieldStart` (before cell) / `Unquoted` (mid-cell, no quotes) / `Quoted` (inside `"..."`) / `QuoteInQuoted` (after `"` inside Quoted — could be escape or close).
+- Transitions on each char (row-local, no cross-line multi-line quoted support in slice-1):
+  - **FieldStart**: `"` → enter Quoted (buffer empty). `,` → emit empty cell, stay FieldStart. else → append char, enter Unquoted.
+  - **Unquoted**: `,` → emit cell, enter FieldStart. else → append char.
+  - **Quoted**: `"` → enter QuoteInQuoted. else → append char (including any char except the row terminator — since row was already split by `\n`, we never see LF here).
+  - **QuoteInQuoted**: `"` → append `"` (escape), return to Quoted. `,` → emit cell, enter FieldStart. else → treat as end-of-quoted-field + lenient reset to Unquoted with the char appended (defensive; real CSVs shouldn't hit this).
+- **End-of-line**: emit whatever's in the buffer as the last cell (regardless of state). Unterminated `Quoted` state at EOL → emit buffered content as the cell (silent partial-quote tolerance; won't affect Excel/Sheets output which always closes quotes on the same line).
+- **LF inside quoted field**: since I pre-split by LF, this manifests as an unterminated Quoted state + row split at the LF. Consumer sees 2 rows where they intended 1 — will most likely fail column-count check → error surfaced. **Documented in JSDoc as slice-1 limitation** (Adv #5 explicit).
+
+*(4) Consumer example* (Adv #3 — mirrored env.ts zod pattern):
+```ts
+import { z } from 'zod';
+import { parseCsvWithSchema } from '@shared/utils/csv-parser.js';
+
+const MenuRowSchema = z.object({
+  name: z.string().min(1).max(120),
+  price_idr: z.coerce.number().int().nonnegative(),
+  category: z.string().min(1),
+});
+type MenuRow = z.infer<typeof MenuRowSchema>;
+
+const result = parseCsvWithSchema<MenuRow>(csvText, MenuRowSchema, {
+  columns: ['name', 'price_idr', 'category'],
+  hasHeader: true,
+});
+// result.valid: readonly MenuRow[] — successfully parsed + validated rows
+// result.errors: readonly CsvRowError[] — per-row error report for UX rendering
+```
+JSDoc includes this consumer sample verbatim.
+
+*(5) Test plan — 15 cases* (targets ≥ 90% coverage; realistically 100% given the pure-fn surface):
+1. `should parse a simple unquoted CSV with header skip`
+2. `should parse quoted fields with embedded commas`
+3. `should parse escaped quotes ("") inside quoted fields`
+4. `should normalize CRLF line endings`
+5. `should normalize lone CR line endings`
+6. `should tolerate mixed CRLF+LF+CR line endings in the same input`
+7. `should strip a UTF-8 BOM at the start of input`
+8. `should silently skip whitespace-only rows without reporting errors`
+9. `should report column-count mismatch as a row error`
+10. `should return empty valid + errors for empty input`
+11. `should skip the first line when hasHeader is true`
+12. `should treat every line as data when hasHeader is false (default)`
+13. `should populate both valid and errors when some rows are invalid (partial success)`
+14. `should return empty valid + populated errors when all rows fail zod validation`
+15. `should track rowIndex (0-based data) and line (1-based file) correctly with header and skipped blanks` (Adv #4 — verifies distinction via header + blank scenario)
+
+**Explicit findings + resolution for each of PM A's 6 advisory checks**
+
+- **Adv #1 — Hand-rolled vs library trade-off**: acknowledged in PLAN + JSDoc. Slice-1 covers Excel/Google Sheets output (`csv` exports from both apps stay within the practical subset). Trade-off documented in JSDoc header (see Adv #2). If Satrio surfaces edge cases (multi-line quoted KB entries), slice-2 escape hatch is `csv-parse` (~50KB, RFC-compliant, actively maintained) with PO ratification. Not needed for MVP scope per ASSIGNMENT.
+
+- **Adv #2 — RFC 4180 subset — documented boundary in JSDoc**. File-level JSDoc will explicitly list:
+  ```
+  Slice-1 supports (Excel/Google Sheets subset):
+    - Quoted fields with embedded commas: "Doe, John",30
+    - Escaped quotes inside quoted: "He said ""hello"""
+    - Line endings LF / CRLF / CR (normalized)
+    - UTF-8 BOM stripped from input start
+    - Empty/whitespace-only rows silently skipped
+    - Column-count mismatch reported as CsvRowError
+
+  Slice-1 does NOT support (deferred to slice-2 with csv-parse dep + PO ratification):
+    - Multi-line quoted values (LF inside quoted field ends the row instead of extending the cell)
+    - Streaming for very large files (parses input string in memory)
+    - Custom delimiters (comma only)
+    - Alternative quote characters (double-quote only)
+  ```
+  Consumers reading the JSDoc will know when to escalate to slice-2.
+
+- **Adv #3 — Zod schema-driven pattern with consumer usage example**: mirrored `env.ts:14-27` zod convention. Consumer builds `z.object({...})` with typical modifiers (`.string().min(1).max(120)`, `.coerce.number().int().nonnegative()`, `.enum(...)`). Parser passes each row's `Record<string, string>` to `schema.safeParse()`. Type inference: `result.valid` = `readonly z.infer<typeof Schema>[]`. Explicit example in JSDoc (see Approach section 4 above).
+
+- **Adv #4 — Row index vs line number distinction — test coverage**: test #15 uses this input (headered CSV with a blank line at file line 2):
+  ```
+  name,price,category    ← line 1 (header)
+                         ← line 2 (blank, skipped)
+  Nasi Goreng,45000,breakfast  ← line 3, rowIndex 0
+                         ← line 4 (blank, skipped)
+  Kopi,invalid,beverages ← line 5, rowIndex 1 (zod error on price)
+  ```
+  Test asserts: `valid[0]` = row from line 3; `errors[0].line = 5` + `errors[0].rowIndex = 1`. Proves both counters advance correctly across skipped blanks + skipped header.
+
+- **Adv #5 — State-machine complexity check for quote handling**: 4-state machine (`FieldStart` / `Unquoted` / `Quoted` / `QuoteInQuoted`) — see Approach section 3. Test cases explicitly cover: (a) unquoted plain (#1), (b) quoted plain (#2 embedded within), (c) quoted with comma (#2), (d) quoted with escaped `""` (#3), (e) LF-in-quoted-field limitation (#6/#9 — LF terminates row → column-count error surfaces to consumer). JSDoc calls out (e) as documented slice-1 behavior (not a bug).
+
+- **Adv #6 — API stability — `interface` not `type`**: all 3 consumer-facing shapes exported as `interface` (`CsvRowError`, `CsvParseResult<T>`, `CsvParseOptions`) so future slice-2 additions (e.g., `csvErrors.warnings?: readonly string[]`) are non-breaking (`interface` merges; `type` alias unions would be breaking). All fields `readonly` (immutability guarantee for consumers). JSDoc notes consumers may deconstruct `{ valid, errors }` at call sites — standard destructuring pattern.
+
+**GAPs / questions**: none. State machine design covers ASSIGNMENT's "practical CSV" subset with a documented LF-in-quoted-field escape valve. Zod pattern mirrors env.ts. Row index + line number distinction has a dedicated test. No edge case unaccounted for in slice-1 scope.
+
+Awaiting PM A ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
