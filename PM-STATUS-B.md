@@ -44,14 +44,15 @@
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
-| T17 | Visit reject + failed_3x | 🟡 wip (PLAN ACK'd) — extends `visits/` | `feat/visits-reject-override` | — |
-| T18 | Manual visit create | 🟢 unblocked on T16 merge (extends `visits/`) | — | — |
+| T17 | Visit reject + failed_3x | ✅ approved (attempt 1) | `feat/visits-reject-override` @ `cb705f4` (merges clean) | ⏳ awaiting PO merge |
+| T18 | Manual visit create | 🟢 unblocks on T17 merge (extends `visits/`) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **6/10 merged (T11, T13, T14, T15, T12, T16)** · 🟡 T17 assigned (visits) · 🟢 T18 + T19 ready · ⚪ T20 (←T16✓+T19). Zero foundation blockers (only DEP-4 go-live). Sisa 4: T17, T18, T19, T20.
+**Counts**: ✅ **6/10 merged (T11, T13, T14, T15, T12, T16)** + **T17 approved (awaiting merge)** · 🟢 T18 (unblocks on T17 merge) + T19 (ready) · ⚪ T20 (←T19). **7/10 done pending T17 merge.** Zero foundation blockers (only DEP-4 go-live). Sisa: T18, T19, T20.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 11 — 2026-07-02 — T17 APPROVED.** Visit reject + failed_3x approve-manual done (PM rerun: make check 219 no-Docker, coverage 96.48%, drift clean, merge dry-run CLEAN, **T16 regression clean** — visits suite 65 tests all green through generalized R3 transition map). → merge `feat/visits-reject-override`. **7/10 done pending merge. T17 merge unblocks T18** (same visits module). Remaining: T18, T19 (ready), T20 (←T19).
 - **Loop 10b — 2026-07-02 — T16 MERGED (PR #6); T17 issued.** Visits module complete on main → **6/10 merged** (T11,T13,T14,T15,T12,T16). Going one-at-a-time (parallel deferred — worktree setup skipped for now). Issued **T17** (visit reject + approve-manual/failed_3x, extends `visits/`, reuses T16 transition tx + checkout). Remaining: T17 (wip), T18 (visits, after T17 — same module), T19 (notifications, ready anytime), T20 (←T19).
 - **Loop 10 — 2026-07-02 — T16 APPROVED (full V1–V6).** Visits verify-manual done (PM rerun: make check 205 no-Docker, coverage 98.01%, drift clean, merge dry-run CLEAN, tx atomicity + 422/404 no-mutate verified, checkout-TZ seam + module-local transition). Branch rebased cleanly (was 56 behind). → merge `feat/visits-list-verify`. **6/10 done pending merge. T16 merge unblocks T17 + T18.** Remaining: T19 (ready), T17, T18 (←T16), T20 (←T16+T19).
 - **Loop 9b — 2026-07-02 — T12 MERGED (PR #5).** Slot B **5/10 merged** (T11,T13,T14,T15,T12). Next: T16 resume V2–V5 — ⚠ branch `feat/visits-list-verify` is **56 commits behind main** (created pre-foundation-merges); **must rebase onto main first** (picks up `BusinessRuleError`+`ctx.userId`; disjoint `visits/` module → rebase should be clean) before adding verify-manual.
@@ -79,7 +80,7 @@
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
-| T17 | Visit reject + failed_3x override                         | wip          | —              | PLAN ACK'd 2026-07-02 (§2). R3 transition-map generalized (T16 byte-identical). Q-B-12 ruled (reject no-body, nights optional). Coding `feat/visits-reject-override`. |
+| T17 | Visit reject + failed_3x override                         | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 219 (no-Docker) + coverage 96.48% + drift clean + merge dry-run CLEAN + T16 regression clean (65 tests). **Merge `feat/visits-reject-override` @ `cb705f4`.** Unblocks T18. Awaiting PO merge. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1345,6 +1346,30 @@ Notes
 - Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched).
 
 Requesting PM B VERDICT.
+
+##### VERDICT T17 — APPROVED (attempt 1) by PM B (2026-07-02, H14)
+Verified by **my own rerun** on `feat/visits-reject-override` @ `cb705f4`.
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: **219 passed + 1 skipped**, 1.25s (no-Docker).
+- `make test-integration` → **PASS** (real PG).
+- Coverage (PM rerun) — visits lines **96.48%**: checkout 100 / repository 100 / serializer 100 / schema 100 / types 100 / routes 97.14 / service 92.68. Every file ≥80% ✓ R5.
+- **Drift** (visits): all 0; **cross-module import 0** (transition map module-local — no tickets import).
+- **File inventory**: 7 files, all in `src/modules/visits/`, 0 outside; **repository unchanged** (reused `verifyManualTx` as-is, as ACK'd). **Merge dry-run into latest main: CLEAN ✓.**
+
+**DoD spot-verified in code:**
+- R3 ✓ `VISIT_TRANSITIONS` map + `assertVisitTransition` (`service.ts:28-37`), module-local; verify-manual (T16) now routes through it.
+- R1 ✓ `/reject`: `pending_verification → rejected`, no body, reuses `verifyManualTx`; invalid source → 422.
+- R2 ✓ `/approve-manual`: `failed_verification → checked_in`, `nights` optional → `deriveCheckout` when present (`:179-183`); guest_name validate-only.
+- R4 ✓ tenant/404, gm_admin, `count===0` re-resolve, no-op audit + `onVerificationResolved` seams, `actorUserId=ctx.userId`.
+- **T16 REGRESSION CLEAN** — the visits suite is now **65 tests** (44 T16 + 21 T17), **all green**; T16's verify-manual behavior byte-identical through the generalized assert (Q-B-12 (a) no-body reject + (b) nights-optional as ruled).
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/visits-reject-override` @ `cb705f4`. Attempt 1, zero rejects. **Merges CLEAN into latest main.**
+- **→ PO: merge `feat/visits-reject-override`.** Unblocks T18 (same `visits/` module — was gated on T17 to avoid merge collision).
+- → §1 tracker updated (approved); PARENT §1 T17 → approved; roll-up PARENT §2.
+
+Clean reuse, T16 preserved. **T17 closed.** 🟢
 
 <!--
 TEMPLATE — copy untuk task baru:
