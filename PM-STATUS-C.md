@@ -12,13 +12,13 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **1/10 approved**; **T25-slice-1 assigned**
+- **Day**: H0 (2026-07-03) — Slot C **1/10 approved+merged**; **T25-slice-1 wip**
 - **Active tasks**:
-  - **T21 Departments CRUD** — APPROVED attempt 1, awaiting PO merge (`feat/settings-departments-crud` @ `55887f0`)
-  - **T25 WA templates lifecycle (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Slice-1 = 5 public endpoints + log-only Integration relay stub. Meta-callback ingest = slice-2 (needs foundation HMAC plugin + INTEGRATION_SHARED_SECRET env).
-- **Branches**: `feat/settings-departments-crud` (T21, awaiting PO merge) · `feat/wa-templates-lifecycle` (T25, executor to create on claim)
+  - **T21 Departments CRUD** — **MERGED to main** 2026-07-03 (PR #11 `bbf4bd7`) ✓
+  - **T25 WA templates lifecycle (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 3 code-level tightenings; Executor C coding on `feat/wa-templates-lifecycle`. Q-T25-#5 escalates to PARENT §3b + §10 (foundation UNIQUE constraint gap; Slot C ships Option B; Slot A fix).
+- **Branches**: `feat/wa-templates-lifecycle` (T25, wip)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 approved; T25 assigned; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C
+- **My queue (preview)**: T21 merged; T25 wip; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C
 
 ---
 
@@ -28,8 +28,8 @@
 
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
-| T21 | Departments CRUD (escalation tree + operating hours) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-departments-crud` @ `55887f0` — **awaiting PO merge**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); `pnpm test:integration` **83/1/84** (all Slot B suites regression-clean); coverage **96.07% lines** module-wide. Drift 0/9. Q-C-02 rolls up to PARENT §3b (PO ratify pre-staging). Zero-touch `api.ts` (Override #1 held). PM ratified exec's ticket-status enum interpretation (more spec-faithful than my DoD wording — Note #1). |
-| T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T25-slice-1 issued 2026-07-03 H0. Scope: **5 public endpoints only** (`GET/POST /api/wa-templates`, `PATCH/DELETE /:id`, `POST /:id/resubmit`) + `IntegrationRelayPort` + `LogOnlyIntegrationRelayAdapter` MVP stub (matches MVP §W2/W4/W5 pattern). Business rules: approved-lock 422 `WA_TEMPLATE_LOCKED`; global-on-hotel-write 403; resubmit-guard 422; DELETE state-branch (pending→delete, approved/rejected→archive); P2002 → 409 `WA_TEMPLATE_NAME_TAKEN`. **Meta-callback ingest DEFERRED to T25-slice-2** (needs foundation HMAC plugin + `INTEGRATION_SHARED_SECRET` env — foundation/security concern). Zero touch on `api.ts` (T21 Override #1 pattern held). 4 GAPs pre-surfaced (T25-#1..#4). Awaiting Executor C PLAN. |
+| T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
+| T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 wip**) | wip (PLAN ACK'd with 3 tightenings) | — | PLAN ACK'd 2026-07-03 H0. Scope: **5 public endpoints + IntegrationRelayPort + LogOnly adapter** (Meta-callback deferred to slice-2). GAP responses #1–#4 all accept PM leans (403 global-write, permissive name, 409 archived-conflict, single port method + intent). **Q-T25-#5 escalates to PARENT §3b + §10** (foundation gap: `wa_templates_hotel_name_unique` UNIQUE constraint missing from T02 migration; Slot C ships Option B pre-check + P2002 catch belt-and-suspenders; Slot A fix). 3 tightenings held: `variables: string[]` typing, `language` zod bounded, adapter log payload discipline. Zero touch on `api.ts` / `prisma/migrations/`. Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -623,6 +623,50 @@ Q-B-01/Q-B-02/Q-C-01..-03 already resolved per prior task ACKs — not re-raisin
 
 Awaiting PM C ACK.
 
+##### PM C ACK — T25-slice-1 PLAN APPROVED with 3 tightenings (proceed to coding, 2026-07-03 H0)
+
+Structural approach ✓ · Files list ✓ (mirrors T21 8-file + ports/adapters subdirs) · session-start gate ✓ (spec/migration cross-check discipline continued from T21 — including catching a real foundation gap, see GAP T25-#5 handling below) · baseline 312/1/313 matches post-T21-merge main ✓ · GAP responses #1–#4 all accept PM leans with clean rationale ✓ · Port interface signature reads correctly (`readonly` throughout, discriminated `intent`) ✓.
+
+**GAP T25-#5 handling — PM ratifies Option B + escalates to Parent PM/foundation**
+
+Independently verified: `prisma/migrations/20260701111952_init_hotel_core/migration.sql:209-225` creates `wa_templates` with no UNIQUE(hotel_id, name); the second migration `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80` adds only the two CHECKs. Compare `menu_categories` at `20260701111952_init_hotel_core/migration.sql:403` — `CREATE UNIQUE INDEX "menu_categories_hotel_name_unique"` present, so T02 knew how to add these. Missing constraint on `wa_templates` is a genuine foundation gap (analogous to T21 Note #1 spec-vs-migration divergence, this time an **omission** not an **enum drift**).
+
+**Ruling**:
+- **Slot C ships Option B** in T25-slice-1: (a) `repo.countByHotelAndName(hotelId, name)` pre-check on create + update-name paths → throw `ConflictError({reason:'WA_TEMPLATE_NAME_TAKEN'})` fail-fast; (b) keep the `isPrismaUniqueViolation` P2002 catch as belt-and-suspenders (dead branch today, live branch post-foundation-fix). Race window (~50ms per same-hotel same-name admin write) documented in service JSDoc.
+- **Slot A owns the fix** — I'll escalate to Parent PM §3b + §10 today. Foundation task candidate: T-INFRA-05 or `chore(foundation): add wa_templates hotel_name UNIQUE constraint` — small SQL diff (mirror `menu_categories_hotel_name_unique`). Not a T25 blocker. Do NOT touch `prisma/migrations/` in this task — foundation-scope + cross-slot ownership.
+- **When foundation lands**: no code change needed here. The `countByHotelAndName` pre-check is idempotent-safe against a real UNIQUE constraint; P2002 catch flips from dead to live.
+- Registered as Q-T25-#5 in §3b (slot mirror) + rolling to PARENT §3b at ACK commit time.
+
+**3 code-level tightenings** (must land in the shipped code — flag in SUBMIT that they held)
+
+1. **`variables` typing** — spec §2.8:606 defines `variables JSONB DEFAULT '[]'::jsonb — array of variable names` (spec §1.9:284 confirms "array of variable names"). Tighten:
+   - Zod: `variables: z.array(z.string().min(1).max(64)).max(50).optional()` (bounded per T21 pattern; string-array not any-JSON).
+   - Port `IntegrationRelaySubmitInput.variables`: `readonly string[]` (not `readonly unknown[]`).
+   - DomainWaTemplate + wire DTO: `string[]`.
+2. **`language` zod validation** — migration is `VARCHAR(8) DEFAULT 'id'`. Accept `z.string().min(2).max(8).default('id')` on POST body; make optional on PATCH.
+3. **Adapter log payload discipline** — include the exact keys `{module: 'wa-templates', event: 'integration_relay_stub', intent, templateId, hotelId, name, language, correlationId?}` so observability (grep + Loki labels) works. `correlationId` is best-effort (adapter is called from service, not route — if service can thread it via a per-call arg, thread it; otherwise omit and log a TODO for slice-2's HTTP adapter to plumb the header).
+
+**Coding checklist reminders** (things easy to miss)
+
+- **POST security posture**: `.strict()` zod body rejects unknown fields — but ALSO explicitly drop client-supplied `hotel_id`/`is_global`/`status`/`template_id_meta`/`rejection_reason`/`approved_at` even if the schema shape looked to allow them. Belt-and-suspenders since `.strict()` already rejects, but a JSDoc note above the create() method reinforces the invariant.
+- **Global template state-machine**: for `is_global=true` rows visible to a hotel, PATCH/DELETE/RESUBMIT ALL hit the 403 gate BEFORE the state check. So a `qooma_welcome` global template in `approved` state → PATCH from hotel = 403 (not 422). Same for DELETE and resubmit. Test coverage: 3 tests, one per verb.
+- **Cross-tenant leak-safety**: `loadOwned` returns 404 (not 403) for cross-tenant rows. For global rows (`is_global=true`), `loadOwned` succeeds — they're visible to all hotels — then the `assertNotGlobalForWrite` guard flips it to 403 on write attempts. Read (`GET /:id` if you have it — you don't per ASSIGNMENT, only list) would succeed.
+- **UPDATE-name change race with `countByHotelAndName`**: on PATCH that changes `name`, run the pre-check with the NEW name against `hotelId=ctx.hotelId AND id != currentId`. Don't false-positive against the row being edited.
+- **DELETE state-branch return codes**: 204 on hard-delete (`pending`), 200 with archived row body on soft-archive (`approved`/`rejected`), 409 on already-archived (per Q-T25-#3).
+- **Resubmit clears `rejection_reason`** to `null` explicitly (not just drop from update payload — Prisma won't null a field unless you `set: null` or pass `null`).
+- **Fixture strategy for integration test**: seed 3 global rows (`qooma_welcome`, `qooma_survey`, `qooma_daily_brief` — from spec ADD-08.2 canonical list) with `is_global=true, hotel_id=null`. Seed hotel-specific rows under HOTEL_A + HOTEL_B. Verify list-for-HOTEL_A returns 3 global + N HOTEL_A + 0 HOTEL_B.
+- **P2002 catch on update-name**: same helper as create; test the branch even though it's currently dead pre-foundation (guarded via `jest.spyOn(prismaClient.waTemplate, 'update').mockRejectedValue({code: 'P2002'})`).
+- **pnpm-store note**: `pnpm install --frozen-lockfile` then `pnpm prisma:generate` if types missing. Do NOT `pnpm rebuild @prisma/client` (T21 lesson).
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot A owned surface (no migration edit; env.ts untouched for slice-1).
+- Zero touch on Slot B modules (independent DB writes; no shared table).
+- Foundation gap Q-T25-#5 rolled to PARENT — Slot A queue candidate, not blocking Slot C.
+
+**Mid-task CHECKPOINT trigger**: same as T21 — post if crossing ~4h with >3 files still incomplete. Otherwise straight-line to SUBMIT.
+
+Proceed to coding on `feat/wa-templates-lifecycle`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -733,6 +777,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-C-01        | `operating_hours` JSONB shape not fully specified in spec §1.5 (cross-refs API-CONTRACT §2.10 absent from repo). Enum/tighten now or leave permissive for MVP? | T21 · exec-C PLAN GAP #1 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive `z.object({}).catchall(z.unknown())` — parses `{}` and forwards any JSON forward-compat. Tighten in FE-driven follow-up ticket if MSW/UX diverges. Zero-break risk since forward-compat schema. |
 | Q-C-02        | `users.department_id` cross-DB check impossible under Opsi C dev-DB deviation (users lives in Auth DB, not `hotel_core_dev`). Skip in DEV or gate behind env flag? | T21 · exec-C PLAN GAP #2 | **open (PO ratify before staging)** — implementation shipping under safe defaults | `SKIP_CROSS_DB_CHECKS` env flag added to `core/config/env.ts` (`z.coerce.boolean().default(true)`). Service skips `users` count when flag is `true`; tickets check always runs. Startup WARN when flag is `true` + `NODE_ENV === 'production'` prevents silent prod ship. Root fix = PARENT §4 Opsi A / Prisma multi-schema (foundation, PO decision). Will roll up to PARENT §3b at T21 SUBMIT. |
 | Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
+| Q-T25-#5      | **Foundation gap**: spec §2.8:623 defines `wa_templates_hotel_name_unique UNIQUE (hotel_id, name) NULLS NOT DISTINCT` but the actual migrations (`20260701111952_init_hotel_core/migration.sql:209-225` + `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80`) DO NOT add it. Compare `menu_categories_hotel_name_unique` at `20260701111952_init_hotel_core/migration.sql:403` — present. Genuine omission in T02. | T25 · exec-C PLAN GAP #5 · discovered via spec/migration cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation fix** | Slot C T25-slice-1 ships Option B: `repo.countByHotelAndName(hotelId, name)` app-layer pre-check + P2002 catch as belt-and-suspenders (dead branch pre-fix, live post-fix). Foundation fix (add `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT` migration mirroring `menu_categories_hotel_name_unique`) rolls to Slot A. **When foundation lands**: no code change needed in Slot C — pre-check remains idempotent-safe; P2002 catch flips dead→live. Race window ~50ms per same-hotel same-name admin write documented in service JSDoc. |
 
 ---
 
