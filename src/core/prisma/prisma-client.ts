@@ -8,22 +8,26 @@
  *   const items = await db.exampleResource.findMany();
  */
 
-// TODO(boilerplate): generate client via `pnpm prisma:generate`, lalu uncomment:
-//
-// import { PrismaClient } from '@prisma/client';
-// import { loadConfig } from '@core/config/env.js';
-//
-// const config = loadConfig();
-//
-// export const db = new PrismaClient({
-//   datasources: { db: { url: config.DATABASE_URL } },
-//   log: config.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-// });
-//
-// const shutdown = async (): Promise<void> => {
-//   await db.$disconnect();
-// };
-// process.on('SIGTERM', shutdown);
-// process.on('SIGINT', shutdown);
+import { PrismaClient } from '@prisma/client';
 
-export const db = {} as unknown as Record<string, unknown>; // placeholder
+import { loadConfig } from '@core/config/env.js';
+
+const config = loadConfig();
+
+export const db = new PrismaClient({
+  datasources: { db: { url: config.DATABASE_URL } },
+  log: config.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+});
+
+const shutdown = async (): Promise<void> => {
+  await db.$disconnect();
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
+  process.on('SIGINT', () => {
+    void shutdown();
+  });
+}
