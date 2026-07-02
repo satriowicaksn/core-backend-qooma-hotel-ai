@@ -42,16 +42,17 @@
 | T14 | Guests CRUD + preferences | ✅ approved | `feat/guests-crud` | ✅ **merged (PR #3)** |
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | 🟡 V1 done — V2–V5 now UNBLOCKED (DEP-6 landed) → resume | `feat/visits-list-verify` @ `f63e10b` | — |
-| T12 | Ticket transition + reroute | 🟡 assigned (awaiting PLAN) — UNBLOCKED (T06+DEP-6) | `feat/tickets-transition` | — |
-| T19 | Notifications CRUD | ⛔ blocked (DEP-5 still open — T-INFRA-02 pending) | `feat/notifications-crud` | — |
+| T12 | Ticket transition + reroute | 🟡 wip (PLAN ACK'd) | `feat/tickets-transition` | — |
+| T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ⚪ backlog (←T16) | — | — |
 | T18 | Manual visit create | ⚪ backlog (←T16) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **4/10 merged (T11, T13, T14, T15)** · 🟡 2 unblocked-active (T12 issued, T16-V2..5 resume) · ⛔ T19 (DEP-5) · ⚪ 3 backlog (T17, T18, T20).
-**Foundation watch (corrected 2026-07-02)**: ✅ **DEP-6 `BusinessRuleError(422)` MERGED** (→ T16-V2..5 + T12 unblocked) · ✅ **T06 state-machine MERGED** (→ T12) · ✅ **T-INFRA-01 MERGED** (prisma real; drop `pnpm prisma:generate` workaround) · ❌ **DEP-5 `ctx.userId` STILL OPEN** (T-INFRA-02 assigned, not merged → T19 blocked; my earlier "shipped" was inaccurate — grep matched `SessionUser.userId`, not `TenantContext`) · DEP-4 `api.ts` bootstrap (go-live).
+**Counts**: ✅ **4/10 merged (T11, T13, T14, T15)** · 🟡 T12 wip (PLAN ACK'd) + T16-V2..5 resume · 🟢 T19 ready (DEP-5 merged) · ⚪ 3 backlog (T17, T18, T20). **Zero foundation blockers left for Slot B impl** (only DEP-4 go-live remains).
+**Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 8 — 2026-07-02 H14 — T12 PLAN ACK'd; DEP-5 + GAP-T11-3 now merged.** T12 PLAN ACK'd (ruled Q-B-11 → option (a): DEP-5 merged mid-flight so use `ctx.userId` directly, no null-interim). **DEP-5 (T-INFRA-02) + GAP-T11-3 (T-INFRA-03) both MERGED** → **T19 now unblocked**, `make check` no longer needs Docker, prisma-gen workaround droppable. Ratified T-INFRA-02's fixture edits to my test files. **All Slot-B impl blockers cleared** (only DEP-4 go-live left). Active: T12 (coding) + T16 (resume) + T19 (ready).
 - **Loop 7 — 2026-07-02 — Slot A unblocks land; DEP-5 correction.** Verified main precisely: ✅ **DEP-6** (`BusinessRuleError`) + ✅ **T06** (state-machine) + ✅ **T-INFRA-01** (prisma real) all MERGED → **T16-V2..5 resume + T12 issued** (both now unblocked). ⚠ **Correction**: my Loop-6 "DEP-5 shipped → T19 unblocked" was WRONG (grep matched `SessionUser.userId`, not `TenantContext`) — DEP-5 still open, **T19 still blocked** (T-INFRA-02 pending). Executors: drop `pnpm prisma:generate` workaround (T-INFRA-01). Active now: T12 (PLAN) + T16 (resume V2–V5).
 - **Loop 6b — 2026-07-02 — T15 MERGED (PR #4).** Slot B **4/10 merged** (T11, T13, T14, T15). No new PLAN/SUBMIT yet. Productive paths open: **T19 PLAN** (unblocked) + poke Slot A for **DEP-6** (only blocker left, opens T16-V2..5 + T12).
 - **Loop 6 — 2026-07-02 — T15 APPROVED; DEP-5 shipped → T19 unblocked.** T15 (guest messages) APPROVED attempt 1 (PM rerun: make check 144, coverage 97.46%, drift clean, merge dry-run CLEAN) → merge `feat/guest-messages`. **Slot A shipped DEP-5** (`ctx.userId` now on `TenantContext`) → **T19 unblocked** (ready for PLAN). Still open: **DEP-6** (`BusinessRuleError` → T16-V2..5 + T12). Next active: T15 merge + T19 PLAN; T16 still waits on DEP-6.
@@ -74,8 +75,8 @@
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | wip (partial)| —              | V1 read-path done+green on `feat/visits-list-verify`. **V2–V5 blocked on DEP-6** (`BusinessRuleError(422)`, Slot A). GAP T16-#4 ruled (code `BUSINESS_RULE` + `details.rule`). Hold merge until complete. |
-| T19 | Notifications CRUD + optimistic ops                       | assigned ⛔  | —              | **STILL BLOCKED on DEP-5** (`ctx.userId` NOT yet on `TenantContext`; T-INFRA-02 assigned, not merged). My earlier "unblocked" was a mis-read — corrected 2026-07-02. |
-| T12 | Ticket status transition + reroute                        | assigned     | —              | **UNBLOCKED 2026-07-02** (T06 ✅ merged + DEP-6 ✅ merged). Issued §2. Extends `tickets/`, consumes `ticket-state-machine.ts` + `BusinessRuleError`. Awaiting PLAN. |
+| T12 | Ticket status transition + reroute                        | wip          | —              | PLAN ACK'd 2026-07-02 (§2). Q-B-11 → (a) `ctx.userId` (DEP-5 merged). Coding `feat/tickets-transition`. Consumes `ticket-state-machine.ts` + `BusinessRuleError`. |
+| T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
 ---
@@ -1063,6 +1064,29 @@ Two mutating endpoints, **extending `src/modules/tickets/`**: `PATCH /api/ticket
 
 Awaiting PM B ACK (PLAN + Q-B-11 actor decision + note-field confirm). Not coding before ACK.
 
+##### PM B ACK — T12 PLAN APPROVED (2026-07-02, H14)
+Strong PLAN. **ACK — create `feat/tickets-transition` (off latest main), implement.** Rulings:
+
+**Q-B-11 — RULED (a), premise changed: DEP-5 MERGED since you wrote this.** T-INFRA-02 landed on main (`e95a23d`) — I verified `TenantContext` now has `userId: string` (`tenant-guard.ts`). So drop option (b) null-interim: **rebase `feat/tickets-transition` onto latest main and write `actor_user_id = ctx.userId` directly.** No TODO/backfill debt. (Also drop the `pnpm prisma:generate` workaround — T-INFRA-01 merged — and note `make check` no longer needs Docker — T-INFRA-03/GAP-T11-3 merged.)
+
+**note field — APPROVED (optional).** Accept optional `note` on both bodies → `ticket_updates.note`. Harmless + useful (GM annotation); `note` column exists. Provisional on FE MSW (if it omits, stays null). Keep `.strict()` so unknown keys still reject.
+
+**Approach — endorsed, with a callout on the good part:**
+- 👍 **status-guarded `updateMany({ where:{ id, hotelId, status: from } })` + `count===1` race-check** — nice: that's optimistic concurrency preventing lost-updates on concurrent transitions. On `count===0`, re-resolve to 404 (gone/cross-tenant) vs 422 (status moved) as you described. Keep it.
+- ✓ one `$transaction` wraps mutation + `ticketUpdate.create` (atomic audit) — TT2/TT3.
+- ✓ reroute gm_admin-only → `ForbiddenError` 403 explicit domain guard (belt-and-suspenders w/ T04 RBAC; required by §5 AC + testable now) — TT4.
+- ✓ dept validation (exists + `hotelId===ctx.hotelId`) → `NotFoundError('Department')` — TT3.
+- ✓ response reuses `serializeTicketDetail` (returns new status + timeline in one round-trip) — good FE ergonomics.
+- ✓ socket no-op seam (`onTicketUpdated`/`onTicketRerouted`) — T20 wires real emit — TT6.
+- ✓ consume `assertValidTicketTransition` (no reimplement, §4.2); dept read via Prisma (no cross-module import).
+
+**At SUBMIT I verify:** TT1–TT7, the invalid-transition→422 + dept_head-reroute→403 negative tests, tx atomicity (integration), race-check behavior, `actor_user_id=ctx.userId`, `make check`+integration green (no Docker/prisma-gen workaround needed now), ≥80% cov, no `tickets` regression on the merged read endpoints.
+
+Proceed. 🟢
+
+##### PM B RATIFY — T-INFRA-02 Slot-B fixture edits (2026-07-02)
+T-INFRA-02 (Slot A, DEP-5) added `userId` to `TenantContext` and updated 5 of my test fixtures (tickets + guests `__tests__`) to include it. Reviewed the diff: **purely `userId`-additive to the `ctx` literals, no change to my assertions/logic**; `pnpm typecheck` clean on main; PM A reported all Slot-B suites green. **Ratified** (per PM A's "PM B ratify pending" note, PARENT §1 T-INFRA-02).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -1177,7 +1201,8 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | GAP T11-#1    | `make check` has no `prisma-generate` prereq + `prisma-client.ts` `{}` stub → fresh-checkout CI breaks on generated-client import. | T11 | **open — foundation/Slot A** (escalated PARENT §3b) | Affects all B/C Prisma tasks. Interim: executors + PM run `pnpm prisma:generate` before gates. |
 | Q-B-03        | Stats response shape for `GET /api/tickets/stats` — unpinned in specs (§1.2/§1.11 say only "counts by status"). | T13 · MVP §1.2 B3 | **RESOLVED (provisional) 2026-07-01** | Ratified `{ data: { by_status{8}, total, overdue, high_alert_count } }`. `high_alert_count` chosen over `high_alert` to avoid collision with `by_status.high_alert` (status vs flag). Provisional on FE MSW (absent); serializer-isolated. Noted PARENT §3a. |
 | DEP-4 (go-live) | After T04 merges, `api.ts` bootstrap must wire `configureTenantGuardHooks(app)` + `register(<module>Routes)` for routes to actually serve. `api.ts` still a stub. | T11/T13 · DEP-2 | **open — foundation** (flagged PARENT §10) | Not B-task scope. True go-live step for all B routes. |
-| DEP-5         | `TenantContext` has no `userId`. **Blocks T19** (notifications scope by `user_id`). | T19 · §2.5 DDL | **OPEN — T-INFRA-02 (Slot A) assigned, NOT merged** | ⚠ CORRECTION 2026-07-02: I earlier marked this "shipped" — inaccurate (my grep matched `SessionUser.userId`, not `TenantContext`). Verified: `TenantContext` still lacks `userId`; `deriveTenantContext` doesn't copy it. T19 stays blocked until T-INFRA-02 merges. |
+| DEP-5         | `TenantContext` has no `userId`. Blocked T19 + T12 audit. | T19/T12 · §2.5 | **RESOLVED 2026-07-02 (T-INFRA-02 merged `e95a23d`)** | Verified: `TenantContext.userId: string` now present. → T19 unblocked; T12 uses `ctx.userId` for `actor_user_id`. Fixture edits to my test files ratified (§2). |
+| GAP-T11-3     | `test:unit` glob collected integration tests → `make check` needed Docker. | T11 · foundation | **RESOLVED 2026-07-02 (T-INFRA-03 merged `cf65e99`)** | test:unit/integration split. `make check` no longer spins Docker. |
 | Q-B-04        | Guests + Visits **offset** pagination envelope. | T14/T16 · §1.3 | **RESOLVED 2026-07-02** | Both threads converged → ratified `{ data, pageInfo: { page, pageSize, total, hasMore } }` (data/pageInfo wrapper consistent w/ §2.7 cursor lists; offset fields inside). T14+T16 both use. Provisional on FE MSW. |
 | Q-B-08        | Should visit `verify-manual` update the guest's name (`guest_name` payload)? | T16 → T14 | **deferred** | For MVP: T16 validate-only, no cross-write. If needed later, route via guests module (not T16). |
 | Q-B-09        | Visits audit table — add `visit_updates` (like `ticket_updates`) for §4.9 audit entry, or is visit-audit out-of-MVP? | T16 · §4.9 | **open — schema/foundation** (escalated PARENT §3c) | No table exists. Interim: T16 `recordVisitAudit` no-op seam; status update atomic in tx (satisfies V2). |
