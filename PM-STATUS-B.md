@@ -1535,6 +1535,51 @@ Clean. **T18 closed — visits module fully done.** Remaining Slot B: T19 (notif
 
 Awaiting exec-B PLAN for T19.
 
+### ASSIGNMENT T19 — claimed by exec-B (Nathan) at H2 (2026-07-02)
+- Branch: `feat/notifications-crud` (off latest main; created on ACK) · Routed from PARENT §1 T19 = MVP §1.2 B9
+- Claiming the PM-B-issued ASSIGNMENT above. PLAN below.
+
+#### PLAN T19 — exec-B (Nathan) at H2 (2026-07-02)
+
+**Scope recap**
+New greenfield module `src/modules/notifications/` — 4 endpoints for **all authenticated** users (NOT gm_admin-only), every one strictly **per-user** scoped. `GET /api/notifications` (filter `?is_read`, cursor pagination), `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity: Executor, Slot B (Nathan) ✓ · CLAUDE.md loaded ✓
+- Spec read: `02-hotel-core.md §1.6` (endpoints L219-222 + Notification shape + optimistic note L240) + §2.5 DDL (`notifications` — `user_id`, `is_read`, `read_at`, `metadata`, indexes `(user_id, created_at DESC)`); envelope `README §2.7`
+- Dependency: T02 ✅ + **DEP-5 ✅ merged** (`ctx.userId` live). Greenfield module — zero collision.
+- `pnpm typecheck` + `pnpm lint` clean on `main` ✓. No prisma-generate/Docker workaround.
+- Scaffolder risk: **none**.
+
+**Files to create** (`src/modules/notifications/`)
+```
+notifications.types.ts        NotificationRow + wire DTOs + cursor + query
+notifications.schema.ts       zod list-query (limit, cursor, is_read?) + :id param + module-local cursor codec
+notifications.serializer.ts   snake_case wire
+notifications.repository.ts    Prisma direct — findMany, countWhere, markOneRead (guarded updateMany), markAllRead, findOwned
+notifications.service.ts       per-user scope + list/unreadCount/markRead/markAllRead
+notifications.routes.ts        4 routes (Fastify plugin via options)
+index.ts                       barrel + buildNotificationsService
+__tests__/notifications.service.test.ts               unit
+__tests__/notifications.repository.integration.test.ts  integration (≥2 users)
+```
+
+**Approach**
+- **Per-user scope (NT1 — the crux)**: `scopeWhere(ctx) = { userId: ctx.userId, hotelId: ctx.hotelId }` on **every** endpoint. **No super_admin bypass** (a notification is personal — super_admin still sees only their own). `hotel_id`/`user_id` never from URL/body.
+- **list (NT2)**: `where = scope + (is_read filter when provided) + cursor keyset`; `orderBy [{createdAt:'desc'},{id:'desc'}]`; module-local base64 cursor codec on `{createdAt,id}` (N1 OR-decomposition, reuses the T11/T15 *pattern* — T-CLEAN-02 consolidates later); `limit` default 20 / max 100; malformed cursor → 400. Serializer emits `{id, type, title, body, link, metadata, is_read, read_at, created_at}` (NT2 field list).
+- **unread-count (NT3)**: `countWhere(scope + { isRead: false })`.
+- **markRead (NT4)**: `updateMany({ where: { id, userId, hotelId, isRead:false }, data: { isRead:true, readAt:now } })` then `findFirst({ where:{ id, userId, hotelId } })` → `!row` → `NotFoundError` 404 (anti-enumeration, NOT 403). **Idempotent**: already-read → step-1 count 0 but step-2 finds the owned row → returns it 200 (preserves original `read_at`).
+- **markAllRead (NT5)**: one `updateMany({ where:{ userId, hotelId, isRead:false }, data:{ isRead:true, readAt:now } })`; idempotent (0 unread → count 0).
+- **Auth/RBAC**: routes require `req.tenant` (else 401); **all authenticated** roles pass (no gm_admin gate — role gating stays T04's job, N3). `AppError` only; correlationId; no cross-module import.
+
+**GAP / open question**
+- **Q-B-07** — (a) **list envelope**: proposing cursor `{ data, pageInfo: { nextCursor, hasMore } }` (§2.7; §1.6 FE calls `?limit=20`). (b) **unread-count**: proposing `{ data: { count } }` (consistent envelope). (c) **mark-all-read**: proposing `{ data: { updated } }` (count of rows flipped). (d) **markRead response**: `{ data: NotificationWire }` (the updated notification). All provisional on FE MSW (§1.6 optimistic ops L240 — FE updates optimistically, so bodies are advisory). Confirm.
+- Minor: NT2's serializer field list omits `hotel_id`/`user_id` (which §1.6's example shows). **Following NT2** (they're personal/derivable) — flag if FE MSW needs them.
+
+**Merge posture**: buildable + fully testable now (inject `ctx` incl. `userId`); live once `api.ts` bootstrap wires `register(notificationsRoutes)` (DEP-4, foundation — untouched).
+
+Awaiting PM B ACK (PLAN + Q-B-07 envelopes + NT2 field-list confirm). Not coding before ACK.
+
 ---
 
 <!--
