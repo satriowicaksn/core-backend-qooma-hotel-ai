@@ -516,6 +516,113 @@ src/modules/wa-templates/
 
 Awaiting PM C ACK before coding begins.
 
+#### PLAN T25-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+WA Templates lifecycle slice-1: 5 public endpoints (`GET/POST /api/wa-templates`, `PATCH/DELETE /api/wa-templates/:id`, `POST /api/wa-templates/:id/resubmit`) + `IntegrationRelayPort` interface + `LogOnlyIntegrationRelayAdapter` MVP stub (winston structured log per MVP §W2/W4/W5). Business rules: approved-lock 422 `WA_TEMPLATE_LOCKED`; global-on-hotel-write 403 (Q-T25-#1 lean); resubmit-guard 422 `WA_TEMPLATE_NOT_REJECTED`; DELETE state-branch (`pending` → hard delete; `approved`/`rejected` → archive; `archived` → 409 per T25-#3 lean); P2002 → 409 `WA_TEMPLATE_NAME_TAKEN`. Prisma direct (ADR-0001); tenant scope via `assertHotelOwnership`; RBAC `requireRole(ctx, ['gm_admin'])` (super_admin implicit). Snake_case wire via serializer. `is_global=false` hardcoded on POST. Meta-callback ingest deferred to slice-2.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.9 endpoints (lines 274-295), §2.8 DDL (lines 601-627), §6 RBAC row line 808, §7 error catalog line 829 ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C5 + §W2/W4/W5 pattern (queued for spot-read during coding) ✓
+- Parent docs spot-read: `src/modules/departments/` (T21 approved — layout twin: schema.strict + refine-non-empty, `loadOwned`, `isPrismaUniqueViolation`, serializer snake_case, thin routes), `src/plugins/tenant-guard.ts` + `rbac.ts` (T21 verified pattern), `src/core/errors/app-errors.ts` (`BusinessRuleError` L104, `ConflictError` L51, `ForbiddenError` L37), `prisma/schema.prisma:343-363` (WaTemplate model), migration `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80` (status CHECK + scope XOR) ✓
+- Dependencies: T02 ✓ (schema+migrations), T03 ✓ (tenant-guard), T04 ✓ (rbac), T05 ✓ (seed reference — global fixture names from spec §1.9 ADD-08.2), T07-slice-1 ✓ (`BusinessRuleError`), T21 ✓ (living-reference pattern approved) — all approved
+- `make typecheck` clean ✓ (post-T21 merge; verified 2026-07-03 H0) · `make lint` clean ✓ · `make test-unit` **312/1/313** (T21-merged baseline) ✓
+- Scaffolder risk: **none** — no `pnpm create`/`pnpm dlx`; no schema.prisma edit; no new package (winston is stubbed in `@core/logger` — adapter uses same `Logger` interface as T21 startup warn); no env changes for slice-1
+
+**Files to create**
+```
+src/modules/wa-templates/
+├── wa-templates.types.ts                             (DomainWaTemplate, WaTemplateWire,
+│                                                       WaTemplateStatus type-only union,
+│                                                       WaTemplateRow, list filters + response envelopes)
+├── wa-templates.schema.ts                            (zod: CreateWaTemplateBodySchema (strict)
+│                                                       + UpdateWaTemplateBodySchema.refine(non-empty).strict
+│                                                       + WaTemplateIdParamSchema
+│                                                       + ListWaTemplatesQuerySchema (status filter))
+├── wa-templates.serializer.ts                        (Prisma row → snake_case wire)
+├── wa-templates.repository.ts                        (Prisma direct — ADR-0001; findManyForHotel
+│                                                       [global-OR-hotelId WHERE], findById, create,
+│                                                       update, delete, countByHotelAndName [Q-T25-#5])
+├── wa-templates.service.ts                           (loadOwned + state-machine branches;
+│                                                       injects IntegrationRelayPort;
+│                                                       Q-T25-#5 pre-check via countByHotelAndName)
+├── wa-templates.routes.ts                            (Fastify plugin: 5 handlers; thin;
+│                                                       T21 pattern: requireTenant → requireRole
+│                                                       → parse → service → send)
+├── ports/
+│   └── integration-relay.port.ts                     (interface IntegrationRelayPort with single
+│                                                       method relaySubmit({intent, templateId,
+│                                                       hotelId, name, body, language, variables}) —
+│                                                       Q-T25-#4 lean confirmed)
+├── adapters/
+│   └── log-only-integration-relay.adapter.ts         (impl: winston-shaped Logger, structured log
+│                                                       payload, returns {messageId: crypto.randomUUID(),
+│                                                       relayedAt: new Date()})
+├── index.ts                                          (barrel: waTemplatesRoutes plugin +
+│                                                       WaTemplatesService class +
+│                                                       buildWaTemplatesService factory +
+│                                                       IntegrationRelayPort interface +
+│                                                       LogOnlyIntegrationRelayAdapter class +
+│                                                       public types only)
+└── __tests__/
+    ├── wa-templates.service.test.ts                          (unit; mock repo + mock port;
+    │                                                          all 9 branch cases from PM DoD)
+    ├── wa-templates.routes.test.ts                           (unit; Fastify inject;
+    │                                                          happy + 401 + 403 dept_head/staff/global
+    │                                                          + 404 cross-tenant + 422 lock)
+    ├── log-only-integration-relay.adapter.test.ts            (unit; verify log payload shape +
+    │                                                          returns {messageId, relayedAt})
+    └── wa-templates.repository.integration.test.ts           (testcontainers real Postgres;
+                                                               scope-XOR CHECK, status CHECK,
+                                                               tenant isolation, global-visible-cross-hotel,
+                                                               UNIQUE assertion behavior per Q-T25-#5)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1 held; barrel wiring; DEP-4 registers). No env changes (slice-2 concern).
+
+**Approach**
+Mirror T21 module layout: `types → schema → serializer → repository → service → routes → barrel`. Add `ports/` + `adapters/` subdirs for the port+adapter mandate per CLAUDE.md §4 (outbound RPC — WAJIB). Repository stays Prisma-direct (ADR-0001); the port only wraps the RPC seam. Service constructor takes `(repo, integrationRelay, opts?)`; `loadOwned` mirrors T21 for cross-tenant 404 (leak-safe); `isPrismaUniqueViolation` P2002 helper reused (copy from T21 pattern — small pure fn, not worth extracting yet). State-machine branches consolidated in one `assertNotLocked(row)` + `assertNotGlobalForWrite(row)` guards used by PATCH/DELETE/RESUBMIT. POST hardcodes `isGlobal=false`, `status='pending'`, and drops any client-supplied `hotel_id`/`is_global`/`status` at zod boundary (`.strict()` rejects unknown fields; my schema simply omits them). Global visibility on list: repository builds `where` as `{ OR: [{ isGlobal: true }, { hotelId: ctx.hotelId }] }` (unless super_admin — then unscoped). Delete state-branch returns 200 with archived row for approved/rejected, 204 for pending-hard-delete. Resubmit calls repository update + then port.relaySubmit(intent='resubmit'); POST calls create + port.relaySubmit(intent='create'). LogOnly adapter reuses the existing stubbed `Logger` (matches T21 startup warn — no new dep). Tests: service branch coverage via mock repo + mock port (9 cases per DoD); routes via Fastify inject (mirrors T21 routes test); adapter unit test verifies log payload + return shape; integration testcontainer proves DB CHECKs, scope XOR, tenant isolation, and the actual UNIQUE behavior (see Q-T25-#5).
+
+**GAP responses** (Q-T25-#1..#4 pre-surfaced by PM; #5 discovered during spec/migration cross-check)
+
+- **Q-T25-#1 (global-write 403 vs 422)** → **Accepting PM lean: 403 FORBIDDEN**. Rationale: matches spec §1.9:295 "read-only at hotel level" auth semantic; keeps `BusinessRuleError` scoped to state-transition rules (not tenancy). Envelope: `ForbiddenError('Global template read-only at hotel level', { reason: 'GLOBAL_TEMPLATE_READONLY' })`.
+
+- **Q-T25-#2 (name enum-lock vs permissive)** → **Accepting PM lean: permissive** `z.string().min(1).max(80)` (matches migration VARCHAR(80) + spec §2.8:606 "hotel-specific" carve-out). Enum-lock breaks hotel custom-template use case. Follow-up ticket if PO wants soft-lint recommendation on 8 canonical names.
+
+- **Q-T25-#3 (DELETE on archived — 404 vs 409)** → **Accepting PM lean: 409** `ConflictError('WA template already archived', { reason: 'WA_TEMPLATE_ALREADY_ARCHIVED', currentStatus: 'archived' })`. Preserves "row exists but action invalid" semantic; FE gets definitive signal.
+
+- **Q-T25-#4 (port shape — single vs split)** → **Accepting PM lean: single `relaySubmit(payload)` with `intent: 'create' | 'resubmit'`**. Smaller port surface; slice-2 HTTP adapter simpler; log-only adapter differentiates intent in payload for observability. Full signature:
+  ```ts
+  interface IntegrationRelaySubmitInput {
+    readonly intent: 'create' | 'resubmit';
+    readonly templateId: string;
+    readonly hotelId: string;
+    readonly name: string;
+    readonly body: string;
+    readonly language: string;
+    readonly variables: readonly unknown[];
+  }
+  interface IntegrationRelayResult {
+    readonly messageId: string;
+    readonly relayedAt: Date;
+  }
+  interface IntegrationRelayPort {
+    relaySubmit(input: IntegrationRelaySubmitInput): Promise<IntegrationRelayResult>;
+  }
+  ```
+
+- **GAP T25-#5** (new — spec/migration divergence) — **UNIQUE(hotel_id, name) NULLS NOT DISTINCT is defined in spec §2.8:623 but NOT in the actual migration** (`prisma/migrations/20260701111952_init_hotel_core/migration.sql:209-224` and `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80` — neither adds the UNIQUE). So P2002 will NEVER fire in DEV/staging today. ASSIGNMENT DoD line 483 assumes the constraint exists.
+  - **Options**: A) Add a new migration in this task (`20260703_add_wa_templates_hotel_name_unique/migration.sql`) restoring the spec's UNIQUE NULLS NOT DISTINCT + regenerate Prisma client — foundation-scope encroachment but aligns spec+migration+code atomically. B) Ship without the constraint; keep `isPrismaUniqueViolation` catch code for future forward-compat; add an app-layer pre-check via `countByHotelAndName(hotelId, name)` before create/update to detect duplicates fail-fast (races possible but rare on this admin endpoint). C) Ship without either — accept duplicates silently until foundation adds the constraint. D) Raise as GAP to Parent PM, pause coding.
+  - **My intent**: **B** — app-layer pre-check + P2002 catch (defensive both ways). B keeps T25 within Slot C scope + gives correct UX today; the P2002 catch acts as belt-and-suspenders once foundation ships the migration. Race window is ~50ms per admin write on the same name in the same hotel — acceptable risk on a settings surface. I'll note the actual DB migration gap in SUBMIT for PM C escalation to Parent PM/foundation. If PM prefers A (add migration here), I can — small SQL diff — but wanted PM ratify before touching foundation-scope files.
+
+Q-B-01/Q-B-02/Q-C-01..-03 already resolved per prior task ACKs — not re-raising.
+
+**Est.**: ~5–6h (5 endpoints + port/adapter + state-machine branching). Mid-task CHECKPOINT if crossing ~4h with >3 files incomplete.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
