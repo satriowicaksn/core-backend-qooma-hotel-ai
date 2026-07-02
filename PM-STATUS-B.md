@@ -1084,6 +1084,42 @@ Strong PLAN. **ACK — create `feat/tickets-transition` (off latest main), imple
 
 Proceed. 🟢
 
+### SUBMIT T12 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Ticket status transition + reroute — `PATCH /api/tickets/:id/status` + `PATCH /api/tickets/:id/department`
+Branch: **`feat/tickets-transition`** (rebased on latest main; pushed; commit `625a8b8`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 8 modified, **all** in `src/modules/tickets/` (0 outside — no `api.ts`/`prisma`/`core`/cross-module edits; consumes merged `shared/utils/ticket-state-machine.js` + `BusinessRuleError`)
+  - `tickets.schema.ts` (+`parseStatusUpdate`/`parseDepartmentUpdate`, `.strict()`), `tickets.types.ts` (+`TicketRow`/`StatusUpdate`/`DepartmentUpdate`), `tickets.repository.ts` (+`findById`/`findDepartmentById`/`transitionStatusTx`/`rerouteTx`), `tickets.service.ts` (+`updateStatus`/`reroute` + socket seams), `tickets.routes.ts` (+2 PATCH routes), + 3 test files
+
+DoD self-check
+- [x] **TT1** — consumes merged `assertValidTicketTransition(row.status, to)` (no table reimplement, §4.2) → invalid = `BusinessRuleError` 422 `details.rule='INVALID_TICKET_TRANSITION'`. Integration: `open→closed` → 422, no audit written, status unchanged.
+- [x] **TT2** — valid status change = **one `$transaction`**: status-guarded `updateMany({where:{id,hotelId,status:from}})` + `ticketUpdate.create({type:'status_change',from_status,to_status,note,actor_user_id=ctx.userId})`. Atomic audit. Integration asserts the audit row with `actor_user_id=USER_1`, from/to, note.
+- [x] **TT3** — reroute = one tx: update `department_id` + `ticketUpdate.create({type:'reroute',from_department_id,to_department_id,note,actor_user_id})`. Target dept validated exists + `hotelId===ticket.hotelId` else `NotFoundError('Department')`.
+- [x] **TT4** — reroute **gm_admin-only → dept_head 403** (`ForbiddenError`, explicit domain guard before resource lookup; MVP §5 AC). Status: dept_head allowed own-dept; cross-dept → 404 via `assertDeptOwnership`. Integration covers both.
+- [x] **TT5** — tenant guard on both (scoped by the ticket's `hotelId`; super_admin bypass via `assertHotelOwnership`); cross-tenant `:id` → 404. Integration: `gmB` status update on hotel-A ticket → 404.
+- [x] **TT6** — socket emits = named no-op seams (`onTicketUpdated`/`onTicketRerouted`, default `() => {}`); T20 wires the gateway. Unit asserts the seam fires.
+- [x] **TT7** — unit (parse strict, transition-consume, RBAC 403, concurrency count=0→422) + integration (valid + invalid→422, reroute writes audit, dept_head reroute→403, cross-hotel dept→404, cross-tenant→404, atomicity). **Q-B-11 → (a)**: `actor_user_id = ctx.userId` (DEP-5 merged; no null-interim). **note** accepted (optional) per ACK. Response reuses `serializeTicketDetail`.
+
+Quality gate
+- `make check`: **PASS** (**173 passed, 1 skipped** template placeholder; T11/T13/T15 read-endpoint suites green → no regression)
+- `make test-integration`: **PASS** (tickets **24** via testcontainers; guests 14)
+- ✓ No `pnpm prisma:generate` / Docker workaround needed for `make check` (T-INFRA-01/03 merged).
+
+Drift scans (src/modules/tickets): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Tenant + dept scope on both mutations; cross-boundary masked 404 (§7); reroute gm-only 403. Optimistic-concurrency guarded update (no lost writes). `AppError` only; correlationId; no secrets/PII in logs.
+
+Test evidence
+- Unit/component: **47** (service 38 + routes 9). Integration: **24**. **Changed-file line coverage 96.62%** (repo 100 / service 97.36 / serializer 100 / routes 97.77 / schema 91.78 / types 100 / overdue 100).
+- Sample: `PATCH /api/tickets/:id/status { "status": "in_progress", "note": "on it" }` → `200 { data: { …status:'in_progress', updates:[{ type:'status_change', from_status:'open', to_status:'in_progress', actor_user_id:'…', note:'on it' }] } }`. `dept_head` → `PATCH …/department` → `403 { error: { code:'FORBIDDEN' } }`.
+
+Notes
+- Merge posture same as prior: buildable + fully tested now; live once `api.ts` bootstrap wires `register(ticketsRoutes)` (DEP-4, foundation — untouched).
+- Socket seams ready for T20; `note` field provisional on FE MSW.
+
+Requesting PM B VERDICT.
+
 ##### PM B RATIFY — T-INFRA-02 Slot-B fixture edits (2026-07-02)
 T-INFRA-02 (Slot A, DEP-5) added `userId` to `TenantContext` and updated 5 of my test fixtures (tickets + guests `__tests__`) to include it. Reviewed the diff: **purely `userId`-additive to the `ctx` literals, no change to my assertions/logic**; `pnpm typecheck` clean on main; PM A reported all Slot-B suites green. **Ratified** (per PM A's "PM B ratify pending" note, PARENT §1 T-INFRA-02).
 
