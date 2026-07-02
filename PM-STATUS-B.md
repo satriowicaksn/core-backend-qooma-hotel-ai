@@ -1752,6 +1752,53 @@ Best-reasoned PLAN of the slot — you pre-empted every concern. **ACK — creat
 
 Proceed — land the finale. 🟢
 
+### SUBMIT T20 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Socket emitters — `SocketEmitterPort` + `SocketIoEmitterAdapter` + wire the merged modules' emit-seams to §3 events (room `hotel:${hotelId}`)
+Branch: **`feat/socket-emitters`** (pushed; commit `47aabbd`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 4 new (`src/shared/socket/`) + 4 modified (2 services + 2 test files) — **no `core/`, no `api.ts`, no server, no dep added**
+  - **new** `shared/socket/socket-emitter.port.ts` (SocketEmitterPort + SocketEvent), `socket-io-emitter.adapter.ts` (SocketIoEmitterAdapter(SocketServerLike) + NoopSocketEmitter), `socket-events.ts` (8 §3 payload builders), `index.ts` + adapter test
+  - **mod** `tickets.service.ts` (emit `ticket:updated`/`ticket:rerouted`), `visits.service.ts` (emit `verification:pending`/`verification:resolved`) — consolidated the per-module no-op callbacks into one injected `emitter?: SocketEmitterPort` (default `NoopSocketEmitter`); + their unit tests
+
+DoD self-check
+- [x] **S1** — `SocketEmitterPort { emitToHotel(hotelId, event, payload) }` + `SocketIoEmitterAdapter` wrapping a **structural `SocketServerLike { to(room).emit(event,payload) }`** → emits to `hotel:${hotelId}` (adapter unit-tested with a fake `io`). `NoopSocketEmitter` default. **socket.io NOT installed** (DEP-7 / no dep add).
+- [x] **S2** — every seam with a Slot-B producer wired to the port (see manifest below); each service receives the injected emitter (default no-op → T11–T19 behavior unchanged).
+- [x] **S3** — payloads match §3 exactly, reusing existing serializers: `ticket:updated` `{ ticket: TicketSummary, changed }` (TicketSummary via the detail wire = list-item superset), `ticket:rerouted` `{ ticket_id, from_department_id, to_department_id }`, `verification:pending` `{ visit_id, guest_id, hotel_id }`, `verification:resolved` `{ visit_id, status }`. Room `hotel:${hotelId}` uses the **resource's** hotelId (super_admin-safe).
+- [x] **S4** — unit: each mutation asserts `emitToHotel(hotelId, event, payload)` (mock port); adapter asserts room+event+payload (fake io); all 8 builders asserted. ≥80% cov. `make check` + integration green. **T11–T19 regression green** (the 4 consolidated seam tests updated to assert the port; all other suites untouched).
+
+**★ Emit-surface manifest (REQUIRED — no silent cap):**
+| §3 event | status | producer |
+|---|---|---|
+| `ticket:updated` | ✅ **WIRED LIVE** | tickets `updateStatus` |
+| `ticket:rerouted` | ✅ **WIRED LIVE** | tickets `reroute` |
+| `verification:pending` | ✅ **WIRED LIVE** | visits `create` (T18) |
+| `verification:resolved` | ✅ **WIRED LIVE** | visits verify-manual + reject + approve-manual (T16/T17) |
+| `ticket:created` | 🟡 builder-only | AI service inserts tickets — no Slot-B producer |
+| `ticket:escalated` | 🟡 builder-only | escalation worker (deferred, MVP §2) |
+| `verification:failed_3x` | 🟡 builder-only | failed-3x worker (deferred) |
+| `notification:new` | 🟡 builder-only | notifications inserted by workers/AI — T19 is read/mark, no create path |
+`billing:threshold_reached` / `message:new` are in the `SocketEvent` union for completeness (Slot-C/Integration surface). The 4 builder-only helpers are exported + tested so their producers emit in one line.
+
+Quality gate
+- `make check`: **PASS** (**256 passed, 1 skipped** template placeholder; T11–T19 regression green)
+- `make test-integration`: **PASS** (69 tests — tickets/visits/guests/notifications, all green through the seam consolidation)
+
+Drift scans (shared/socket + touched services): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Emits scoped to the resource's `hotel:${hotelId}` room (README §2.5 server-authoritative); no PII beyond the already-serialized wires; no secrets. No new attack surface (emit is outbound to a tenant room).
+
+Test evidence
+- New adapter suite: **8** (adapter room-emit, noop, all 8 §3 builders). Updated service tests: `ticket:updated`/`ticket:rerouted`/`verification:pending`/`verification:resolved` assert `(hotelId, event, payload)`. **shared/socket coverage: 100%** (port/adapter/events).
+- Sample: `PATCH /tickets/:id/status` → adapter calls `io.to('hotel:H').emit('ticket:updated', { ticket: {…summary…}, changed: ['status'] })`.
+
+Notes / boundary
+- **DEP-7 (foundation)** — live Socket.io `Server` + cookie-auth room-join is bootstrap (DEP-4 family). T20 ships port + adapter + wiring; **live emission works once foundation constructs the real `io` and passes `new SocketIoEmitterAdapter(io)` to `buildTicketsService`/`buildVisitsService`** (the emitter dep). No server built here.
+- **Q-B-14** → `src/shared/socket/` as ruled (no `core/` edit, no escalation).
+- 🏁 **This is the last Slot-B task — T20 completes the slot (10/10).**
+
+Requesting PM B VERDICT.
+
 ---
 
 <!--
