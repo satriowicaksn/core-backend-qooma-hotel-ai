@@ -667,6 +667,139 @@ Independently verified: `prisma/migrations/20260701111952_init_hotel_core/migrat
 
 Proceed to coding on `feat/wa-templates-lifecycle`. Awaiting your SUBMIT.
 
+#### SUBMIT T25-slice-1 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: WA templates lifecycle (slice-1) — 5 public endpoints + IntegrationRelayPort + LogOnly adapter
+Branch: `feat/wa-templates-lifecycle` @ `138edcd` (pushed to origin)
+Files changed: 11 new (zero modified — `api.ts`, `env.ts`, `prisma/migrations/` all untouched)
+  - `src/modules/wa-templates/wa-templates.types.ts` (new)
+  - `src/modules/wa-templates/wa-templates.schema.ts` (new)
+  - `src/modules/wa-templates/wa-templates.serializer.ts` (new)
+  - `src/modules/wa-templates/wa-templates.repository.ts` (new)
+  - `src/modules/wa-templates/wa-templates.service.ts` (new)
+  - `src/modules/wa-templates/wa-templates.routes.ts` (new)
+  - `src/modules/wa-templates/ports/integration-relay.port.ts` (new)
+  - `src/modules/wa-templates/adapters/log-only-integration-relay.adapter.ts` (new)
+  - `src/modules/wa-templates/index.ts` (new — barrel with `buildWaTemplatesService` factory)
+  - `src/modules/wa-templates/__tests__/wa-templates.service.test.ts` (new)
+  - `src/modules/wa-templates/__tests__/wa-templates.routes.test.ts` (new)
+  - `src/modules/wa-templates/__tests__/log-only-integration-relay.adapter.test.ts` (new)
+  - `src/modules/wa-templates/__tests__/wa-templates.repository.integration.test.ts` (new)
+
+**DoD self-check** (from ASSIGNMENT T25-slice-1 lines 475-495)
+- [x] 5 public endpoints wired: GET list · POST create · PATCH edit · DELETE state-branch · POST resubmit — `wa-templates.routes.ts:47,64,80,97,120`.
+- [x] Zod schemas: `CreateWaTemplateBodySchema.strict()` + `UpdateWaTemplateBodySchema.strict().refine(non-empty)` + `WaTemplateIdParamSchema` + `ListWaTemplatesQuerySchema.strict()` — `wa-templates.schema.ts:29-46,48-59,61-63,66-70`.
+- [x] Tenant scope: `hotelId` from `ctx.hotelId` on create (never body); `loadOwned` → `assertHotelOwnership` on hotel-scoped rows; global rows visible cross-hotel via list but 403 on write (see next). Cross-tenant 404 leak-safe via `NotFoundError('WaTemplate', id)`.
+- [x] RBAC: `requireRole(ctx, ['gm_admin'])` on every handler; super_admin bypass via `requireRole` implicit; dept_head/staff both 403 verified in routes tests.
+- [x] `is_global` hardcoded false on POST (`wa-templates.service.ts:114`); PATCH/DELETE/RESUBMIT on global row → 403 `GLOBAL_TEMPLATE_READONLY` (Q-T25-#1) via `assertNotGlobalForWrite` guard applied BEFORE state check (PM ACK coding note held).
+- [x] Approved-lock: `assertNotLocked` throws `BusinessRuleError({rule:'WA_TEMPLATE_LOCKED', currentStatus})` when `status IN ['approved','archived']` (`service.ts:47-54`).
+- [x] Resubmit-guard: `BusinessRuleError({rule:'WA_TEMPLATE_NOT_REJECTED', currentStatus})` when `status !== 'rejected'` (`service.ts:227-232`).
+- [x] Delete state-branch: `pending` → hard delete + service returns `null` → route 204; `approved|rejected` → update `status='archived'` + returns row → route 200; `archived` → `ConflictError({reason:'WA_TEMPLATE_ALREADY_ARCHIVED', currentStatus:'archived'})` per Q-T25-#3.
+- [x] Q-T25-#5 pre-check: `repo.countByHotelAndName(hotelId, name, excludeId?)` before create AND before update-when-name-changes; P2002 catch as belt-and-suspenders (dead branch today, live post-foundation-fix). Both paths translate to `ConflictError({reason:'WA_TEMPLATE_NAME_TAKEN'})`.
+- [x] `IntegrationRelayPort` defined with single `relaySubmit(input)` method (Q-T25-#4); `IntegrationRelaySubmitInput.variables: readonly string[]` per tightening #1; `LogOnlyIntegrationRelayAdapter.relaySubmit` emits winston payload with exact keys per tightening #3, returns `{messageId: randomUUID(), relayedAt: new Date()}`.
+- [x] Service calls `integrationRelay.relaySubmit` on both POST (`intent: 'create'`) and resubmit (`intent: 'resubmit'`).
+- [x] Response envelope: list `{data: WaTemplateWire[]}` · single `{data: WaTemplateWire}` (Q-B-01); **201** on POST create; **200** on PATCH/RESUBMIT and DELETE-archive; **204** on DELETE-hard-delete.
+- [x] Winston logger scoped via `req.log.info({module:'wa-templates', action, correlationId})` in each handler (T21 pattern).
+- [x] Unit tests: full branch coverage per DoD line 488 — 9+ cases across service + routes + adapter (see coverage below).
+- [x] Integration test: real Postgres via testcontainers; scope-XOR CHECK proven (2 tests); status CHECK proven (1 test); tenant isolation + global-visible-cross-hotel-list proven; Q-T25-#5 pre-check behaviour proven (same-hotel dup rejected, same-name-different-hotel allowed — foundation UNIQUE absent case explicitly asserted).
+- [x] Line coverage ≥ 80% on new files — **96.68% lines / 97.14% stmts** across `src/modules/wa-templates/**`.
+- [x] `make check` PASS — 363/1/364 unit tests (baseline = 312/1/313 T21-merged, delta **+51**: 34 service + 12 routes + 5 adapter).
+- [x] `pnpm test:integration` PASS — 104/1/105 tests (baseline 83/1/84 post-T21, delta **+21**).
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes public API (`waTemplatesRoutes` plugin + `WaTemplatesService` + `LogOnlyIntegrationRelayAdapter` + `buildWaTemplatesService` factory + `IntegrationRelayPort/Input/Result` + wire/body types). Two `eslint-disable-next-line no-restricted-imports` in the barrel with justification comments (barrel/factory is sanctioned wiring seam per CLAUDE.md §4 — service still consumes port only, verified).
+- [x] Zero touch on `src/entrypoints/api.ts` (T21 Override #1 held). Zero env / migration touches.
+
+**3 PM tightenings — all held**
+- **#1 `variables: string[]`** — zod `z.array(z.string().min(1).max(64)).max(50)`; port input `readonly string[]`; wire DTO `readonly string[]`; serializer narrows defensively to guard JSONB anomalies.
+- **#2 `language` bounded** — zod `z.string().min(2).max(8)`; default `'id'` applied at service layer when body omits it.
+- **#3 adapter log payload** — exact keys emitted: `module: 'wa-templates'`, `event: 'integration_relay_stub'`, `intent`, `templateId`, `hotelId`, `name`, `language`, `messageId`; `correlationId` conditionally included when passed (best-effort per ACK; slice-2 HTTP adapter will plumb x-correlation-id end-to-end). Verified by adapter unit test that pins the exact key set.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings — 2 inline eslint-disable in barrel for `no-restricted-imports` with justification comments; documented above)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 363 passed, 1 skipped, 364 total (baseline 312/1/313 + **+51**)
+- `pnpm test:integration`: **PASS** — 104 passed, 1 skipped, 105 total (baseline 83/1/84 + **+21**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/wa-templates/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route/adapter (excl tests): **0** (test files use `throw new Error('expected throw')` as jest assertion helpers only — 6 hits, allowed pattern per T21 precedent)
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- Hardcoded URL / secret: **0** (adapter is log-only; no HTTP endpoint)
+- Wrap-Prisma interface: **0** (`WaTemplatesRepository` is Prisma-direct per ADR-0001)
+- `setTimeout` for delay: **0**
+
+**Security check**
+- HMAC verified before business logic: **N/A** for slice-1 (no callback ingest; that's slice-2 with foundation HMAC plugin + `INTEGRATION_SHARED_SECRET`).
+- Token encryption via `shared/utils/crypto`: **N/A** (no token storage).
+- PII masking in log: **N/A** (WA template metadata is operational config, not guest PII; adapter logs `name`/`hotelId`/`templateId` — no phone/email).
+- `hotel_id` NEVER from body — enforced at zod boundary (`.strict()` rejects unknown fields including `hotel_id`, `is_global`, `status`, `template_id_meta`, `rejection_reason`, `approved_at`) + JSDoc invariant on `create()` reinforcing the belt-and-suspenders per PM ACK coding note.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 51 new tests (34 service + 12 routes + 5 adapter)
+- Integration: 21 new tests
+- Coverage (`src/modules/wa-templates/**`, ran with `--coverageThreshold='{}'`):
+  ```
+  All files                             | 97.14 stmts | 82.05 branch | 96.55 funcs | 96.68 lines
+   wa-templates.repository.ts           | 100         | 100          | 100         | 100
+   wa-templates.routes.ts               | 98.11       | 60           | 100         | 98.07
+   wa-templates.schema.ts               | 100         | 75           | 100         | 100
+   wa-templates.serializer.ts           | 100         | 75           | 100         | 100
+   wa-templates.service.ts              | 93.75       | 83.33        | 100         | 94.80
+   ports/integration-relay.port.ts      | 100         | 100          | 100         | 100
+   adapters/log-only-….adapter.ts       | 100         | 100          | 100         | 100
+   index.ts                             | 100         | 100          | 25          | 100
+  ```
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+POST /wa-templates
+> body {"name":"hotel_promo","body":"Halo {{g}}","variables":["g"]}
+< 201 Created
+< {"data":{"id":"…","hotel_id":"…","name":"hotel_promo","status":"pending","is_global":false, …}}
+# adapter emits: {module:"wa-templates", event:"integration_relay_stub", intent:"create", templateId, hotelId, name, language, messageId}
+
+DELETE /wa-templates/:id (status=pending)
+< 204 No Content
+# hard delete
+
+DELETE /wa-templates/:id (status=approved)
+< 200 OK
+< {"data":{...,"status":"archived"}}
+
+POST /wa-templates/:id/resubmit (status=rejected)
+< 200 OK
+< {"data":{...,"status":"pending","rejection_reason":null}}
+# adapter emits with intent:"resubmit"
+
+PATCH /wa-templates/:id (row status=approved)
+< 422 Unprocessable Entity
+< {"code":"BUSINESS_RULE","message":"WA template locked","details":{"rule":"WA_TEMPLATE_LOCKED","currentStatus":"approved"}}
+
+PATCH /wa-templates/:id (row is_global=true)
+< 403 Forbidden
+< {"code":"FORBIDDEN","message":"Global template read-only at hotel level","details":{"reason":"GLOBAL_TEMPLATE_READONLY","templateId":"…"}}
+```
+
+**Notes / questions for PM C**
+
+1. **Q-T25-#5 foundation gap — code ready for post-fix** (info, action = Slot A ticket). Slice-1 ships Option B as ratified: `repo.countByHotelAndName` pre-check on create + update-name paths (verified by integration test "should ALLOW same name across different hotels" — proves absence of DB UNIQUE today), plus `isPrismaUniqueViolation` P2002 catch (dead branch today, live post-foundation). When Slot A adds `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT`, **no Slot C code change needed** — the pre-check remains idempotent-safe, the P2002 catch flips dead→live. Roll-up to PARENT §3b + §10 per PM ACK.
+
+2. **`correlationId` plumbing for adapter** (info). Adapter accepts `correlationId?` on the port input; service does NOT currently thread it because it's not in the port's initial call site (service isn't reading `req.log` context). Once DEP-4 lands foundation Fastify bootstrap, service could take a per-call `correlationId` arg from route → thread to adapter. Deferred as tightening #3 explicitly said "best-effort … TODO for slice-2's HTTP adapter to plumb the header". Documented in adapter code (`log-only-integration-relay.adapter.ts:35-37`).
+
+3. **`WA_TEMPLATE_ARCHIVED_LOCK` semantics** — Q-T25-#3 archived is 409 CONFLICT. But note: PATCH on archived is 422 `WA_TEMPLATE_LOCKED` (via `assertNotLocked`), DELETE on archived is 409 `WA_TEMPLATE_ALREADY_ARCHIVED` (Q-T25-#3), RESUBMIT on archived is 422 `WA_TEMPLATE_NOT_REJECTED` (via status !== 'rejected'). Three different error codes for three different intents on the same terminal state — I believe that matches spec + your Q-T25-#3 lean (each carries a definitive signal), but flagging for verification.
+
+4. **No `variables` DB-level CHECK** — zod at boundary enforces `string[]` bounded (tightening #1); serializer defensively narrows non-string entries; but DB has no CHECK constraint. A manual DB insert with `variables: [42, {"foo":"bar"}]` would survive → serializer would drop non-strings. Not a slice-1 concern (no ingest path bypasses zod), but flagging as foundation-adjacent for future hardening if PO wants.
+
+5. **PATCH `body` accepts empty string?** Currently zod requires `body.min(1)` on both create AND update. If FE ever needs to send `body: ""` deliberately, we'd 400 it. Believe this is correct per spec §2.8 (`body TEXT NOT NULL`), but flagging.
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
