@@ -9,6 +9,7 @@ import {
 } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
+import type { SocketEmitterPort, SocketEvent } from '@shared/socket/index.js';
 
 import type { TicketsRepository } from '../tickets.repository.js';
 import {
@@ -31,6 +32,19 @@ function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
     isSuperAdmin: false,
     role: 'gm_admin',
     ...overrides,
+  };
+}
+
+interface EmitCall {
+  hotelId: string;
+  event: SocketEvent;
+  payload: unknown;
+}
+function spyEmitter(): { port: SocketEmitterPort; calls: EmitCall[] } {
+  const calls: EmitCall[] = [];
+  return {
+    calls,
+    port: { emitToHotel: (hotelId, event, payload) => calls.push({ hotelId, event, payload }) },
   };
 }
 
@@ -383,14 +397,17 @@ describe('TicketsService.updateStatus', () => {
     expect(wrote).toBe(false);
   });
 
-  it('should commit a valid transition and fire the socket seam', async () => {
-    const events: Array<{ ticketId: string; changed: readonly string[] }> = [];
-    const service = new TicketsService(repo({}), {
-      onTicketUpdated: (e) => events.push(e),
-    });
+  it('should commit a valid transition and emit ticket:updated', async () => {
+    const emitted = spyEmitter();
+    const service = new TicketsService(repo({}), { emitter: emitted.port });
     const res = await service.updateStatus(ctx(), 't1', { status: 'in_progress' });
     expect(res.data.status).toBe('in_progress');
-    expect(events).toEqual([{ ticketId: 't1', changed: ['status'] }]);
+    expect(emitted.calls).toHaveLength(1);
+    expect(emitted.calls[0]?.hotelId).toBe('hotel-1');
+    expect(emitted.calls[0]?.event).toBe('ticket:updated');
+    const payload = emitted.calls[0]?.payload as { ticket: { status: string }; changed: string[] };
+    expect(payload.changed).toEqual(['status']);
+    expect(payload.ticket.status).toBe('in_progress');
   });
 
   it('should surface a concurrency loss (count 0) as BusinessRuleError', async () => {
@@ -435,14 +452,18 @@ describe('TicketsService.reroute', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('should reroute and fire the socket seam', async () => {
-    const events: Array<{ ticketId: string; fromDepartmentId: string; toDepartmentId: string }> =
-      [];
-    const service = new TicketsService(repo({}), { onTicketRerouted: (e) => events.push(e) });
+  it('should reroute and emit ticket:rerouted (snake_case §3 payload)', async () => {
+    const emitted = spyEmitter();
+    const service = new TicketsService(repo({}), { emitter: emitted.port });
     const res = await service.reroute(ctx(), 't1', {
       department_id: '22222222-2222-4222-8222-222222222222',
     });
     expect(res.data.department_id).toBe('dept-2');
-    expect(events[0]?.fromDepartmentId).toBe('dept-1');
+    expect(emitted.calls[0]?.event).toBe('ticket:rerouted');
+    expect(emitted.calls[0]?.payload).toEqual({
+      ticket_id: 't1',
+      from_department_id: 'dept-1',
+      to_department_id: '22222222-2222-4222-8222-222222222222',
+    });
   });
 });
