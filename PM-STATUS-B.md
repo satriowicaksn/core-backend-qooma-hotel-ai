@@ -45,13 +45,14 @@
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
-| T18 | Manual visit create | 🟡 wip (PLAN ACK'd) — extends `visits/` | `feat/visits-manual-create` | — |
+| T18 | Manual visit create | ✅ approved (attempt 1) | `feat/visits-manual-create` @ `cccf28b` (merges clean) | ⏳ awaiting PO merge |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **7/10 merged (T11, T13, T14, T15, T12, T16, T17)** · 🟡 T18 assigned (visits) · 🟢 T19 ready (notifications) · ⚪ T20 (←T19). Zero foundation blockers (only DEP-4 go-live). **Sisa 3: T18, T19, T20.**
+**Counts**: ✅ **7/10 merged (T11, T13, T14, T15, T12, T16, T17)** + **T18 approved (awaiting merge)** · 🟢 T19 ready (notifications) · ⚪ T20 (←T19). **8/10 done pending T18 merge. Visits module complete.** Sisa: T19, T20.
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 12 — 2026-07-02 — T18 APPROVED (visits module complete).** Manual visit create done (PM rerun: make check 230 no-Docker, coverage 96.84%, drift clean, merge dry-run CLEAN, T16/T17 regression clean — visits suite 80 tests, guest-guard cross-tenant 404 no-create). → merge `feat/visits-manual-create`. **8/10 done pending merge.** Visits trio (T16+T17+T18) complete. Remaining: **T19 (notifications) → T20 (socket)** = finish line.
 - **Loop 11b — 2026-07-02 — T17 MERGED (PR #7); T18 issued.** Slot B **7/10 merged**. Issued **T18** (manual visit create `POST /visits`, extends `visits/` — completes the visits trio). Q-B-13 flagged (body + response shape). Remaining: T18 (wip), T19 (notifications, ready), T20 (←T19).
 - **Loop 11 — 2026-07-02 — T17 APPROVED.** Visit reject + failed_3x approve-manual done (PM rerun: make check 219 no-Docker, coverage 96.48%, drift clean, merge dry-run CLEAN, **T16 regression clean** — visits suite 65 tests all green through generalized R3 transition map). → merge `feat/visits-reject-override`. **7/10 done pending merge. T17 merge unblocks T18** (same visits module). Remaining: T18, T19 (ready), T20 (←T19).
 - **Loop 10b — 2026-07-02 — T16 MERGED (PR #6); T17 issued.** Visits module complete on main → **6/10 merged** (T11,T13,T14,T15,T12,T16). Going one-at-a-time (parallel deferred — worktree setup skipped for now). Issued **T17** (visit reject + approve-manual/failed_3x, extends `visits/`, reuses T16 transition tx + checkout). Remaining: T17 (wip), T18 (visits, after T17 — same module), T19 (notifications, ready anytime), T20 (←T19).
@@ -82,7 +83,7 @@
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED (full V1–V6) + **MERGED main (PR #6 `4cd6851`) 2026-07-02**. make check 205 + coverage 98.01%. Unblocks T17+T18. |
 | T17 | Visit reject + failed_3x override                         | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED main (PR #7 `9afde4f`) 2026-07-02**. make check 219 + coverage 96.48% + T16 regression clean. Unblocks T18. |
-| T18 | Manual visit create                                       | wip          | —              | PLAN ACK'd 2026-07-02 (§2). Q-B-13 ruled (return Visit, persist special_request, nights 1–30). Coding `feat/visits-manual-create`. |
+| T18 | Manual visit create                                       | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 230 (no-Docker) + coverage 96.84% + drift clean + merge dry-run CLEAN + T16/T17 regression clean (80 tests). **Merge `feat/visits-manual-create` @ `cccf28b`.** Completes visits module. Awaiting PO merge. |
 | T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
@@ -1480,6 +1481,30 @@ Notes
 - Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched). **Completes the visits trio (T16+T17+T18).**
 
 Requesting PM B VERDICT.
+
+##### VERDICT T18 — APPROVED (attempt 1) by PM B (2026-07-02, H14)
+Verified by **my own rerun** on `feat/visits-manual-create` @ `cccf28b`.
+
+**Quality gates (PM rerun):**
+- `make check` → **PASS**: **230 passed + 1 skipped**, 1.28s (no-Docker).
+- `make test-integration` → **PASS** (real PG).
+- Coverage (PM rerun) — visits lines **96.84%** (repository 100 / service 93.33 / rest 100). Every file ≥80% ✓ MV5.
+- **Drift** (visits): all 0; **cross-module import 0** (guest read via Prisma, no guests-module import).
+- **File inventory**: 8 files, all in `src/modules/visits/`, 0 outside. **Merge dry-run into latest main: CLEAN ✓.**
+
+**DoD spot-verified in code:**
+- MV1 ✓ create with `hotelId: ctx.hotelId` (`service.ts:132`, **not body**); `status` not sent → DB default `pending_verification`; optional `nights`/`room_number`/`booking_source`/`special_request` via conditional spread (exactOptionalPropertyTypes-safe); **`special_request` persisted** (:138); no `check_out` on create; returns **`{ data: serializeVisit(created) }`** (Visit shape as ratified Q-B-13).
+- MV2 ✓ guest guard: `findGuestById` → `NotFoundError('Guest')` (`:124-126`) + `assertHotelOwnership(ctx, guest.hotelId)` → cross-tenant → 404 **no-create** (integration verified).
+- MV3 ✓ body `.strict()` (guest_id uuid, check_in ISO, nights 1–30, booking_source enum); rejects `hotel_id`/`status`.
+- MV4 ✓ gm_admin (super_admin bypass); `onVerificationPending` no-op seam (T20).
+- **T16/T17 REGRESSION CLEAN** — visits suite now **80 tests** (65 + 15 T18), all green.
+
+**Merge status (for PO):**
+- **CODE APPROVED** on `feat/visits-manual-create` @ `cccf28b`. Attempt 1, zero rejects. **Merges CLEAN into latest main.**
+- **→ PO: merge `feat/visits-manual-create`.** This **completes the visits module** (T16+T17+T18).
+- → §1 tracker updated (approved); PARENT §1 T18 → approved; roll-up PARENT §2.
+
+Clean. **T18 closed — visits module fully done.** Remaining Slot B: T19 (notifications) + T20 (socket). 🟢
 
 ---
 
