@@ -3065,6 +3065,42 @@ Note: `void db.$disconnect()` — `$disconnect()` returns `Promise<void>`; wrapp
 
 Awaiting PM A ACK.
 
+##### PM A ACK — T05 PLAN APPROVED, proceed to coding (H0 2026-07-02) by PM A (Nanak)
+
+Zero-rebuttal quality. All 6 advisories resolved with concrete pre-PLAN file-read/grep evidence — `feedback_verify_before_act.md` discipline in action across every checkpoint.
+
+**Verified in PLAN**:
+- **Adv #1 (schema fields)** ✓ — 5 target models spot-read with hard limits captured (Department `code` VarChar(8), MenuItem `priceIdr` Decimal(12,2) coerced from integer literals cleanly, KnowledgeEntry `tags` String[]). Optionals identified.
+- **Adv #2 (CHECK constraints)** ✓ — file-read of `prisma/migrations/20260701112000*/migration.sql`, all 19 constraints enumerated, 3 relevant identified, seed values verified compliant:
+  * Department codes match `^[A-Z]{2,8}$` (CON/HSK/FNB/ENG/FO — 2-3 chars, uppercase Latin only)
+  * `price_idr ≥ 0` (all 10 items 15000-120000)
+  * `prep_minutes IS NULL OR ≥ 0` (skipping optional → NULL → passes)
+  Other 16 constraints irrelevant (no Guest/Visit/Ticket/Notification/WaTemplate/FeatureFlag/Billing rows in scope).
+  **This is a REJECT-SUBMIT prevented** — pre-PLAN grep caught what would have been a DB-layer failure at seed-run time. Exemplar `verify_before_act` discipline.
+- **Adv #3 (own PrismaClient)** ✓ — `import { PrismaClient } from '@prisma/client'` + `new PrismaClient()`; zero singleton import. `void db.$disconnect()` in `.finally()` reuses the `no-floating-promises` pattern from T-INFRA-01's signal handler (`void shutdown()`) — cross-task consistency.
+- **Adv #4 (idempotent upsert)** ✓ — `update: {}` no-op default with sound rationale (preserves manual dev tweaks; `pnpm seed:refresh` variant can be a future follow-up if needed). Conservative call is correct for dev-only script.
+- **Adv #5 (env var)** ✓ — `process.env.SEED_HOTEL_ID ?? '00000000-0000-4000-8000-000000000001'` matches ASSIGNMENT template; v4 UUID shape verified (`4` at position 13, `8` at position 17).
+- **Adv #6 (Slot B fixture alignment)** ✓ — grep-proven Nathan's HOTEL_A/B + DEPT_1/2 live only in testcontainers (ephemeral, isolated from `hotel_core_dev`). Zero collision. **Bonus non-blocking preemptive alignment**: reusing Nathan's HSK (Housekeeping) + FO (Front Office) codes as friction-reducer for future Satrio shared-seed use. This is model cross-slot hygiene — costs nothing, buys future coherence.
+
+**Design fidelity** ✓ — matches ASSIGNMENT template exactly. UUID scheme (`d0.../ca.../11.../ee...` prefixes visually distinct from Nathan's `aaaa/bbbb/1111/2222`) is a small readability win. Data plan (5 depts + 3 categories + 10 items + 6 KB) is proportionate.
+
+**Scope match** ✓ — 1 file modify (`prisma/seeds/index.ts`), 0 create. Zero touch to singleton, schema, migrations, package.json, src/, docs/, tests, Slot B. HARD constraints all upheld.
+
+**Efficacy datapoint noted (feedback_verify_before_act.md)**: this PLAN is the strongest efficacy evidence yet — 6 advisories → 6 pre-PLAN verifications → 6 concrete resolutions → 0 REJECT-PLAN cycle needed. Pattern is holding under load. Not adding to memory now (already extended after T05 ASSIGNMENT drafting), but tracked mentally as continuing evidence.
+
+**Proceed to implementation on branch `feat/foundation-seed-hotel-core`.**
+
+**SUBMIT expectations (reminders)**:
+- Post-code: `pnpm seed` on empty DB → success + expected row counts (1 hotel + 5 depts + 3 categories + 10 items + 6 KB) via `psql` or Prisma studio verify
+- 2nd `pnpm seed` run → success + same row counts (idempotency proof)
+- `make check` PASS with unchanged 160/1/161 test:unit (seed changes don't affect app code)
+- `git diff main -- prisma/schema.prisma prisma/migrations/ package.json pnpm-lock.yaml src/` = empty
+- File-level drift scan on `prisma/seeds/index.ts` clean (0 `any`, 0 `console.log/info/debug`, 0 default export; `console.warn/error` + `throw new Error` at top-level main OK per script exception)
+- Own PrismaClient verified by absence of `@core/prisma/prisma-client` import in final file
+- Silent-ratification note included in file JSDoc header
+
+Ship it.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
