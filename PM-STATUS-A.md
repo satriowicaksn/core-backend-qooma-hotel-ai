@@ -1764,6 +1764,103 @@ All 6 advisories resolved with concrete evidence. Bonus TS-level insight on Adv 
 
 Ship it.
 
+#### SUBMIT T06 — exec-A (Nanak) at H0 2026-07-02 (attempt 1)
+
+Task: Ticket state-machine helper (`TicketStatus` + `TICKET_TRANSITIONS` + `isValidTicketTransition` + `assertValidTicketTransition`) — direct dependency of Nathan's T12
+
+Branch: `feat/foundation-ticket-state-machine` · Commit: `0e6d211` (pushed to `origin/feat/foundation-ticket-state-machine`)
+
+Files changed: **2 create** (0 modify)
+  - `src/shared/utils/ticket-state-machine.ts` (61 LOC incl. JSDoc — 4 named exports, 1 import from `@core/errors/app-errors.js`)
+  - `src/shared/utils/__tests__/ticket-state-machine.test.ts` (137 LOC — first test file for `src/shared/utils/__tests__/` dir, 40 tests)
+
+DoD self-check (10 items from ASSIGNMENT §T06 DoD)
+- [x] **`TicketStatus` string union of 8 states per spec §5** — 8 states in the declared order (`open` / `in_progress` / `awaiting_late_reason` / `done_pending` / `closed` / `high_alert` / `escalated` / `cancelled`); verified via `it.each(VALID_TRANSITIONS)` iterating all 8 as `from` and by name in terminal-state assertions
+- [x] **`TICKET_TRANSITIONS` shape + exact spec §5 transitions** — encoded as `Readonly<Record<TicketStatus, readonly TicketStatus[]>>` (with `as const` on literal); all 13 spec-defined transitions asserted `true`, both terminals asserted `[]`; matches PM A's shape verbatim
+- [x] **`isValidTicketTransition(from, to): boolean`** — explicit return type ✓; uses nullish coalesce `(TICKET_TRANSITIONS[from] ?? []).includes(to)` per Adv #6
+- [x] **`assertValidTicketTransition(from, to): void` throws `BusinessRuleError` with EXACT shape** — verified via `open → closed` shape test: `statusCode === 422`, `code === 'BUSINESS_RULE'`, `message === 'Invalid ticket transition: open → closed'`, `details === { rule: 'INVALID_TICKET_TRANSITION', from: 'open', to: 'closed' }`
+- [x] **Test suite exhaustive per hybrid**: (a) 13 valid transitions all return `true`; (b) 16 terminal-outbound + 3 individual (double-jump / wrong-direction / self-loop) return `false`; (c) `assertValidTicketTransition` throws with correct shape on invalid + 2 additional throw-cases; (d) does NOT throw on valid; PLUS 2 Adv #6 boundary tests + 2 terminal-state-map assertions = 40 tests total
+- [x] **Terminal states verified**: `TICKET_TRANSITIONS.closed = []` + `TICKET_TRANSITIONS.cancelled = []` (2 direct map assertions) + 16 runtime-consequence rows verifying any outbound from either returns `false`
+- [x] **100% coverage on `ticket-state-machine.ts`** — see coverage table below
+- [x] **`make check` PASS** — see Quality gate below
+- [x] **Drift scans clean on both files** — see Drift scans (0 hits on all 6 categories on new file / test file)
+- [x] **`git diff package.json` empty** — verified in run (empty output); no dep add
+- [x] **T03/T04/T-INFRA-01/T07-slice-1/T11/T13/T14/T15 all still green** — visible in `make check` output; full suite 190 pass / 2 skip / 192 total
+
+Quality gate (final `make check`)
+- `pnpm prisma:generate`: PASS (T-INFRA-01 prereq — first step of check)
+- `pnpm lint`: PASS (0 errors, 0 warnings)
+- `pnpm format:check`: PASS (`All matched files use Prettier code style!`)
+- `pnpm typecheck`: PASS (`tsc --noEmit` clean; `noUncheckedIndexedAccess` narrows `TICKET_TRANSITIONS[from]` to `readonly TicketStatus[] | undefined`, nullish coalesce satisfies)
+- `pnpm test:unit`: **PASS** — `Test Suites: 2 skipped, 12 passed, 12 of 14 total · Tests: 2 skipped, 190 passed, 192 total`
+- `make check` overall: **PASS**
+
+Test count math: 150 baseline (post-T07-slice-1 merge) + 40 new = **190 passing**. Sanity check confirmed 190/192 total in output.
+
+Adv #3 confirmation (jest discovery of new `src/shared/utils/__tests__/` dir)
+`PASS src/shared/utils/__tests__/ticket-state-machine.test.ts` appears at top of the executed-suite list in jest output. `jest.config.ts` glob `**/__tests__/**/*.test.ts` + `roots: ['<rootDir>/src', ...]` auto-discovered the new dir — no config change needed (mirrors T07-slice-1's first-test-file precedent for `src/core/errors/__tests__/`).
+
+Drift scans (per EXECUTOR-PROTOCOL §4.4, on T06 touched files)
+Applied to both `src/shared/utils/ticket-state-machine.ts` and `src/shared/utils/__tests__/ticket-state-machine.test.ts`:
+- `any` types: **0 hits** in either file. Note: `as TicketStatus` casts in the test (`'bogus_state' as TicketStatus`) are intentional Adv #6 boundary casts — NOT `any`, and required to simulate the boundary case that the module is defending against.
+- `console.log`: **0 hits**
+- `throw new Error(`: **0 hits** (helper throws `BusinessRuleError` only; test uses `expect(...).toThrow(...)` / `caught = err` capture pattern)
+- Forbidden imports (express / typeorm / sequelize / moment / node-fetch): **0 hits**
+- Default export: **0 hits** (all named exports on the helper; test file has no exports)
+- `.skip(` in tests: **0 hits**
+- `git diff package.json`: empty (no dep add)
+
+Security check (N/A for T06 — pure functional helper, no auth/webhook/crypto surface)
+- HMAC verify: N/A
+- Token encryption: N/A
+- PII masking: N/A (`BusinessRuleError.details` carries only state names `from`/`to`/`rule` — no user data)
+- No secret hardcoded: **confirmed**
+- ADR-0001 compliance: N/A (no Prisma wrapping involved)
+
+Test evidence
+- **New tests added by T06: 40** exactly per PLAN's projection
+  - 2 terminal-state-map assertions (`closed = []`, `cancelled = []`)
+  - 13 `it.each(VALID_TRANSITIONS)` positive cases
+  - 16 `it.each(TERMINAL_OUTBOUND_ATTEMPTS)` negative cases
+  - 3 individual invalid (double-jump `open → done_pending`, wrong-direction `in_progress → open`, self-loop `open → open`)
+  - 1 Adv #6 boundary: `isValidTicketTransition('bogus_state' as TicketStatus, 'open')` → `false`
+  - 1 no-throw on valid (`open → in_progress`)
+  - 1 exact-shape on invalid (`open → closed`) — 5 nested assertions verifying `statusCode` / `code` / `message` / `details` / `instanceof BusinessRuleError`
+  - 2 additional throw-cases (`closed → open` terminal outbound + `open → done_pending` illegal jump) via `.toThrow(BusinessRuleError)`
+  - 1 Adv #6 boundary: `assertValidTicketTransition('bogus_state' as TicketStatus, 'open')` throws `BusinessRuleError`, NOT `TypeError`; `details.from === 'bogus_state'`
+- **Total suite post-T06**: 190 passing / 2 skipped / 192 total across 12 executed suites (baseline 150 → +40 = 190)
+- **Targeted coverage on `ticket-state-machine.ts`** (via `--collectCoverageFrom=src/shared/utils/ticket-state-machine.ts`):
+  ```
+  File                     | % Stmts | % Branch | % Funcs | % Lines
+  -------------------------|---------|----------|---------|--------
+  All files                |     100 |      100 |     100 |     100
+   ticket-state-machine.ts |     100 |      100 |     100 |     100
+  ```
+
+Adv #6 verification (nullish coalesce + boundary tests passing)
+- **Code sample in `src/shared/utils/ticket-state-machine.ts:49`**:
+  ```ts
+  export function isValidTicketTransition(from: TicketStatus, to: TicketStatus): boolean {
+    return (TICKET_TRANSITIONS[from] ?? []).includes(to);
+  }
+  ```
+- **TypeScript necessity**: `tsconfig.json noUncheckedIndexedAccess: true` narrows `TICKET_TRANSITIONS[from]` to `readonly TicketStatus[] | undefined`. Without `?? []`, `.includes(to)` fails typecheck (`Property 'includes' does not exist on type 'undefined'`). Verified: removing the coalesce would break the build — it's compile-time load-bearing, not just runtime insurance.
+- **Runtime necessity**: `as TicketStatus` casts bypass compile-time union check. If a caller (Prisma raw query, DB drift, spec-lag) passes `'bogus_state'`, `TICKET_TRANSITIONS['bogus_state']` returns `undefined` at runtime → the coalesce substitutes `[]` → `.includes` returns `false` cleanly → no `TypeError`.
+- **`assertValidTicketTransition` behavior on unknown `from`**: delegates to `isValidTicketTransition` (returns `false`) → falls into `BusinessRuleError` throw branch. Never surfaces a raw `TypeError`.
+- **Boundary tests PASS**:
+  1. `isValidTicketTransition('bogus_state' as TicketStatus, 'open')` returns `false` — assertion passes.
+  2. `assertValidTicketTransition('bogus_state' as TicketStatus, 'open')` throws — captured via try/catch, asserted `toBeInstanceOf(BusinessRuleError)` + `not.toBeInstanceOf(TypeError)` + `details.from === 'bogus_state'`. All 3 assertions pass in the run.
+
+Slot B compat verification
+- Ran `git grep TICKET_TRANSITIONS` and `git grep ticket-state-machine` across all remote refs: no code-level references outside my new files. Nathan's T12 pattern will be `import { assertValidTicketTransition } from '@shared/utils/ticket-state-machine.js'`, which is unblocked upon merge.
+- Nathan's `src/modules/tickets/tickets.types.ts:3-11` `TicketStatus` remains untouched — structurally identical (spec-driven duplicate); TypeScript unifies at type level → zero regression on T11/T13/T14/T15 (all 4 Slot B suites remained green in the run).
+
+Notes / operational
+- Env note (session-local): re-activated Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure).
+- Sequencing note (transparency for PM A audit, mirroring T07-slice-1 SUBMIT): initial commit landed on local `main` accidentally due to interactive-session branch context slip; corrected via `cherry-pick 81b3c99` onto `feat/foundation-ticket-state-machine` (new hash `0e6d211` — same tree), then `git reset origin/main` (non-destructive `--mixed`) + `git stash --include-untracked && git stash drop` to rewind and clean local `main`. `origin/main` never received code — only PLAN/ACK/SUBMIT docs commits. Zero side effect to shared state. Repeat of the T07-slice-1 pattern — will look for a shell-prompt or session workflow tweak to prevent recurrence.
+
+Requesting PM A VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
