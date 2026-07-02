@@ -70,3 +70,19 @@ export interface VisitListResponse {
   readonly data: readonly VisitWire[];
   readonly pageInfo: OffsetPageInfoWire;
 }
+
+export interface VisitDetailResponse {
+  readonly data: VisitWire;
+}
+
+// verify-manual dual-mode payload (parsed). approve → checked_in (+ derived
+// checkout); reject → rejected. guest_name is validate-only (GAP T16-#2 / Q-B-08:
+// no visits column, no cross-module write into guests).
+export type VerifyManualInput =
+  | { readonly mode: 'reject' }
+  | {
+      readonly mode: 'approve';
+      readonly guestName: string;
+      readonly roomNumber: string;
+      readonly nights: number;
+    };

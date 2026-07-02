@@ -7,16 +7,35 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { visitsRoutes } from '../visits.routes.js';
 import type { VisitsService } from '../visits.service.js';
-import type { VisitListResponse } from '../visits.types.js';
+import type { VisitDetailResponse, VisitListResponse } from '../visits.types.js';
 
 const LIST_RESULT: VisitListResponse = {
   data: [],
   pageInfo: { page: 1, pageSize: 20, total: 0, hasMore: false },
 };
+const DETAIL_RESULT: VisitDetailResponse = {
+  data: {
+    id: 'visit-1',
+    guest_id: 'guest-1',
+    check_in: '2026-06-11T06:00:00.000Z',
+    check_out: '2026-06-13T04:00:00.000Z',
+    nights: 2,
+    room_number: '1204',
+    status: 'checked_in',
+    booking_source: null,
+    verification_attempts: 0,
+    special_request: null,
+    satisfaction_score: null,
+    created_at: '2026-06-11T05:00:00.000Z',
+    updated_at: '2026-06-11T05:00:00.000Z',
+  },
+};
 
 interface Recorder {
   listCtx?: TenantContext;
   listQuery?: unknown;
+  verifyId?: string;
+  verifyBody?: unknown;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -25,6 +44,15 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
       recorder.listCtx = ctx;
       recorder.listQuery = rawQuery;
       return Promise.resolve(LIST_RESULT);
+    },
+    verifyManual: (
+      _ctx: TenantContext,
+      id: string,
+      body: unknown,
+    ): Promise<VisitDetailResponse> => {
+      recorder.verifyId = id;
+      recorder.verifyBody = body;
+      return Promise.resolve(DETAIL_RESULT);
     },
   } as unknown as VisitsService;
 
@@ -43,7 +71,13 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
   return app;
 }
 
-const GM: TenantContext = { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin' };
+const GM: TenantContext = {
+  userId: 'user-1',
+  hotelId: 'hotel-1',
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
+const VALID_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('visitsRoutes', () => {
   let app: FastifyInstance;
@@ -73,5 +107,29 @@ describe('visitsRoutes', () => {
     const res = await app.inject({ method: 'GET', url: '/visits' });
     expect(res.statusCode).toBe(401);
     expect(recorder.listCtx).toBeUndefined();
+  });
+
+  it('should forward the visit id + body to the service on verify-manual', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/visits/${VALID_ID}/verify-manual`,
+      payload: { action: 'reject' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(DETAIL_RESULT);
+    expect(recorder.verifyId).toBe(VALID_ID);
+    expect(recorder.verifyBody).toEqual({ action: 'reject' });
+  });
+
+  it('should return 400 when the visit id is not a valid uuid on verify-manual', async () => {
+    app = buildApp(GM, recorder);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/visits/not-a-uuid/verify-manual',
+      payload: { action: 'reject' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(recorder.verifyId).toBeUndefined();
   });
 });

@@ -2,14 +2,16 @@
 // Self-contained: spins its own PG, applies migrations, seeds fixtures. Does not
 // depend on the (still-stubbed) global test-setup harness. Requires Docker.
 //
-// Read-path only (V1). verify-manual tx atomicity / tenant-404 coverage lands with
-// V2–V5 once GAP T16-#4 (422 BusinessRuleError) is resolved.
+// Covers V1 (list read-path) + V2–V5 (verify-manual tx atomicity, transition
+// guard, tenant-404) against real Postgres.
 
 import { execFileSync } from 'node:child_process';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { PrismaClient } from '@prisma/client';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+
+import { BusinessRuleError, NotFoundError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -22,9 +24,24 @@ const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const GUEST_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const GUEST_B = 'dddddddd-cccc-4ccc-8ccc-cccccccccccc';
 
-const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };
-const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };
-const superAdmin: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: true, role: 'super_admin' };
+const gmA: TenantContext = {
+  userId: 'user-a',
+  hotelId: HOTEL_A,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
+const gmB: TenantContext = {
+  userId: 'user-b',
+  hotelId: HOTEL_B,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
+const superAdmin: TenantContext = {
+  userId: 'user-s',
+  hotelId: HOTEL_A,
+  isSuperAdmin: true,
+  role: 'super_admin',
+};
 
 let container: StartedPostgreSqlContainer;
 let db: PrismaClient;
@@ -163,5 +180,55 @@ describe('VisitsService.list (integration)', () => {
         'verification_attempts',
       ].sort(),
     );
+  });
+});
+
+describe('VisitsService.verifyManual (integration)', () => {
+  // visit 0 = pending_verification, check_in 2026-06-11T00:00:00Z.
+  it('should approve a pending visit → checked_in with derived checkout persisted', async () => {
+    const res = await service.verifyManual(gmA, visitId(0), {
+      guest_name: 'Budi Santoso',
+      room_number: '1204',
+      nights: 2,
+    });
+    expect(res.data.status).toBe('checked_in');
+    expect(res.data.room_number).toBe('1204');
+    expect(res.data.nights).toBe(2);
+    expect(res.data.check_out).toBe('2026-06-13T11:00:00.000Z');
+
+    const row = await db.visit.findUnique({ where: { id: visitId(0) } });
+    expect(row?.status).toBe('checked_in');
+    expect(row?.checkOut?.toISOString()).toBe('2026-06-13T11:00:00.000Z');
+  });
+
+  it('should reject a pending visit → rejected without setting room/nights/checkout', async () => {
+    const res = await service.verifyManual(gmA, visitId(1), { action: 'reject' });
+    expect(res.data.status).toBe('rejected');
+    expect(res.data.room_number).toBeNull();
+    expect(res.data.check_out).toBeNull();
+  });
+
+  it('should reject a non-pending visit with BusinessRuleError (422) and not mutate it', async () => {
+    // visit 2 = checked_in.
+    await expect(
+      service.verifyManual(gmA, visitId(2), { action: 'reject' }),
+    ).rejects.toBeInstanceOf(BusinessRuleError);
+    const row = await db.visit.findUnique({ where: { id: visitId(2) } });
+    expect(row?.status).toBe('checked_in');
+  });
+
+  it('should mask a cross-tenant visit as NotFoundError (404) and leave it untouched', async () => {
+    // visit 99 belongs to hotel B; gmA must not resolve it.
+    await expect(
+      service.verifyManual(gmA, visitId(99), { action: 'reject' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    const row = await db.visit.findUnique({ where: { id: visitId(99) } });
+    expect(row?.status).toBe('pending_verification');
+  });
+
+  it('should raise NotFoundError when the visit does not exist', async () => {
+    await expect(
+      service.verifyManual(gmA, visitId(500), { action: 'reject' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
