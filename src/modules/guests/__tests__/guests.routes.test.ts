@@ -90,7 +90,12 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
   return app;
 }
 
-const GM: TenantContext = { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin' };
+const GM: TenantContext = {
+  userId: 'u-1',
+  hotelId: 'hotel-1',
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
 const ID = '11111111-1111-4111-8111-111111111111';
 
 describe('guestsRoutes', () => {

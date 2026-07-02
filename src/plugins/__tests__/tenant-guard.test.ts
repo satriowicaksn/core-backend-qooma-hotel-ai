@@ -45,6 +45,12 @@ describe('deriveTenantContext', () => {
     const tenant = deriveTenantContext(user);
     expect(tenant.deptId).toBeUndefined();
   });
+
+  it('should copy userId from SessionUser to TenantContext', () => {
+    const user: SessionUser = { userId: 'u-42', hotelId: 'h-1', role: 'gm_admin' };
+    const tenant = deriveTenantContext(user);
+    expect(tenant.userId).toBe('u-42');
+  });
 });
 
 describe('assertHotelOwnership', () => {

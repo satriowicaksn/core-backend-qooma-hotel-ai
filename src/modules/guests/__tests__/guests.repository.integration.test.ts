@@ -25,8 +25,18 @@ const TICKET_A2 = 'e2222222-eeee-4eee-8eee-eeeeeeeeeeee';
 const TICKET_OTHER = 'e3333333-eeee-4eee-8eee-eeeeeeeeeeee';
 const TICKET_B = 'e4444444-eeee-4eee-8eee-eeeeeeeeeeee';
 
-const gmA: TenantContext = { hotelId: HOTEL_A, isSuperAdmin: false, role: 'gm_admin' };
-const gmB: TenantContext = { hotelId: HOTEL_B, isSuperAdmin: false, role: 'gm_admin' };
+const gmA: TenantContext = {
+  userId: 'u-1',
+  hotelId: HOTEL_A,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
+const gmB: TenantContext = {
+  userId: 'u-1',
+  hotelId: HOTEL_B,
+  isSuperAdmin: false,
+  role: 'gm_admin',
+};
 
 let container: StartedPostgreSqlContainer;
 let db: PrismaClient;

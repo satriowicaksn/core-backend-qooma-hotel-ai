@@ -18,7 +18,13 @@ import { buildGuestListWhere, buildGuestMessagesWhere, GuestsService } from '../
 import type { GuestDetailRow, GuestRow, TicketMessageRow, VisitRow } from '../guests.types.js';
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
-  return { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin', ...overrides };
+  return {
+    userId: 'u-1',
+    hotelId: 'hotel-1',
+    isSuperAdmin: false,
+    role: 'gm_admin',
+    ...overrides,
+  };
 }
 
 function makeGuest(overrides: Partial<GuestRow> = {}): GuestRow {

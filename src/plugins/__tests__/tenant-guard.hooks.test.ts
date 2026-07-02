@@ -42,7 +42,7 @@ describe('configureTenantGuardHooks', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      tenant: { hotelId: 'h-1', isSuperAdmin: false, role: 'gm_admin' },
+      tenant: { userId: 'u-1', hotelId: 'h-1', isSuperAdmin: false, role: 'gm_admin' },
     });
 
     await app.close();

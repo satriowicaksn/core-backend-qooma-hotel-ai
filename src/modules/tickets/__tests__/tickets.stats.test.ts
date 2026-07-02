@@ -12,7 +12,13 @@ import type { TicketListRow } from '../tickets.types.js';
 const NOW = new Date('2026-06-11T12:00:00.000Z');
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
-  return { hotelId: 'hotel-1', isSuperAdmin: false, role: 'gm_admin', ...overrides };
+  return {
+    userId: 'u-1',
+    hotelId: 'hotel-1',
+    isSuperAdmin: false,
+    role: 'gm_admin',
+    ...overrides,
+  };
 }
 
 function makeRow(overrides: Partial<TicketListRow> = {}): TicketListRow {
