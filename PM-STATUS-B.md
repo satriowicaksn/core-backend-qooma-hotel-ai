@@ -1448,6 +1448,39 @@ Clean. **ACK — create `feat/visits-manual-create`, implement.** No required fi
 
 Proceed. 🟢
 
+### SUBMIT T18 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Manual visit create — `POST /api/visits` (existing guest → `pending_verification`)
+Branch: **`feat/visits-manual-create`** (off latest main incl. merged T16+T17; pushed; commit `cccf28b`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 8 modified, **all** in `src/modules/visits/` (0 outside; reuses `serializeVisit`, guest read via Prisma — no guests-module import)
+  - `visits.schema.ts` (+`parseCreateVisit`, `.strict()`), `visits.types.ts` (+`CreateVisitInput`), `visits.repository.ts` (+`findGuestById`/`createVisit`), `visits.service.ts` (+`create` + `onVerificationPending` seam), `visits.routes.ts` (+`POST /visits` → 201), + 3 test files
+
+DoD self-check
+- [x] **MV1** — creates a `Visit` with `hotelId = ctx.hotelId` (session, **never** body), `guest_id` from body, `status` defaults to `pending_verification` (DB default, not sent), optional `check_in`(req)/`nights`/`room_number`/`booking_source`/`special_request`. Unit asserts `createVisit` got `ctx.hotelId`; integration asserts persisted row.
+- [x] **MV2** — `guest_id` must exist AND belong to tenant: `findGuestById` → `NotFoundError('Guest')`; `assertHotelOwnership(ctx, guest.hotelId)` → cross-tenant guest = **404 no-create** (integration asserts count unchanged), super_admin bypass. Guest read via Prisma; no guests-module import.
+- [x] **MV3** — body zod `.strict()`: `guest_id` uuid (req), `check_in` ISO (req), `nights?` **1–30** (DDL), `room_number?` (≤16), `booking_source?` enum (`BOOKING_SOURCES`), `special_request?`. Body `hotel_id`/`status` → `ValidationError`. No `check_out` on create.
+- [x] **MV4** — tenant guard + gm_admin (super_admin bypass); `verification:pending` via named no-op seam `onVerificationPending` (T20 wires real emit); no actor column on `visits` (seam only).
+- [x] **MV5** — unit (body validation, guest-scope, create path) + integration (own-tenant guest → pending_verification persisted; cross-tenant guest → 404 no-create; non-existent guest → 404; invalid body → ValidationError; tenant isolation). ≥80% cov. `make check`+integration green. **T16/T17 tests green.**
+
+Quality gate
+- `make check`: **PASS** (**230 passed, 1 skipped** template placeholder; T16/T17 visits regression green)
+- `make test-integration`: **PASS** (visits **23** [T16 12 + T17 7 + T18 4] via testcontainers)
+
+Drift scans (src/modules/visits): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- `hotelId` from session never body (anti-tenant-spoof); cross-tenant guest masked 404 (§7, no-create verified); body `.strict()` rejects `hotel_id`/`status`. `AppError` only; correlationId; no secrets/PII in logs.
+
+Test evidence
+- Unit/component: **57** (service 48 + routes 9). Integration: **23**. **Changed-file line coverage 96.75%** (checkout 100 / repo 100 / routes 97.5 / schema 100 / serializer 100 / service 93.33 / types 100).
+- Sample: `POST /api/visits { guest_id, check_in:'2026-06-20T06:00:00Z', nights:3, room_number:'1501', booking_source:'direct', special_request:'high floor' }` → `201 { data: { status:'pending_verification', room_number:'1501', special_request:'high floor', check_out:null } }`. Cross-tenant guest → `404 { error:{ code:'NOT_FOUND' } }` (no row created).
+
+Notes
+- **Q-B-13** shipped as ruled: response = created `Visit` (`{ data: VisitWire }`); `special_request` persisted; `nights` 1–30. If FE MSW's POST returns guest+`visits[]`, one-file serializer swap (read via Prisma, no guests-module import).
+- Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched). **Completes the visits trio (T16+T17+T18).**
+
+Requesting PM B VERDICT.
+
 ---
 
 <!--
