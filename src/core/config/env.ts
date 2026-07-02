@@ -56,8 +56,16 @@ const EnvSchema = z.object({
   // Service-specific (tambah field service di sini, contoh):
   // ====================================================================
   // ANTHROPIC_API_KEY: z.string().min(1),
-  // S3_BUCKET: z.string().min(1),
   // UPSTREAM_API_BASE: z.string().url(),
+
+  // Object storage (T08 — fail-lazy per S3Adapter design; all optional so
+  // app boots without S3 creds. Consumer adapter throws ExternalServiceError
+  // at first upload/delete if the required subset is missing.)
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
