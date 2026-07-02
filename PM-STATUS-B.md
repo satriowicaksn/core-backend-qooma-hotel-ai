@@ -43,7 +43,7 @@
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
 | T16 | Visits list + verify-manual | ✅ approved (full V1–V6) | `feat/visits-list-verify` | ✅ **merged (PR #6)** |
 | T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
-| T19 | Notifications CRUD | 🟡 assigned (awaiting PLAN) — new `notifications/` module | `feat/notifications-crud` | — |
+| T19 | Notifications CRUD | 🟡 wip (PLAN ACK'd) — new `notifications/` module | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ✅ approved | `feat/visits-reject-override` | ✅ **merged (PR #7)** |
 | T18 | Manual visit create | ✅ approved | `feat/visits-manual-create` | ✅ **merged (PR #8)** |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
@@ -1580,6 +1580,27 @@ __tests__/notifications.repository.integration.test.ts  integration (≥2 users)
 
 Awaiting PM B ACK (PLAN + Q-B-07 envelopes + NT2 field-list confirm). Not coding before ACK.
 
+##### PM B ACK — T19 PLAN APPROVED (2026-07-02, H14)
+Strong PLAN — the per-user scope + markRead idempotency are exactly right. **ACK — create `feat/notifications-crud`, implement.**
+
+**Q-B-07 — all four RATIFIED** (provisional on FE MSW; envelope bodies advisory per the optimistic-ops note):
+- (a) list `{ data, pageInfo: { nextCursor, hasMore } }` (cursor, §2.7) ✓
+- (b) unread-count `{ data: { count } }` ✓
+- (c) mark-all-read `{ data: { updated } }` (count flipped) ✓
+- (d) markRead `{ data: NotificationWire }` ✓
+
+**Field-list — one adjustment (INCLUDE `user_id` + `hotel_id`).** §1.6's example shows them; they're the requester's own (zero leak, zero cost), and matching the documented example is safer than omitting. So serialize `{ id, hotel_id, user_id, type, title, body, link, metadata, is_read, read_at, created_at }`. (Still FE-MSW-tiebroken + serializer-isolated if it wants fewer.)
+
+**Endorsed:**
+- **NT1 per-user scope** `{ userId: ctx.userId, hotelId: ctx.hotelId }` on every endpoint, **NO super_admin bypass** (personal data) — correct, this is the crux.
+- **NT4 markRead idempotency**: guarded `updateMany` + `findFirst` ownership check → `NotFoundError` 404 for non-owned (anti-enumeration, not 403); already-read → 200 preserving `read_at`. Nice.
+- **N3**: no gm_admin/role gate in the handler — all-authenticated pass; role gating is T04's preHandler job. Routes require `req.tenant` (401 pre-auth). Correct.
+- cursor keyset OR-decomposition (N1) module-local (T-CLEAN-02 later); `AppError` only; no cross-module import.
+
+**At SUBMIT I verify:** NT1–NT6, **per-user isolation** (integration: user A can't see/mark user B's — the make-or-break test), unread-count accuracy, mark-all idempotency, cross-tenant isolation, envelopes = ratified, `make check`+integration, ≥80% cov, drift 0.
+
+Proceed. 🟢
+
 ---
 
 <!--
@@ -1708,7 +1729,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-B-12        | T17 `/reject` body + `/approve-manual` nights. | T17 · §1.3 | **RESOLVED (PM ratify) 2026-07-02** | (a) `/reject` = no body (`.strict()`; reason deferred to audit table Q-B-09). (b) `approve-manual` `nights` OPTIONAL (derive checkout if present, else null). Provisional on FE MSW. |
 | Q-B-13        | T18 `POST /visits` body + response shape + special_request + nights range. | T18 · §1.3 / MVP §5 AC | **RESOLVED (PM ratify) 2026-07-02** | (a) body `{guest_id,check_in,nights?,room_number?,booking_source?,special_request?}`. (b) response `{data: VisitWire}` (created Visit) — **AC discrepancy noted** (§5 says "guest+visit"); FE MSW tiebreaker → serializer swap if needed (no guests-module import). (c) persist special_request. (d) nights 1–30 on create. |
 | Q-B-05        | Canonical `Visit` wire shape (T14 embeds, T16 owns). | T14/T16 · §2.3 DDL | **RESOLVED (PM ratify) 2026-07-01** | Pinned in §2 (13 fields from DDL §2.3). T16 owns serializer; T14 embeds same shape module-local. Unblocks T14 ∥ T16 parallel. Provisional on FE MSW. |
-| Q-B-07        | Notifications list + `unread-count` envelope. | T19 · §1.9 | **open** | exec-B propose per §2.7 + FE MSW in PLAN. |
+| Q-B-07        | Notifications list + `unread-count` + mark-all + markRead envelopes + field-list. | T19 · §1.6 | **RESOLVED (PM ratify) 2026-07-02** | list `{data,pageInfo:{nextCursor,hasMore}}`; unread-count `{data:{count}}`; mark-all `{data:{updated}}`; markRead `{data:NotificationWire}`. Field-list INCLUDES `user_id`+`hotel_id` (match §1.6 example). Provisional on FE MSW. |
 
 ---
 
