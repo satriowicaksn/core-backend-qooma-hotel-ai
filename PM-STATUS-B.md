@@ -1313,6 +1313,39 @@ Excellent — the optimistic-concurrency race-check is a nice touch beyond the a
 ##### PM B RATIFY — T-INFRA-02 Slot-B fixture edits (2026-07-02)
 T-INFRA-02 (Slot A, DEP-5) added `userId` to `TenantContext` and updated 5 of my test fixtures (tickets + guests `__tests__`) to include it. Reviewed the diff: **purely `userId`-additive to the `ctx` literals, no change to my assertions/logic**; `pnpm typecheck` clean on main; PM A reported all Slot-B suites green. **Ratified** (per PM A's "PM B ratify pending" note, PARENT §1 T-INFRA-02).
 
+### SUBMIT T17 — exec-B (Nathan) at H2 (2026-07-02) (attempt 1)
+
+Task: Visit reject + failed_3x override — `PATCH /api/visits/:id/reject` + `PATCH /api/visits/:id/approve-manual`
+Branch: **`feat/visits-reject-override`** (off latest main incl. merged T16; pushed; commit `cb705f4`) — **PO merges to main manually**. Code NOT on main.
+Files changed: 7 modified, **all** in `src/modules/visits/` (0 outside; reuses merged T16 units — no fork)
+  - `visits.service.ts` (**R3: `VISIT_TRANSITIONS` map + `assertVisitTransition`** replacing `assertPendingVerification`; `reject()` + `approveManual()` + shared `runTransition`), `visits.schema.ts` (+`parseApproveManual`), `visits.types.ts` (+`ApproveManualInput`), `visits.routes.ts` (+2 PATCH routes), + 3 test files
+
+DoD self-check
+- [x] **R1** — `/reject`: `pending_verification → rejected`, reuses `verifyManualTx` (status-guarded, `from: PENDING`) + `count===0` re-resolve (404/422). Non-pending source → `BusinessRuleError(422)` `INVALID_VISIT_TRANSITION`. Integration: reject checked_in → 422 no-mutate.
+- [x] **R2** — `/approve-manual`: **`failed_verification → checked_in` only** (`from: FAILED` guard; non-failed source → 422). `nights` **optional** (Q-B-12) → `deriveCheckout` when present, else `check_out`/`nights` stay null. `guest_name`/`room_number` required; `guest_name` **validate-only** (no cross-write to `guests`, Q-B-08).
+- [x] **R3** — generalized the transition guard into module-local `VISIT_TRANSITIONS = { pending_verification:[checked_in,rejected], failed_verification:[checked_in] }` + `assertVisitTransition(from,to)` (NOT tickets' state-machine; map scoped to manual transitions only). Two-layer guard (pre-tx assert on `row.status` + fixed expected-source in the tx). **T16 verify-manual byte-identical → its 28 unit + 5 integration tests stay green.**
+- [x] **R4** — tenant guard (`assertHotelOwnership` → cross-tenant 404); gm_admin (super_admin bypass); audit + `onVerificationResolved` no-op seams fire with `actorUserId=ctx.userId` (T20 wires real emit).
+- [x] **R5** — unit (transition map, approve-manual checkout ±nights, reject/approve 422/404) + integration (reject pending→rejected, approve-manual failed→checked_in ±nights, invalid-source→422 no-mutate, cross-tenant→404 no-mutate, atomicity). ≥80% cov. `make check`+integration green.
+
+Quality gate
+- `make check`: **PASS** (**219 passed, 1 skipped** template placeholder; **T16 verify-manual regression green**)
+- `make test-integration`: **PASS** (visits **19** [12 T16 + 7 T17] via testcontainers)
+
+Drift scans (src/modules/visits): `any` 0 · `console.*` 0 · `throw new Error(` 0 · forbidden imports 0 · default export 0 · `.skip` 0.
+
+Security check
+- Per-endpoint source-restricted transitions; cross-tenant masked 404 (§7); optimistic-concurrency guarded update (no lost writes / partial state). `AppError` only; correlationId; no secrets/PII in logs.
+
+Test evidence
+- Unit/component: **46** (service 39 + routes 7). Integration: **19**. **Changed-file line coverage 96.37%** (checkout 100 / repo 100 / routes 97.14 / schema 100 / serializer 100 / service 92.68 / types 100).
+- Sample: `PATCH /api/visits/:id/reject` (no body) → `200 { data: { …status:'rejected' } }`. `PATCH …/approve-manual { guest_name, room_number, nights:2 }` on a `failed_verification` visit → `200 { data: { status:'checked_in', check_out:'…T11:00:00Z' } }`. Non-failed source → `422 { error:{ code:'BUSINESS_RULE', details:{ rule:'INVALID_VISIT_TRANSITION' } } }`.
+
+Notes
+- **Q-B-12** shipped as ruled: `/reject` no body (`.strict()` — route ignores body; the `{action:'reject'}` shape is served by verify-manual per Q-CONTRACT-15); `approve-manual` `nights` optional.
+- Merge posture same as prior: buildable + tested now; live once `api.ts` bootstrap wires `register(visitsRoutes)` (DEP-4, foundation — untouched).
+
+Requesting PM B VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
