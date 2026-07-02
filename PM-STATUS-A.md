@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T07-slice-1 APPROVED (`feat/foundation-business-rule-error` @ `b214743`, awaiting PO merge). PM A pauses + awaits PO direction on next task (T05 seed vs T06 state-machine vs monitor Nathan for next unblock).
-- **Branch (last active task)**: `feat/foundation-business-rule-error` @ `b214743` — awaiting PO merge. Next branch TBD.
-- **Completed**: T01, T02, T03, T04, T-INFRA-01 (all merged to main) · **T07-slice-1** (approved 2026-07-02 H0, awaiting merge)
+- **Active task**: T06 (ticket state-machine helper) — ASSIGNMENT posted §2, awaiting exec-A PLAN. Direct dependency of Nathan's T12 (imminent post-T07-slice-1 merge). T07-slice-1 merged (PO commit `8ebdb9a`).
+- **Branch (current active task)**: `feat/foundation-ticket-state-machine` (per PO branch-per-task policy)
+- **Completed**: T01, T02, T03, T04, T-INFRA-01, T07-slice-1 (all merged to main)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · **T07-slice-1 ✅** · T05 seed · T06 (parallel-friendly, feeds T12) · T07-slice-2+ (deferred on demand) · T08–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T07-slice-1 ✅ · **T06 (assigned, next)** · T05 seed (Opsi C twist pending) · T07-slice-2+ (deferred) · T08–T10 backlog
 
 ---
 
@@ -33,7 +33,7 @@
 | T03 | Tenant-guard middleware (`hotel_id` from session everywhere) | approved | PM A (Nanak) | 3 files: tenant-guard.ts (pure fns) + .types.ts (req.tenant augmentation) + test (14 pass); jest config bonus fix for alias+.js |
 | T04 | RBAC middleware (gm_admin / dept_head / super_admin all-access) + tenant-guard onRequest hooks factory (Option A bundle) | approved | PM A (Nanak) | 5 files (rbac.ts + tenant-guard.hooks.ts + tenant-guard.types.ts modify + 2 tests). 28 tests pass (14 T03 preserved + 11 rbac + 3 hooks). 100% coverage on rbac.ts + tenant-guard.hooks.ts. Branch `feat/foundation-rbac` @ `df5648b` — PO merge pending. Q-B-02 fully resolved. T11 seam FULLY unblocked. |
 | T05 | Seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB) | backlog | —      | After T04 |
-| T06 | Ticket state-machine helper + unit-test the transition table | backlog | —              | Parallel-friendly after T01 |
+| T06 | Ticket state-machine helper + unit-test the transition table | assigned | — | Direct dependency of Nathan's T12. Codifies spec §5 (8 states, ~15 transitions, 2 terminal). Uses T07-slice-1 `BusinessRuleError` + `rule: 'INVALID_TICKET_TRANSITION'`. Home: `src/shared/utils/ticket-state-machine.ts` (pure fn). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
@@ -1500,6 +1500,136 @@ Triage between:
 PM A will pause here + await PO next-task direction (T05 vs T06 vs "wait for Nathan's next unblock").
 
 Ship it.
+
+### ASSIGNMENT T06 — claimed by exec-A (Nanak) at H0 2026-07-02
+- Branch: `feat/foundation-ticket-state-machine` (per PO branch-per-task policy)
+- Routed from: PARENT §1 T06 (issued post T07-slice-1 merge to unblock Nathan's imminent T12)
+- Depends on: T07-slice-1 ✓ merged (`BusinessRuleError` shipped; `rule: 'INVALID_TICKET_TRANSITION'` is the ratified `details.rule` value per spec §5 line 74). T01-T04 + T-INFRA-01 ✓ merged (foundation healthy).
+- Downstream unblocks: **T12** (ticket status transition + reroute — direct consumer, likely Nathan's next start post T07-slice-1 merge). Also feeds T13 (stats — needs to know valid transitions for KPI computation) if Nathan wants to consume.
+- Spec / reference (WAJIB read before PLAN):
+  - `docs/spec/02-hotel-core.md §5` lines 50-74 — full state machine definition (8 states, ~15 transitions, terminal states, `422 BUSINESS_RULE code INVALID_TICKET_TRANSITION` on rejection)
+  - `src/core/errors/app-errors.ts` — `BusinessRuleError` class (T07-slice-1 shipped `8ebdb9a`)
+  - `src/modules/tickets/tickets.types.ts:3-11` — Nathan's existing `TicketStatus` declaration (Slot B canonical for tickets domain; NOT exported via barrel)
+  - `CLAUDE.md §3` — folder structure rules (pure helpers → `src/shared/utils/`)
+  - `CLAUDE.md §5.4` — `AppError` subclass mandatory (no `throw new Error`)
+
+#### PM A notes untuk exec-A
+
+**Scope**
+
+Single new file `src/shared/utils/ticket-state-machine.ts` with 4 named exports + one fresh test file. Pure functions, no framework coupling, no DB, no side effects.
+
+Class/type shape:
+```ts
+export type TicketStatus =
+  | 'open'
+  | 'in_progress'
+  | 'awaiting_late_reason'
+  | 'done_pending'
+  | 'closed'
+  | 'high_alert'
+  | 'escalated'
+  | 'cancelled';
+
+export const TICKET_TRANSITIONS: Readonly<Record<TicketStatus, readonly TicketStatus[]>> = {
+  open: ['in_progress', 'cancelled'],
+  in_progress: ['awaiting_late_reason', 'done_pending', 'escalated', 'cancelled'],
+  awaiting_late_reason: ['done_pending'],
+  done_pending: ['closed', 'high_alert', 'cancelled'],
+  high_alert: ['in_progress'],
+  escalated: ['in_progress', 'cancelled'],
+  closed: [],       // terminal
+  cancelled: [],    // terminal
+} as const;
+
+export function isValidTicketTransition(from: TicketStatus, to: TicketStatus): boolean {
+  return TICKET_TRANSITIONS[from].includes(to);
+}
+
+export function assertValidTicketTransition(from: TicketStatus, to: TicketStatus): void {
+  if (!isValidTicketTransition(from, to)) {
+    throw new BusinessRuleError(`Invalid ticket transition: ${from} → ${to}`, {
+      rule: 'INVALID_TICKET_TRANSITION',
+      from,
+      to,
+    });
+  }
+}
+```
+
+That's the whole surface. ~40 LOC + JSDoc.
+
+**Design decision: Slot A ships own `TicketStatus`** (structurally-identical duplicate of Nathan's `src/modules/tickets/tickets.types.ts:3-11`)
+
+Rationale:
+- TypeScript string literal unions are structural, not nominal → Slot A's `TicketStatus` and Nathan's `TicketStatus` are TYPE-COMPATIBLE (unify at type level). Zero runtime friction.
+- Nathan's declaration is INTERNAL to tickets module (not exported via barrel `src/modules/tickets/index.ts`); Slot A cannot cleanly import it without violating CLAUDE.md §3 cross-module rule.
+- Both mirror spec §5 as authoritative source; if either drifts, tests catch it.
+- Nathan can optionally consolidate later (import Slot A canonical + remove his local) as a T-CLEAN cleanup — out of T06 scope.
+- Alternative "make it generic" (helper takes any string union) was considered but rejected — state-machine helper without the ticket state-machine data isn't useful; T06 spec explicitly says "state-machine helper + unit-test the transition table".
+
+**HARD constraints (WAJIB — pelanggaran = REJECT)**
+- **No new deps** — `BusinessRuleError` already shipped via T07-slice-1; imported from `@core/errors/app-errors.js`
+- **No `any` / `console.log` / `throw new Error(`** — well-formed subclass throw via `BusinessRuleError` ✓
+- **No default export** — 4 named exports
+- **Do NOT modify Nathan's `src/modules/tickets/*` files** — Slot B territory. Slot A ships parallel canonical; Nathan consolidates on his own terms later.
+- **Do NOT modify T07-slice-1's error classes** — reuse `BusinessRuleError` as-is
+- **Do NOT touch `src/plugins/*`** (T03/T04 files)
+- **Do NOT touch other `shared/utils/*` files** (crypto.ts / masking.ts / test-setup.ts)
+- **Pure function design** — no side effects, no I/O, no time-of-day dependency
+- **Explicit return types** for both public fns (`: boolean` and `: void`)
+
+**Files to create** (2, both new; 0 modify)
+- `src/shared/utils/ticket-state-machine.ts` — helper + type + table (~40 LOC + JSDoc)
+- `src/shared/utils/__tests__/ticket-state-machine.test.ts` — first test file for this dir (precedent-setting like T07-slice-1 did for `src/core/errors/__tests__/`)
+
+**T06 DoD**
+- [ ] `TicketStatus` string union of 8 states per spec §5 (`open` / `in_progress` / `awaiting_late_reason` / `done_pending` / `closed` / `high_alert` / `escalated` / `cancelled`) — verified via test
+- [ ] `TICKET_TRANSITIONS` Readonly<Record<TicketStatus, readonly TicketStatus[]>> map with **exactly** these transitions per spec §5 lines 52-72:
+  - open → [in_progress, cancelled]
+  - in_progress → [awaiting_late_reason, done_pending, escalated, cancelled]
+  - awaiting_late_reason → [done_pending]
+  - done_pending → [closed, high_alert, cancelled]
+  - high_alert → [in_progress]
+  - escalated → [in_progress, cancelled]
+  - closed → [] (terminal)
+  - cancelled → [] (terminal)
+- [ ] `isValidTicketTransition(from, to): boolean` pure fn — explicit return type
+- [ ] `assertValidTicketTransition(from, to): void` throws `BusinessRuleError` when invalid, with EXACT shape: `statusCode = 422`, `code = 'BUSINESS_RULE'`, `details = { rule: 'INVALID_TICKET_TRANSITION', from, to }`
+- [ ] Test suite exhaustive: (a) every valid transition returns `true` from `isValidTicketTransition` (all ~15 spec-defined pairs); (b) every INVALID transition returns `false` (from×to matrix minus allowed = ~49 disallowed pairs, cover a representative subset + all terminal-state-outbound + all "wrong direction" pairs); (c) `assertValidTicketTransition` throws `BusinessRuleError` with correct shape on invalid; (d) `assertValidTicketTransition` does NOT throw on valid
+- [ ] Terminal states verified: `TICKET_TRANSITIONS.closed` and `TICKET_TRANSITIONS.cancelled` are BOTH `[]`; any transition FROM either → invalid
+- [ ] Test coverage 100% on `ticket-state-machine.ts` (target file focused, not global)
+- [ ] `make check` PASS (lint + format:check + typecheck + test:unit)
+- [ ] Drift scans clean on both files (0 `any`, 0 `console.log`, 0 `throw new Error(`, 0 default export)
+- [ ] `git diff package.json` empty (no dep add)
+- [ ] T03/T04/T07-slice-1/T-INFRA-01 + Nathan's T11/T13/T14/T15 tests all still green — verified via full test suite
+
+**Advisory PLAN checks (proactive gotcha flags — 6 items)**
+
+1. **TicketStatus duplication awareness**: Nathan already declares `TicketStatus` at `src/modules/tickets/tickets.types.ts:3-11` mirroring spec §5 (8 states). Slot A's declaration will be structurally-identical string union — TypeScript unifies them at type level (no runtime conflict). Advisory: acknowledge in PLAN as spec-driven duplicate; do NOT try to import from Nathan's module (barrel doesn't export TicketStatus, and cross-module internal import violates CLAUDE.md §3). If exec-A prefers a different resolution (e.g., escalate to Nathan for canonicalization first), route via PLAN GAP → PM A coordinates.
+
+2. **`BusinessRuleError` availability check**: T07-slice-1 shipped it via PO merge `8ebdb9a`. Import path `@core/errors/app-errors.js` should work. Verify via `grep 'export class BusinessRuleError' src/core/errors/app-errors.ts` before writing code (defensive — should return 1 hit). If not found, dependency assumption wrong → escalate immediately.
+
+3. **First test file in `src/shared/utils/__tests__/`**: precedent-setting like T07-slice-1 did for `src/core/errors/__tests__/`. Existing `jest.config.ts` glob `**/__tests__/**/*.test.ts` should auto-discover — no config change. Verify signal via test suite listing in first run (jest output includes `PASS src/shared/utils/__tests__/ticket-state-machine.test.ts`). Note in SUBMIT if missing.
+
+4. **Exhaustive transition matrix coverage**: 8 states × 8 targets = 64 potential from→to pairs, ~15 allowed + ~49 disallowed. Options for test structure:
+   - **Fully exhaustive**: table-driven test iterating all 64 pairs; asserts each matches expected valid/invalid. Comprehensive but verbose.
+   - **Representative**: individual `it` per spec §5 rule (positive) + a few key negatives (terminal outbound, wrong-direction pairs, illegal double-jumps). Cleaner.
+   - **Hybrid**: table-driven for validity check + individual for BusinessRuleError shape verification.
+   - PM A recommendation: **hybrid** — table-driven `describe.each` over all 15 allowed transitions + all 8 terminal outbound (16 disallowed) + 3 illegal jumps for BusinessRuleError shape. Total ~34 test cases. Exec-A choice, justify in PLAN.
+
+5. **Terminal states verification** — spec §5 line 63-72: `closed` has NO outbound (implicit — spec lists no lines starting with `closed`); `cancelled` same. Slot A must encode `closed: []` and `cancelled: []` in TICKET_TRANSITIONS. Any transition FROM these → invalid throws. Test explicit assertions for both.
+
+6. **Runtime input handling (defensive)** — **PM A recommendation: nullish coalesce**: If a caller sneaks a raw string via `as TicketStatus` cast (e.g., Prisma raw query returns a `String` column value not in the spec union — DB drift, spec change lagging code), naive `TICKET_TRANSITIONS[from].includes(to)` returns `undefined.includes(to)` → runtime `TypeError`. PM A recommendation: use nullish coalescing `(TICKET_TRANSITIONS[from] ?? []).includes(to)` for safe fallback. Cost = 4 chars, benefit = defensive at the module boundary per CLAUDE.md philosophy (TS covers the happy path at compile time; runtime insurance covers the boundary drift path). Apply the same pattern in `assertValidTicketTransition` — if `from` is unknown, treat as invalid and throw `BusinessRuleError` (never `TypeError`). Include 1 test case: `assertValidTicketTransition('bogus_state' as TicketStatus, 'open')` throws `BusinessRuleError`, not `TypeError`.
+
+**Coordination downstream (PM A tracking, exec-A no action)**
+- Post VERDICT APPROVED, PM A will:
+  - Update PARENT §1 T06 → approved
+  - Post roll-up to PARENT §2
+  - Notify PO to merge `feat/foundation-ticket-state-machine` → main
+  - Nathan can then consume via `import { assertValidTicketTransition } from '@shared/utils/ticket-state-machine.js'` in T12 service layer
+
+Awaiting **PLAN T06** from exec-A.
 
 <!--
 TEMPLATE — copy untuk task baru:
