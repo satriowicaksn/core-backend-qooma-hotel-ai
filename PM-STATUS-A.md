@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T08 multipart upload utility (main queue continuation) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T05 merged (PO commit `2c9eb27`).
-- **Branch (current active task)**: `feat/foundation-multipart-upload` (per PO branch-per-task policy)
-- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03 (all merged to main)
+- **Active task**: T08 APPROVED (`feat/foundation-multipart-upload` @ `50ec906`, awaiting PO merge). PM A pauses + awaits PO direction. Branch-slip mitigation 3rd consecutive not-recurring — pattern now empirically durable.
+- **Branch (last active task)**: `feat/foundation-multipart-upload` @ `50ec906` — awaiting PO merge.
+- **Completed**: T01–T04, T05, T06, T-INFRA-01, T07-slice-1, T-INFRA-02, T-INFRA-03 (all merged to main) · **T08** (approved 2026-07-02 H0, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (open triage restored, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 multipart (assigned, active)** · T09 CSV · T10 workers · T-INFRA-04 (elective, PO ratification for option a/b/c) · DEP-4 api.ts bootstrap (defer until T10 done per PO) · docs/TESTING.md (planning territory).
+- **My queue (open triage, main queue preferred)**: T01–T04 ✅ · T05 ✅ · T06 ✅ · T-INFRA-01/02/03 ✅ · T07-slice-1 ✅ · **T08 ✅** · T09 CSV (next main-queue) · T10 workers · T-INFRA-04 (elective) · DEP-4 api.ts (per PO defer until T10) · docs/TESTING.md (planning).
 
 ---
 
@@ -37,7 +37,7 @@
 | T-INFRA-02 | Foundation: DEP-5 fix — add `userId: string` to `TenantContext` + `deriveTenantContext` | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO commit `e95a23d`)**. Nathan Q-B-11 auto-resolved (T12 PLAN uses `ctx.userId` directly). T19 unblocked. PM B post-hoc ratify pending. |
 | T-INFRA-03 | Foundation: GAP-T11-3 fix — split `test:unit` from integration tests so `make check` stays Docker-free | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-testglob-split` @ `59b12cd` — **awaiting PO merge**. 1-line `package.json` script change. Test count trio verified: unit 160/1/161 (0.532s) + integration 31/1/32 + coverage 191/2/193 (full baseline). Sum sanity: 161+32=193 ✓. **test:unit ~20x faster** (0.532s vs ~11s baseline). Docker-free confirmed. Mitigation held (no 4th slip). |
 | T07 | Common error handlers (HC-specific codes per spec §7)      | backlog | —              | After T01 |
-| T08 | Multipart upload utility (S3 / R2 abstraction)             | assigned | — | Main-queue continuation. Ships port + adapter per ADR-0001. Home `src/core/storage/`. Scope: object-storage port + S3Adapter (AWS SDK v3) + InMemoryAdapter for tests. New dep `@aws-sdk/client-s3` — PO ratification required. Signed URLs deferred to T08-slice-2. |
+| T08 | Multipart upload utility (S3 / R2 abstraction)             | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). `feat/foundation-multipart-upload` @ `50ec906` — **awaiting PO merge**. 5 new files under `src/core/storage/` (port + S3Adapter + InMemoryAdapter + 2 tests) + env.ts additive + `@aws-sdk/client-s3` dep. `make check` **212/1/213** (Nathan baseline shift 160→205 caught cleanly by exec-A). InMemoryAdapter 100% coverage; S3Adapter fail-lazy paths only per hexagonal principle. Modular imports verified (3 named). Drift 0 (2 false positives verified). Branch-slip mitigation held 3rd consecutive. |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
 | T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved+merged | PM A (Nanak) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-02 (PO `9a50c6d`)**. 2 files (Makefile + prisma-client.ts). GAP-T11-1 resolved. |
@@ -3765,6 +3765,111 @@ Notes / operational
 - Consumer wiring reminder for PM A / Satrio T22/T24 (future): construct `S3Adapter` at composition root with `S3AdapterConfig` sourced from `loadConfig()`; inject via `ObjectStoragePort` typed field. For unit tests, inject `InMemoryAdapter` and inspect via `peek()` — no SDK mocking needed.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T08 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on `feat/foundation-multipart-upload` @ commit `50ec906`. All gates green. Cross-team pace awareness demonstrated by exec-A. Third consecutive task with branch-slip mitigation held — behavior change now durable.
+
+**Transparency verification**
+- `git log 2bc5ac3..origin/main --oneline` (since ACK) → 5 commits: exec-A SUBMIT docs (`ed774a9`) + 4 Nathan Slot B commits (T17 flurry: claim/PLAN/ACK/SUBMIT/VERDICT + merge). No T08 source leaked.
+- `git log origin/main -- src/core/storage/` → **empty**. Zero T08 code on main. ✓
+
+**DoD verification (11 items)** — all ✓
+- `ObjectStoragePort` exported from `object-storage.port.ts:29` with `upload` + `delete` methods (+ input/output types) ✓
+- `S3Adapter` implements port (`s3-adapter.ts:53`); env-driven config (S3AdapterConfig `:38-44`); fail-lazy at `requireConfig()` `:86-95`; throws `ExternalServiceError('S3', 'not configured…')` ✓
+- `InMemoryAdapter` implements port (`in-memory-adapter.ts:30`); Map-based storage `:31`; `upload` returns `memory://<key>` at `:38`; `delete` idempotent at `:41-44` (Map.delete return ignored) ✓
+- `env.ts` has 5 OPTIONAL S3 fields (verified via diff — all `.optional()`, endpoint gets `.url()`) ✓
+- InMemoryAdapter test suite: **5 tests at 100% coverage** (upload+URL / contentType via peek / peek-undefined / delete removes / delete missing idempotent) ✓
+- `package.json` has `@aws-sdk/client-s3` in `dependencies` (not devDep) ✓
+- `pnpm install` clean (no peer-dep warnings observed in `make check` output) ✓
+- `make check` PASS with **212/1/213** independently verified (matches SUBMIT exactly) ✓
+- Drift scans clean on all 5 new files (both dismissed false positives verified — see below) ✓
+- Out-of-scope `git diff main --name-only`: **empty** across all restricted paths (http-client.ts / plugins/ / modules/ / shared/ / prisma/ / docs/ / Makefile / jest.config.ts / tsconfig.json) ✓
+- JSDoc on `S3Adapter:1-26` documents R2/MinIO usage + fail-lazy rationale + signed URL slice-2 deferral with spec cross-references ✓
+
+**Drift scans — 2 dismissed false positives independently verified**
+1. `s3-adapter.ts:18` — hit was English word "any" in JSDoc prose: `"SDK error wrap: any \`S3Client.send\` failure..."`. NOT a TypeScript `any` type. Confirmed false positive. ✓
+2. `src/core/config/env.ts:83` — pre-existing `throw new Error('Invalid environment configuration:...')` from T-INFRA-01's zod validation error path. Present in file before T08 branch cut. Not new drift. Confirmed pre-existing. ✓ (exec-A SUBMIT cited line 75 due to intervening edits — same semantic content, current line 83.)
+
+Zero net drift on T08.
+
+**Independent `make check` re-run on branch**
+```
+Test Suites: 1 skipped, 14 passed, 14 of 15 total
+Tests:       1 skipped, 212 passed, 213 total
+Time:        1.288 s
+```
+Matches SUBMIT. Baseline 205 + 7 new = 212 verified.
+
+**Coverage verification** (targeted `--collectCoverageFrom='src/core/storage/**/*.ts'`)
+```
+File                  | % Stmts | % Branch | % Funcs | % Lines
+in-memory-adapter.ts  |   100   |   100    |   100   |   100
+s3-adapter.ts         |   34.48 |   27.27  |   57.14 |   35.71
+```
+InMemoryAdapter **100%** across all metrics — matches SUBMIT claim exactly. S3Adapter scoped to fail-lazy paths only (uncovered lines `60-73` upload happy, `78-82` delete happy, `94-122` ensureClient/buildUrl/wrap) — matches PLAN + ACK hexagonal justification. Global jest threshold warnings are expected/correct: coverage run is deliberately scoped to storage files, warnings signal that S3Adapter is intentionally under-tested per port+adapter division of responsibility (consumers use InMemoryAdapter via port injection).
+
+**Modular imports independently verified**
+- `grep -n "@aws-sdk" src/core/storage/s3-adapter.ts` returns 2 hits:
+  - Line 24: JSDoc mention of `@aws-sdk/s3-request-presigner` (comment prose about future slice-2 dep)
+  - Line 28: `import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';`
+- Exactly 3 named imports, no whole-namespace, no aggregated sub-package. ✓
+
+**Design decisions in code independently verified**
+- **Fail-lazy S3Client instantiation**: `client: S3Client | null = null` at `:54`; `ensureClient()` at `:97-111` lazy-init on first successful `requireConfig()`. Constructor accepts all-optional `S3AdapterConfig`. App boots without S3 creds. ✓
+- **`ExternalServiceError` on missing config**: `:88-93` throws with helpful message enumerating required env vars. ✓
+- **R2/MinIO compat via `forcePathStyle: true`**: `:105-108` spreads `{ endpoint, forcePathStyle: true }` only when `this.config.endpoint !== undefined`. AWS S3 gets virtual-hosted URLs, R2/MinIO get path-style. ✓
+- **URL construction**: `:113-118` endpoint-aware — `${endpoint}/${bucket}/${key}` for R2/MinIO, standard AWS shape for default. ✓
+- **SDK error wrap for Sentry**: `:120-123` — `err instanceof Error` narrow → `ExternalServiceError('S3', message, { body: err })`. Full SDK error object propagates via `upstream.body` so Sentry retains `$metadata` (httpStatusCode, requestId). ✓
+- **InMemoryAdapter `peek()` on class NOT port**: `in-memory-adapter.ts:47` with JSDoc `"Test-only accessor — inspects stored body + contentType. Not on the port."`. `ObjectStoragePort` interface at `object-storage.port.ts:29-32` only exposes `upload` + `delete`. Consumers typed against the port cannot reach `peek`. Type-system enforces boundary. ✓
+- **Idempotent delete test proof**: `in-memory-adapter.test.ts:44-48` — `should not throw when deleting a missing key (idempotent, matches S3 semantics)`. Asserts `resolves.toBeUndefined()`. ✓
+
+**Scope discipline — three-dot branch diff**
+```
+package.json
+pnpm-lock.yaml
+src/core/config/env.ts
+src/core/storage/__tests__/in-memory-adapter.test.ts
+src/core/storage/__tests__/s3-adapter.test.ts
+src/core/storage/in-memory-adapter.ts
+src/core/storage/object-storage.port.ts
+src/core/storage/s3-adapter.ts
+```
+8 files. All within scope. Zero touch to `src/core/http/http-client.ts` (single-concern PR discipline preserved).
+
+**Cross-team pace awareness — discipline signal worth explicit acknowledgment**
+Exec-A noted the baseline shift **160 → 205** correctly at code-time: Nathan's T16 V2-V6 merges (visits.service.test.ts + visits.routes.test.ts) landed on main between PLAN posting and code start. Exec-A reconciled the math cleanly: 205 baseline + 7 new = 212, matching PLAN's +7 delta commitment even though absolute count shifted +45 upward. **This is model executor behavior** — noting cross-team pace changes without panic and reconciling the math correctly. Same discipline family as `feedback_verify_before_act.md` (empirically verify state before asserting) — extension to "empirically verify baseline before comparing deltas".
+
+**Nathan velocity note (per PO ask — since T-INFRA-03 baseline 2026-07-02 morning)**
+- T-INFRA-03 test:unit baseline: **160 pass** (after T05 merge)
+- Post-Nathan-merges + T08: **212 pass** (+52 total since T-INFRA-03; **+45 from Nathan** T16 V2-V6 + T17, **+7 from Slot A T08**)
+- Nathan's Slot B ledger: **7/10 merged** (T11, T13, T14, T15, T16 V1-V6, T17). Slot B remaining: T12 (approved+merged per earlier), T18-T20 pending. Two-slot pace is symmetric — both slots shipping steadily.
+
+**Two durable-pattern mitigations held under continued load**
+1. **Branch-slip mitigation** — **3rd consecutive task without recurrence** (T-INFRA-03 1st, T05 2nd, **T08 3rd**). Pattern is now empirically durable across 3 tasks. `feedback_git_slip_transparency.md` mitigation adoption has proven itself.
+2. **Verify-before-act** — 6 advisories → 6 pre-PLAN verifications → 0 REJECT-PLAN → clean SUBMIT. Adv #2 spec-verified public-bucket assumption via authoritative section reads (§2.6 line 168 + §7 line 317). Adv #3 grep-proved zero external env consumers. Continued efficacy.
+
+**Security floor** — N/A. T08 introduces external I/O boundary (S3 SDK) but keeps secrets in env-driven config (never hardcoded), wraps SDK errors as `ExternalServiceError` (no raw SDK internals leak), and defers signed URLs to slice-2 (public bucket = no auth logic in this slice). ADR-0001 compliance verified (external IO behind port). CLAUDE.md §6 (winston redact on `password|token|secret|authorization`) doesn't need adjustment — S3 secrets never traverse logger.
+
+**Follow-ups actioned in same commit**
+- → §1 T08 → approved
+- → §0 Active task refreshed → next triage
+- → PARENT §1 T08 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top with Nathan velocity note per PO ask)
+
+**PO action item — branch merge**
+`feat/foundation-multipart-upload` @ `50ec906` on `origin`; PM A verified: `make check` 212/1/213 (independent rerun), InMemoryAdapter 100% coverage, S3Adapter scoped fail-lazy per hexagonal principle, modular imports exactly 3-named, drift 0 (2 false positives verified), out-of-scope diff empty, all design decisions verified in code line-by-line. Per CLAUDE.md §12, **please merge `feat/foundation-multipart-upload` → `main`**. Post-merge: Satrio T22 (menu image) + T24 (KB attachment) have foundation ready; wire via `S3Adapter` at composition root when Satrio onboards.
+
+**Slot A ledger post-merge**: **11 approved** — T01, T02, T03, T04, T05, T06, T07-slice-1, T-INFRA-01, T-INFRA-02, T-INFRA-03, **T08**. Main-queue T01-T06 + T08 done + T07 partial. Remaining main-queue: **T09** (CSV import), **T10** (workers harness). Plus deferred electives: T-INFRA-04 (CI PO decision), DEP-4 (api.ts, per PO after T10), docs/TESTING.md (planning), T-INFRA-05+ (backlog only).
+
+**Next Slot A queue** (per PO open-triage guidance, main-queue preferred)
+1. **T09 CSV import utility** — used by menu + knowledge (consumers: T22/T23/T24 Satrio). Smaller scope than T08 (pure fn + zod validation).
+2. **T10 workers harness** — Bull + Redis foundation. Consumers: Nathan's future notification worker + Satrio's daily brief + escalation worker.
+3. THEN electives per PO's earlier queue prioritization.
+
+PM A pauses + awaits PO next-task direction. Straight-line **T09 CSV** expected per numeric queue order.
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
