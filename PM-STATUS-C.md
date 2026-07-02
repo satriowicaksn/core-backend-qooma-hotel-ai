@@ -12,13 +12,13 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **1/10 approved+merged**; **T25-slice-1 wip**
-- **Active tasks**:
+- **Day**: H0 (2026-07-03) — Slot C **2/10 approved** (T21 merged + T25-slice-1 approved-awaiting-merge)
+- **Recent activity**:
   - **T21 Departments CRUD** — **MERGED to main** 2026-07-03 (PR #11 `bbf4bd7`) ✓
-  - **T25 WA templates lifecycle (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 3 code-level tightenings; Executor C coding on `feat/wa-templates-lifecycle`. Q-T25-#5 escalates to PARENT §3b + §10 (foundation UNIQUE constraint gap; Slot C ships Option B; Slot A fix).
-- **Branches**: `feat/wa-templates-lifecycle` (T25, wip)
+  - **T25 WA templates lifecycle (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/wa-templates-lifecycle` @ `138edcd` awaiting PO merge. 13 files (7 module + 1 port + 1 adapter + 1 barrel + 4 tests). Q-T25-#5 stays open at PARENT §3b (Slot A T-INFRA-05 candidate). T25-slice-2 (Meta-callback ingest) blocked on foundation HMAC plugin.
+- **Branches**: `feat/wa-templates-lifecycle` (T25-slice-1, awaiting PO merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 merged; T25 wip; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C
+- **My queue (preview)**: T21 merged; T25-slice-1 approved; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C. Next candidate: T27 Billing (unblocked, spec-check tier data) OR T28 Settings/agents OR T29 Voice groundwork stub.
 
 ---
 
@@ -29,7 +29,7 @@
 | T## | Title                              | Status   | Verified by PM | Notes                                 |
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
-| T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 wip**) | wip (PLAN ACK'd with 3 tightenings) | — | PLAN ACK'd 2026-07-03 H0. Scope: **5 public endpoints + IntegrationRelayPort + LogOnly adapter** (Meta-callback deferred to slice-2). GAP responses #1–#4 all accept PM leans (403 global-write, permissive name, 409 archived-conflict, single port method + intent). **Q-T25-#5 escalates to PARENT §3b + §10** (foundation gap: `wa_templates_hotel_name_unique` UNIQUE constraint missing from T02 migration; Slot C ships Option B pre-check + P2002 catch belt-and-suspenders; Slot A fix). 3 tightenings held: `variables: string[]` typing, `language` zod bounded, adapter log payload discipline. Zero touch on `api.ts` / `prisma/migrations/`. Awaiting Executor C SUBMIT. |
+| T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/wa-templates-lifecycle` @ `138edcd` — **awaiting PO merge**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 
 ---
 
@@ -800,6 +800,68 @@ PATCH /wa-templates/:id (row is_global=true)
 
 Requesting PM C VERDICT.
 
+##### VERDICT T25-slice-1 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 18 DoD boxes verified, independent PM validation on `feat/wa-templates-lifecycle` @ `138edcd`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints (3 tightenings + Q-T25-#5 workaround + coding checklist reminders) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes/adapter/port) : 0
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 2 (both index.ts no-restricted-imports with justification comments — see audit below)
+```
+
+**eslint-disable audit** — 2 hits at `src/modules/wa-templates/index.ts:8` + `:16` for `no-restricted-imports`. ESLint config (`eslint.config.mjs`) restricts `**/adapters/*` imports to force service-via-port composition. The barrel factory is the sanctioned composition-root wiring point (Slot B modules + T21 departments don't hit this because they have no adapters — T25 is the first Slot C module with port+adapter). Two options considered: (a) exempt `src/modules/*/index.ts` in ESLint config (Slot A ownership territory, cross-slot PR); (b) local `eslint-disable` with explicit prose justification. Exec chose (b) — minimal-invasive, precedent-set for future Slot C modules with adapters (T27 billing likely). **Accepted**. Foundation follow-up candidate for Slot A: add `src/modules/*/index.ts` exemption to `eslint.config.mjs`. Non-blocking; nudge routed to PARENT §10.
+
+Step 3 — File inventory: **13 files created** (`git show --name-only 138edcd` — 6 module + 1 port + 1 adapter + 1 barrel + 4 tests). SUBMIT header claims "11 new" but bullet list has 13 items — cosmetic count typo in header, not scope drift. All 13 files exactly match PLAN inventory. Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` — Override #1 held per T21 pattern. Branch is stale relative to main on PM-STATUS files (branched before PM-STATUS-A/-C main updates); this is fine because exec commit touches ZERO PM-STATUS files — squash-merge diff = 13 files exactly.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 363/1/364** (baseline 312/1/313 post-T21-merge + **+51 net**: 34 service + 12 routes + 5 adapter); Docker-free (T-INFRA-03 mitigation held); 1.336s
+- `pnpm test:integration` **PASS 104/1/105** — all 6 module suites green (departments 13 + guests 10 + notifications 15 + tickets 25 + visits 20 + wa-templates 21 new). Slot B + T21 regression clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `wa-templates.service.ts`: comments explain WHY (Q-T25-#5 rationale L91-95, spec §7 ref L28-29, PM ACK coding notes L149, L153); public methods have explicit return types; `assertHotelOwnership` correctly reused for hotel-scoped rows + skipped for global rows (`row.isGlobal` guard at L251 before assert); global check (`assertNotGlobalForWrite`) fires BEFORE state check on PATCH/DELETE/RESUBMIT per PM ACK; P2002 catch in both create + update paths; explicit `rejectionReason: null` on resubmit L227 per PM ACK; JSDoc invariant on `create()` L83-89 documents server-set-only fields belt-and-suspenders; state-branch on DELETE returns `WaTemplateResponse | null` correctly ✓
+- `wa-templates.routes.ts`: thin handlers per Slot B/T21 convention (`requireTenant → requireRole → parse → service → send`); correlationId propagated via helper L33-39; 201 on POST-create, 204 on DELETE-hard, 200 on PATCH/RESUBMIT/DELETE-archive (state-branch handled at L110-113); routes at `/wa-templates` (no `/api` prefix — added at plugin registration; spec §1.9 `/api/wa-templates` = prefix + route, matches T21 `/settings/departments` pattern) ✓
+- `wa-templates.repository.ts`: Prisma direct (ADR-0001 compliant); `countByHotelAndName(hotelId, name, excludeId?)` with `excludeId` param per PM ACK coding note L40-43 (excludes self on PATCH-name); `count` query not `findMany` (cheaper — T21 pattern); ordering `[{isGlobal:'desc'}, {name:'asc'}]` a UX bonus (globals surface first in list) ✓
+- Bonus: `ports/integration-relay.port.ts` — `readonly` throughout, discriminated `intent`, `variables: readonly string[]` (tightening #1 held), `correlationId?: string` optional (tightening #3 signal) ✓
+- Bonus: `adapters/log-only-integration-relay.adapter.ts` — exact log keys `{module, event:'integration_relay_stub', intent, templateId, hotelId, name, language, messageId, correlationId?}` per tightening #3 held verbatim; uses `Logger` interface (no direct winston import); returns `Promise.resolve({messageId: randomUUID(), relayedAt: new Date()})` ✓
+- Bonus: `wa-templates.schema.ts` — tightening #1 held (`variables = z.array(z.string().min(1).max(64)).max(50)`); tightening #2 held (`language = z.string().min(2).max(8)`); `.strict()` on all body schemas; `.refine(non-empty)` on update; permissive `name` per Q-T25-#2 ✓
+- Bonus: `index.ts` barrel — public API only (routes plugin + service class + adapter class for composition + port interface types + wire/body types); `WaTemplatesRepository` NOT re-exported (internal); `LogOnlyIntegrationRelayAdapter` IS re-exported (composition-root wiring pattern for slice-2 HTTP adapter swap); factory `buildWaTemplatesService(db, {logger, integrationRelay?})` with default-adapter fallback ✓
+
+Step 6 — Security floor: no webhook in slice-1 (HMAC N/A — slice-2 concern); no token storage (crypto N/A); no PII (WA template metadata operational config, not guest data); `hotel_id` sourced from `ctx.hotelId` on create — verified `service.ts:108`; `.strict()` zod rejects any client-supplied `hotel_id`/`is_global`/`status`/`template_id_meta`/`rejection_reason`/`approved_at` (belt-and-suspenders); JSDoc invariant on `create()` reinforces; no secret hardcoded ✓
+
+Step 7 — Test coverage: line **96.68%** across `wa-templates/**` (exceeds ≥ 80% DoD; repo/serializer/ports/adapter/index all 100%; routes 98.07; schema 100 lines; service 94.80). Branch coverage 82.05% — uncovered branches are defensive fallbacks (routes 60% is the 401 helper branch; serializer 75% is JSONB narrowing defensiveness; service 83% includes P2002 catch dead branch per Q-T25-#5 pending foundation UNIQUE). All coverage misses justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (Q-T25-#5 code ready for post-fix)** ✓ verified. Integration test "should ALLOW same name across different hotels" empirically proves DB UNIQUE absence today; `countByHotelAndName` pre-check is primary guard; `isPrismaUniqueViolation` catch is belt-and-suspenders. Zero-code-change when Slot A ships migration. Q-T25-#5 status unchanged at PARENT §3b: **open, foundation candidate**.
+- **Note #2 (`correlationId` best-effort plumbing)** ✓ accepted as designed. Slice-2 HTTP adapter will end-to-end plumb `x-correlation-id`.
+- **Note #3 (three error codes for three verbs on archived state)** — PM ratifies. PATCH→422 `WA_TEMPLATE_LOCKED`, DELETE→409 `WA_TEMPLATE_ALREADY_ARCHIVED`, RESUBMIT→422 `WA_TEMPLATE_NOT_REJECTED`. Each semantically distinct signal. Consistent with spec §7 discriminator philosophy.
+- **Note #4 (no DB CHECK on `variables`)** — accepted as future foundation-hardening candidate. Zod + defensive serializer narrowing cover ingest path. Not registered as open Q; low-priority.
+- **Note #5 (`body: min(1)` blocks empty string)** — PM ratifies. Spec §2.8 `body TEXT NOT NULL` + semantic sanity. If FE ever needs empty-body case, revisit — zero-value cost to blocking today.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (env.ts + migrations + api.ts + shared plugins all untouched).
+- Q-T25-#5 stays open PARENT §3b (Slot A T-INFRA-05 candidate) — non-blocking for T25 merge.
+- Slot A `no-restricted-imports` config nudge routed to PARENT §10 — small foundation refinement; will benefit T27 billing (likely port+adapter for PDF storage / Bull job producer).
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T25 row → approved · Short roll-up posted to PARENT §2 · Q-T25-#5 stays open PARENT §3b · new ESLint nudge added to PARENT §10.**
+
+**PO merge please**: branch `feat/wa-templates-lifecycle` @ `138edcd` ready for main merge. Slice-2 (Meta-callback ingest) blocked on foundation HMAC plugin + `INTEGRATION_SHARED_SECRET` env — separate ticket. Slot C **2/10 approved** (T21 merged + T25-slice-1 approved-awaiting-merge).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -920,6 +982,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | --- | ------------- | ----- | ----------- | ------------------ | ----------------- | ------------------------------ | ------- | ------------- | ------------------ | --------------------- |
 | H0 baseline | (no src/ touched) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2026-07-03 T21 SUBMIT | src/modules/departments/** (10) + src/core/config/env.ts (+7 lines additive) | 0 | 0 | 0 (env.ts:91 pre-existing boilerplate `5ce7f867`, not this task) | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
+| 2026-07-03 T25-slice-1 SUBMIT | src/modules/wa-templates/** (13) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
