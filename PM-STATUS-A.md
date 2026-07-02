@@ -14,11 +14,11 @@
 
 - **Day**: H0 (2026-07-01)
 - **Owner**: Nanak (permanent — see PARENT §4 2026-07-01 slot swap)
-- **Active task**: T-INFRA-01 (foundation fix for GAP-T11-1) — ASSIGNMENT posted §2, awaiting exec-A PLAN. T04 merged to main (PO commit `a563fa4`).
-- **Branch (current active task)**: `feat/foundation-prisma-ci` (per PO branch-per-task policy)
-- **Completed today**: T01, T02, T03, T04 (all merged to main)
+- **Active task**: T05 (seed scripts) — awaiting PM A to draft ASSIGNMENT. T-INFRA-01 APPROVED (`583d324` on `feat/foundation-prisma-ci`, awaiting PO merge).
+- **Branch (last active task)**: `feat/foundation-prisma-ci` — awaiting PO merge. Next branch TBD for T05.
+- **Completed**: T01, T02, T03, T04 (merged to main) · T-INFRA-01 (approved, awaiting merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 (assigned, next) · T05 · T06 (parallel-friendly) · T07–T10 backlog
+- **My queue (T01–T10 + infra)**: T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T-INFRA-01 ✅ · T05 (next) · T06 (parallel-friendly) · T07–T10 backlog
 
 ---
 
@@ -38,7 +38,7 @@
 | T08 | Multipart upload utility (S3 / R2 abstraction)             | backlog | —              | After T01 |
 | T09 | CSV import utility (used by menu + knowledge)              | backlog | —              | After T01 |
 | T10 | Workers harness (cron + queue) — actual workers wired per B/C tasks | backlog | —      | After T02 |
-| T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | assigned | — | Addresses PARENT §3b GAP-T11-1. Small foundation fix — Makefile `check` target + `src/core/prisma/prisma-client.ts` uncomment. Unblocks any B/C module that imports generated `PrismaClient` at typecheck on fresh checkout. |
+| T-INFRA-01 | Foundation: `make check` prisma-generate prereq + real Prisma client singleton (GAP-T11-1 fix) | approved | PM A (Nanak) | ✅ APPROVED attempt 1 (2026-07-02 H0). 2 files (Makefile 1-line + prisma-client.ts body rewrite). Fresh-checkout acceptance PASS on **simulated post-merge state** (144 tests incl. T13/T14/T15 all green). Branch `feat/foundation-prisma-ci` @ `583d324` — PO merge pending. Adv-#1 fallback not triggered. PARENT §3b GAP-T11-1 resolved. |
 
 ---
 
@@ -1029,6 +1029,82 @@ Notes / operational
 - Env note (session-local): had to re-activate Node 20 + pnpm 9 via `nvm use 20 && corepack prepare pnpm@9 --activate` at session start (T01-established procedure). No permanent config change.
 
 Requesting PM A VERDICT.
+
+##### VERDICT T-INFRA-01 — APPROVED (H0 2026-07-02, attempt 1) by PM A (Nanak)
+
+Validated per PM-AGENT §3 Steps 1–7 on branch `feat/foundation-prisma-ci` @ commit `583d324`, with **additional validation on simulated post-merge state** (main + T13/T14/T15 + T-INFRA-01 applied via `git checkout feat/foundation-prisma-ci -- Makefile src/core/prisma/prisma-client.ts`). All gates green.
+
+**DoD verification (11 items from ASSIGNMENT)** — all ✓
+- Makefile:148 `check` target has `prisma-generate` first: verified `check: prisma-generate lint format-check typecheck test-unit ## …` ✓
+- `src/core/prisma/prisma-client.ts` exports real `PrismaClient` instance (not `{}` stub): file-read verified (33 LOC, JSDoc lines 1-9 preserved verbatim per PLAN) ✓
+- **Fresh-checkout acceptance test** (primary DoD signal — closes GAP-T11-1): independent PM re-run on **combined main+T-INFRA-01 state** → PASS. Evidence below.
+- `make check` PASS on already-generated checkout: green ✓
+- T04 `tenant-guard.hooks.test.ts` (3): green ✓
+- T04 `rbac.test.ts` (11): green ✓
+- T03 `tenant-guard.test.ts` (14): green ✓
+- `_template` 2 skipped: unchanged ✓
+- Drift scans clean on prisma-client.ts (Makefile N/A for TS rules) ✓
+- No new deps: `git diff main -- package.json pnpm-lock.yaml` empty ✓
+- Nathan T11 workaround note landed in SUBMIT ✓
+
+**Independent fresh-checkout acceptance evidence (PM rerun, simulated post-merge state)**
+
+```bash
+git checkout main
+git checkout feat/foundation-prisma-ci -- Makefile src/core/prisma/prisma-client.ts
+rm -rf node_modules dist coverage .tsbuildinfo
+pnpm install --frozen-lockfile
+make check
+```
+
+Result (tail):
+```
+pnpm prisma:generate
+  ✔ Generated Prisma Client (v5.22.0) to ./node_modules/.prisma/client in 172ms
+pnpm lint  → PASS (0 errors, 0 warnings, --max-warnings 0)
+pnpm format:check  → PASS
+pnpm typecheck  → PASS  (proves T13/T14/T15's PrismaClient type consumption compiles on fresh checkout)
+pnpm test:unit  → PASS
+Test Suites: 2 skipped, 10 passed, 10 of 12 total
+Tests:       2 skipped, 144 passed, 146 total
+Time:        9.986 s
+```
+
+**PM rerun count = 144 passed** (vs exec-A's 69 on branch-alone). Delta = **Nathan's T13/T14/T15 tests all green**. Stronger acceptance signal than SUBMIT alone — validates the fix on the exact state PO will see post-merge.
+
+**Drift scans** (PM-AGENT §3 Step 2, on `src/core/prisma/prisma-client.ts`)
+- `any`: **0** · `console.log/info/debug`: **0** · `throw new Error(`: **0** · Forbidden imports: **0** · Default export: **0** · Hardcoded URL: **0** · Wrap-Prisma interface: **0** (ADR-0001 ✓)
+
+**Spot-check** (PM-AGENT §3 Step 5)
+- Naming ✓; explicit return type `Promise<void>` on `shutdown` ✓; JSDoc lines 1-9 preserved verbatim ✓; `NODE_ENV !== 'test'` guard prevents jest open-handle ✓; `void shutdown()` inside sync arrow — lint PASS proves `no-misused-promises` + `no-floating-promises` compliance ✓; imports leaf-only (`@prisma/client` lib + `@core/config/env.js`) ✓; 33 LOC ✓
+
+**Security floor** — N/A (no auth/webhook/crypto/PII surface). Log config sanitized (`warn/error` levels only, no query params/user data serialized).
+
+**Advisory tracking (all 3 resolved, no fallback triggered)**
+- Adv-#1 (fail-fast at import): NOT triggered. `loadConfig()` at module load impacts **zero current test** (T11-T15 all use `import type { PrismaClient }` + constructor injection; T03/T04 don't touch `@core/prisma/*`). Lazy-getter fallback stays documented for future.
+- Adv-#2 (SIGTERM guard `NODE_ENV !== 'test'`): in code, lint PASS.
+- Adv-#3 (circular): leaf chain `prisma-client.ts → env.ts → zod` confirmed.
+
+**pnpm-store deep-dive from SUBMIT — mirroring to PARENT §10 (per PO request)**
+Under `.npmrc` `node-linker=isolated` + `shamefully-hoist=false`, pnpm 9 does NOT auto-run `@prisma/client`'s postinstall on `pnpm install --frozen-lockfile`. Pnpm-store `.prisma/client/` absent after fresh install. `pnpm prisma:generate` writes to project-root `node_modules/.prisma/client/` (per `schema.prisma`'s `output = "../node_modules/.prisma/client"`), and TS module resolution walks up from the pnpm store, finds it there. This is why `prisma-generate` as `check` prereq is the correct fix (not CI-level or `.npmrc` tweak). **Do NOT run `pnpm rebuild @prisma/client`** — pollutes pnpm store with 110-line stub that shadows project-root types (red herring; doesn't reproduce under standard acceptance steps). Useful onboarding note for Satrio.
+
+**Follow-ups actioned in same commit**
+- → §1 T-INFRA-01 → approved
+- → §0 Active task refreshed → T05 next
+- → PARENT §1 T-INFRA-01 → approved (row mirrored)
+- → PARENT §2 short roll-up (latest-at-top)
+- → PARENT §3b GAP-T11-1 → **resolved**
+- → PARENT §10 pnpm-store insight documented
+
+**PO action item — branch merge**
+`feat/foundation-prisma-ci` @ `583d324` on `origin`; PM A verified green on both (1) branch alone (69 tests) and (2) **simulated post-merge state with T13/T14/T15 (144 tests)**. Per CLAUDE.md §12, **please merge `feat/foundation-prisma-ci` → `main` when ready**. PM A will not auto-merge. Post-merge impact: every dev's `make check` runs `prisma-generate` first (~300ms overhead), exec-B drops the `pnpm prisma:generate` workaround, future singleton consumers work out of the box.
+
+**Next Slot A queue**
+1. **T05** seed scripts (1 demo hotel via Auth API + 5 depts + sample menu + KB)
+2. **T06** ticket state-machine helper (parallel-friendly)
+3. **T07** common error handlers (HC-specific codes per spec §7)
+
+Ship it.
 
 <!--
 TEMPLATE — copy untuk task baru:
