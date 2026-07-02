@@ -41,17 +41,18 @@
 | T13 | Ticket stats + overdue | ✅ approved | `feat/tickets-stats-overdue` | ✅ merged |
 | T14 | Guests CRUD + preferences | ✅ approved | `feat/guests-crud` | ✅ **merged (PR #3)** |
 | T15 | Guest messages history | ✅ approved | `feat/guest-messages` | ✅ **merged (PR #4)** |
-| T16 | Visits list + verify-manual | 🟡 V1 done — V2–V5 now UNBLOCKED (DEP-6 landed) → resume | `feat/visits-list-verify` @ `f63e10b` | — |
-| T12 | Ticket transition + reroute | ✅ approved (attempt 1) | `feat/tickets-transition` @ `625a8b8` (merges clean) | ⏳ awaiting PO merge |
+| T16 | Visits list + verify-manual | 🟡 NEXT — V1 done, V2–V5 unblocked. ⚠ REBASE branch first (56 behind) | `feat/visits-list-verify` @ `f63e10b` | — |
+| T12 | Ticket transition + reroute | ✅ approved | `feat/tickets-transition` | ✅ **merged (PR #5)** |
 | T19 | Notifications CRUD | 🟢 UNBLOCKED (DEP-5 merged) — ready for PLAN | `feat/notifications-crud` | — |
 | T17 | Visit reject + failed_3x | ⚪ backlog (←T16) | — | — |
 | T18 | Manual visit create | ⚪ backlog (←T16) | — | — |
 | T20 | Socket emitters | ⚪ backlog (←T11✓+T16+T19) | — | — |
 
-**Counts**: ✅ **4/10 merged (T11, T13, T14, T15)** + **T12 approved (awaiting merge)** · 🟡 T16-V2..5 resume · 🟢 T19 ready · ⚪ 3 backlog (T17, T18, T20). **Zero foundation blockers left for Slot B impl** (only DEP-4 go-live remains). **5/10 done pending T12 merge.**
+**Counts**: ✅ **5/10 merged (T11, T13, T14, T15, T12)** · 🟡 T16-V2..5 resume (⚠ branch 56 behind — rebase first) · 🟢 T19 ready · ⚪ 3 backlog (T17, T18, T20). **Zero foundation blockers left for Slot B impl** (only DEP-4 go-live remains).
 **Foundation watch (updated 2026-07-02 H14)**: ✅ DEP-6 `BusinessRuleError` · ✅ T06 state-machine · ✅ T-INFRA-01 prisma · ✅ **DEP-5 `ctx.userId` MERGED** (T-INFRA-02 `e95a23d` → T19 + T12 audit unblocked) · ✅ **GAP-T11-3 fixed** (T-INFRA-03 `cf65e99` → `make check` no Docker) — ALL Slot-B impl blockers cleared. ⏳ only **DEP-4 `api.ts` bootstrap** (go-live for all routes) remains.
 
 ### Loop ledger (newest on top)
+- **Loop 9b — 2026-07-02 — T12 MERGED (PR #5).** Slot B **5/10 merged** (T11,T13,T14,T15,T12). Next: T16 resume V2–V5 — ⚠ branch `feat/visits-list-verify` is **56 commits behind main** (created pre-foundation-merges); **must rebase onto main first** (picks up `BusinessRuleError`+`ctx.userId`; disjoint `visits/` module → rebase should be clean) before adding verify-manual.
 - **Loop 9 — 2026-07-02 H14 — T12 APPROVED.** Ticket transition + reroute APPROVED attempt 1 (PM rerun: make check 173 in 2.5s no-Docker, coverage 96.68%, drift clean, merge dry-run into latest main CLEAN, negative tests 422+403 verified, optimistic-concurrency race-check). → merge `feat/tickets-transition`. **5/10 done pending merge.** Remaining active: T16 (resume V2–V5), T19 (ready). Then T17/T18 (←T16), T20 (←T16+T19).
 - **Loop 8 — 2026-07-02 H14 — T12 PLAN ACK'd; DEP-5 + GAP-T11-3 now merged.** T12 PLAN ACK'd (ruled Q-B-11 → option (a): DEP-5 merged mid-flight so use `ctx.userId` directly, no null-interim). **DEP-5 (T-INFRA-02) + GAP-T11-3 (T-INFRA-03) both MERGED** → **T19 now unblocked**, `make check` no longer needs Docker, prisma-gen workaround droppable. Ratified T-INFRA-02's fixture edits to my test files. **All Slot-B impl blockers cleared** (only DEP-4 go-live left). Active: T12 (coding) + T16 (resume) + T19 (ready).
 - **Loop 7 — 2026-07-02 — Slot A unblocks land; DEP-5 correction.** Verified main precisely: ✅ **DEP-6** (`BusinessRuleError`) + ✅ **T06** (state-machine) + ✅ **T-INFRA-01** (prisma real) all MERGED → **T16-V2..5 resume + T12 issued** (both now unblocked). ⚠ **Correction**: my Loop-6 "DEP-5 shipped → T19 unblocked" was WRONG (grep matched `SessionUser.userId`, not `TenantContext`) — DEP-5 still open, **T19 still blocked** (T-INFRA-02 pending). Executors: drop `pnpm prisma:generate` workaround (T-INFRA-01). Active now: T12 (PLAN) + T16 (resume V2–V5).
@@ -76,7 +77,7 @@
 | T14 | Guests CRUD + preferences                                 | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #3 `ab4c113`) 2026-07-02**. make check 131 + coverage 97.95% + drift clean. Unblocks T15. T-CLEAN-01 queued. |
 | T15 | Guest messages history                                    | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #4 `64db2a9`) 2026-07-02**. make check 144 + coverage 97.46% + drift clean. |
 | T16 | Visits list + verify-manual                               | wip (partial)| —              | V1 read-path done+green on `feat/visits-list-verify`. **V2–V5 blocked on DEP-6** (`BusinessRuleError(422)`, Slot A). GAP T16-#4 ruled (code `BUSINESS_RULE` + `details.rule`). Hold merge until complete. |
-| T12 | Ticket status transition + reroute                        | **approved** | PM B (Nathan) | ✅ APPROVED attempt 1 (§2, 2026-07-02) — PM rerun: make check 173 (no-Docker) + coverage 96.68% + drift clean + merge dry-run CLEAN + negative tests 422/403 + race-check. **Merge `feat/tickets-transition` @ `625a8b8`.** Awaiting PO merge. |
+| T12 | Ticket status transition + reroute                        | **approved+MERGED** | PM B (Nathan) | ✅ APPROVED + **MERGED to main (PR #5 `3718e38`) 2026-07-02**. make check 173 (no-Docker) + coverage 96.68% + 422/403 negatives + race-check. |
 | T19 | Notifications CRUD + optimistic ops                       | assigned 🟢  | —              | **UNBLOCKED 2026-07-02** — DEP-5 (T-INFRA-02 `e95a23d`) merged, `ctx.userId` now on `TenantContext`. Ready for PLAN + impl. `feat/notifications-crud`. |
 | T17/T18/T20 | Downstream CRM + socket                           | backlog      | —              | T17/T18←T16; T20←T11✓+T16+T19 |
 
