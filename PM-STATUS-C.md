@@ -2324,6 +2324,80 @@ src/modules/menu/
 
 Awaiting PM C ACK before coding begins.
 
+#### PLAN T22-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+7 JSON endpoints: `GET /api/settings/menu` (nested categories-with-items list, optional `?is_active` filter on categories) + `POST/PATCH/DELETE /api/settings/menu/:id` (items — JSON body accepts `image_url` as pre-signed URL string per Q-T22-#5) + `POST/PATCH/DELETE /api/settings/menu/categories/:id` (categories — Delete blocks 409 `CATEGORY_HAS_ITEMS` via app-layer pre-check + P2003 FK Restrict backstop). Prisma direct (ADR-0001) — Menu tables have UNIQUE(hotel_id, name) + `price_idr >= 0` + `prep_minutes >= 0` CHECKs shipped in T02 (verified). Tenant scope via `assertHotelOwnership` + cross-tenant category-reuse guard (item write validates `category_id` belongs to `ctx.hotelId`). Snake_case wire; `Decimal.toFixed(2)` on `price_idr` (T27 pattern); TIME → `"HH:mm"` string. Zod strict + `.refine(non-empty)` + `available_window` cross-field refine. **Multipart image upload deferred to T22-slice-2** — `@fastify/multipart` not installed; PO ratify required (Q-T22-#1).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.5 (endpoints lines 168-171) + §2.6 (DDL 544-579) + §6:806 RBAC + §7:832 error catalog (`CATEGORY_HAS_ITEMS`) ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C2 (AC) + §79 (fallback guidance for pre-signed URL) + §97 (seed guidance) ✓
+- Parent docs spot-read: `src/modules/departments/` (T21 — `loadOwned` + `isPrismaUniqueViolation` + tenant-scoped repo pattern), `src/modules/wa-templates/` (T25 — `.strict()` + `.refine(non-empty)` + P2002 catch), `src/modules/billing/` (T27 — `Decimal.toFixed(2)` serializer at `billing.serializer.ts:76`), `src/modules/agents/` (T28 — thin route + no port/adapter reference), `src/plugins/tenant-guard.ts` (T21/T25/T27/T28/T29 verified), `src/core/errors/app-errors.ts` (`ConflictError` L51 + `NotFoundError` L42 + `ValidationError` L27), `prisma/schema.prisma:284-326` (MenuCategory + MenuItem verified — UNIQUE + CHECKs + FK Restrict on category-delete via `category` relation) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T21/T25/T27/T28/T29 ✓ (living references — T29 approved awaiting PO merge; if merged before my SUBMIT, baseline shifts to 483; otherwise 450 — will state explicitly in SUBMIT) — all approved
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **450/1/451** on `main` (pre-T29-merge; will be 483/1/484 if T29 merges first) ✓
+- Scaffolder risk: **none** — no `pnpm create`/`pnpm dlx`; **no new dependency** in slice-1 (multipart deferred per Q-T22-#1); no schema.prisma edit; no env change; no migration touch
+
+**GAP responses** — accept all 6 PM leans cleanly
+
+- **Q-T22-#1 (multipart deferral)** → **Accepting PM lean**: slice-1 JSON-only; `@fastify/multipart` dep escalation to PARENT §3b for PO ratify; slice-2 is a separate task. Slice-1 accepts `image_url` as pre-signed URL string per Q-T22-#5.
+- **Q-T22-#2 (dept_head RBAC)** → **Accepting PM lean**: `requireRole([gm_admin])` slice-1 (dept_head 403); Q rolls to PARENT §3a for PO decision. Menu tables lack `dept_id` FK, so extending to dept_head would need schema + spec clarification.
+- **Q-T22-#3 (list response shape)** → **Accepting PM lean A**: nested `{data: {categories: [{...category, items: [...]}]}}`. Matches spec "categories + items" wording + natural FE rendering; less normalization overhead than option B.
+- **Q-T22-#4 (`available_window` cross-field)** → **Accepting PM lean A**: both-or-neither + `from < to`; no wrap-around in slice-1. Zod `.refine()` at schema level. Strict-first is easier to relax later than tighten if late-night menu items surface.
+- **Q-T22-#5 (`image_url` slice-1)** → **Accepting PM lean A**: `z.string().url().max(500).nullable().optional()`. Matches DDL VARCHAR(500) nullable + supports admin manual pre-upload workflow. Slice-2 replaces with multipart adapter but retains this pre-signed URL fallback (dual-path per spec §79 fallback spirit).
+- **Q-T22-#6 (`is_active` filter scope)** → **Accepting PM lean A**: filter categories only (`?is_active=true` returns only active categories with all their items). Item-level `is_available` filter client-side.
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1 already resolved or open elsewhere — not re-raising.
+
+**Files to create** (as per ASSIGNMENT §Files to create — 7 module + 3 test files)
+```
+src/modules/menu/
+├── menu.types.ts                          (DomainMenuCategory, DomainMenuItem,
+│                                            CategoryWire w/ nested ItemWire[],
+│                                            ItemWire, MenuListResponse,
+│                                            CategoryResponse, ItemResponse, filters)
+├── menu.schema.ts                         (zod: CreateCategoryBody + UpdateCategoryBody +
+│                                            CreateItemBody + UpdateItemBody +
+│                                            CategoryIdParam + ItemIdParam +
+│                                            ListMenuQuery; TIME `HH:mm` helper +
+│                                            available_window cross-field refine per Q-T22-#4)
+├── menu.serializer.ts                     (Prisma row → snake_case wire;
+│                                            Decimal.toFixed(2) on price_idr per T27 pattern;
+│                                            Date → "HH:mm" string on TIME fields;
+│                                            nested category-with-items shape helper)
+├── menu.repository.ts                     (Prisma direct — listCategoriesWithItems,
+│                                            findCategoryById, findItemById,
+│                                            createCategory, updateCategory, deleteCategory,
+│                                            countItemsInCategory,
+│                                            createItem, updateItem, deleteItem,
+│                                            ensureCategoryBelongsToHotel)
+├── menu.service.ts                        (all business rules; loadOwnedCategory/Item
+│                                            helpers mirror T21; isPrismaUniqueViolation
+│                                            helper reused; delete-category app-layer
+│                                            pre-check + P2003 FK Restrict backstop)
+├── menu.routes.ts                         (Fastify plugin: 7 handlers; thin;
+│                                            requireTenant → requireRole → parse
+│                                            → service → send; 201/200/204 code map)
+├── index.ts                               (barrel: menuRoutes + MenuService + buildMenuService
+│                                            factory + wire/body types only)
+└── __tests__/
+    ├── menu.service.test.ts                       (unit; mock repo; branch coverage per DoD)
+    ├── menu.routes.test.ts                        (unit; Fastify inject; 401/403/404/409/400 matrix)
+    └── menu.repository.integration.test.ts        (testcontainers real Postgres; UNIQUE +
+                                                     CHECKs + FK Restrict + tenant isolation +
+                                                     nested-list ordering + permissive URL storage)
+```
+
+**Files to modify**
+- **Zero** — `api.ts` untouched (T21 Override #1); `env.ts` untouched (no new env); `prisma/migrations/` untouched; `core/` / `plugins/` / `shared/socket/` untouched; **no new dependencies** in slice-1 (multipart deferred).
+
+**Approach**
+Mirror T25/T27 layout (two-entity module with cross-entity guards). Service constructor `(repo)` — no port/adapter. **loadOwned helpers**: `loadOwnedCategory(ctx, id)` + `loadOwnedItem(ctx, id)` each do `repo.findById` → `NotFoundError` if null → `assertHotelOwnership(ctx, row.hotelId, 'MenuCategory'|'MenuItem')` for cross-tenant 404 leak-safety. **Cross-tenant category-reuse guard**: in `createItem`/`updateItem` when `category_id` changes, call `repo.ensureCategoryBelongsToHotel(categoryId, ctx.hotelId)` — if false throw `NotFoundError('MenuCategory', categoryId)` (leak-safe, don't reveal existence). **Category CRUD**: create/update wrap `try/catch (isPrismaUniqueViolation(err))` → `ConflictError({reason:'CATEGORY_NAME_TAKEN', name})`. **Delete category**: app-layer `countItemsInCategory(id) > 0` → `ConflictError({reason:'CATEGORY_HAS_ITEMS', itemCount})` (409 per spec §7:832); Prisma delete inside `try/catch` catches P2003 FK Restrict as belt-and-suspenders (translates to same envelope shape — race-safe). **Item CRUD**: create returns 201; update returns 200; delete returns 204. `price_idr` zod `z.number().nonnegative().max(99999999999.99)` matches DECIMAL(12,2). `prep_minutes` `z.number().int().nonnegative().nullable().optional()`. **TIME fields**: zod `z.string().regex(/^\d{2}:\d{2}$/).optional()` → parse to `Date` at `1970-01-01T${hhmm}:00.000Z` for Prisma write; serialize back to `"HH:mm"` slice on wire. **available_window cross-field**: `.refine((v) => (v.from !== undefined) === (v.to !== undefined), 'both or neither')` + `.refine((v) => !v.from || !v.to || parseHHmm(v.from) < parseHHmm(v.to), 'from < to')`. **List**: `repo.listCategoriesWithItems(hotelId, filters)` returns `MenuCategory[]` with nested `items: MenuItem[]` via Prisma `include: {items: {orderBy: [{name:'asc'}]}}, orderBy: [{sortOrder:'asc'},{name:'asc'}]`. Serializer flattens: `{data: {categories: cats.map(serializeCategoryWithItems)}}`. **RBAC**: `requireRole([gm_admin])` on all 7 handlers. **Winston logging** per T21 pattern.
+
+**Est.**: ~6-8h (biggest task tied with T27). CHECKPOINT WAJIB if crossing ~4h with >4 files still incomplete. Straight-line if all tests + zod refines land clean.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
