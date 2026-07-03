@@ -12,13 +12,14 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **2/10 approved** (T21 merged + T25-slice-1 approved-awaiting-merge)
-- **Recent activity**:
-  - **T21 Departments CRUD** — **MERGED to main** 2026-07-03 (PR #11 `bbf4bd7`) ✓
-  - **T25 WA templates lifecycle (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/wa-templates-lifecycle` @ `138edcd` awaiting PO merge. 13 files (7 module + 1 port + 1 adapter + 1 barrel + 4 tests). Q-T25-#5 stays open at PARENT §3b (Slot A T-INFRA-05 candidate). T25-slice-2 (Meta-callback ingest) blocked on foundation HMAC plugin.
-- **Branches**: `feat/wa-templates-lifecycle` (T25-slice-1, awaiting PO merge)
+- **Day**: H0 (2026-07-03) — Slot C **2/10 approved**; **T27-slice-1 assigned**
+- **Active tasks**:
+  - **T21 Departments CRUD** — **MERGED to main** (PR #11 `bbf4bd7`) ✓
+  - **T25 WA templates lifecycle (slice-1)** — APPROVED attempt 1; `feat/wa-templates-lifecycle` @ `138edcd` awaiting PO merge
+  - **T27 Billing (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 4 public endpoints (overview + upgrade + invoice download + daily-brief-empty) + `UpgradeNotifierPort`/`LogOnly` adapter + `ObjectStoragePort` consumption (T08 merged). Tier read behind `SKIP_CROSS_DB_CHECKS` gate (T21 pattern reuse — no new env). Deferred: quota meter increment (needs HMAC), W3/W5 workers (needs T10), upgrade persistence (no table).
+- **Branches**: `feat/wa-templates-lifecycle` (T25, awaiting PO merge) · `feat/settings-billing` (T27, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21 merged; T25-slice-1 approved; T22/T23/T24 merge-gated on T08/T09 PO merges; T27/T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C. Next candidate: T27 Billing (unblocked, spec-check tier data) OR T28 Settings/agents OR T29 Voice groundwork stub.
+- **My queue (preview)**: T21 merged; T25-slice-1 approved; T27-slice-1 assigned; T22/T23/T24 merge-gated on T09 PO merge; T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C.
 
 ---
 
@@ -30,6 +31,7 @@
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/wa-templates-lifecycle` @ `138edcd` — **awaiting PO merge**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
+| T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T27-slice-1 issued 2026-07-03 H0. Scope: **4 public endpoints** (`GET /api/settings/billing` overview + `POST /api/billing/upgrade-package` + `GET /api/billing/invoices/:id/download` streaming + `GET /api/billing/daily-brief/latest.pdf` 404 slice-1) + `UpgradeNotifierPort` + `LogOnlyUpgradeNotifierAdapter` (T25 pattern) + `ObjectStoragePort` consumption (T08 merged). Tier snapshot behind `SKIP_CROSS_DB_CHECKS` reuse — no new env. **Deferred**: quota meter increment (needs foundation HMAC plugin, same prereq as T25-slice-2), W3 daily brief worker + W5 monthly reset (needs T10 workers harness), upgrade request DB persistence (no table in T02). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/storage/`/`shared/socket/`. 6 GAPs pre-surfaced (T27-#1..#6). Awaiting Executor C PLAN. |
 
 ---
 
@@ -861,6 +863,167 @@ Step 8 — Verdict: **APPROVED**
 **§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T25 row → approved · Short roll-up posted to PARENT §2 · Q-T25-#5 stays open PARENT §3b · new ESLint nudge added to PARENT §10.**
 
 **PO merge please**: branch `feat/wa-templates-lifecycle` @ `138edcd` ready for main merge. Slice-2 (Meta-callback ingest) blocked on foundation HMAC plugin + `INTEGRATION_SHARED_SECRET` env — separate ticket. Slot C **2/10 approved** (T21 merged + T25-slice-1 approved-awaiting-merge).
+
+---
+
+### ASSIGNMENT T27 — Billing (overview + upgrade + invoice + daily brief) slice-1 — issued by PM C at 2026-07-03 H0
+
+- **Routed from**: `PM-STATUS-PARENT.md §1` T27 (Slot C queue; next unblocked task per PM C selection — no PO-merge-chain deps).
+- **Branch (to create on claim)**: `feat/settings-billing`
+- **Slice ruling**: **slice-1 = 4 public read/stream endpoints + upgrade-notifier port/adapter stub + tier read behind SKIP_CROSS_DB_CHECKS gate**. Deferred to future tasks (all needing foundation prereqs):
+  - **Quota meter increment endpoint** (Integration RPC receiver) — needs foundation HMAC plugin + `INTEGRATION_SHARED_SECRET` (same prereq as T25-slice-2 Meta-callback).
+  - **`billing:threshold_reached` socket emit** — depends on meter increment path.
+  - **Daily brief PDF generation worker (W3)** — needs T10 workers harness (Slot A wip).
+  - **Monthly quota reset worker (W5)** — same as W3.
+  - **Upgrade request persistence** — no `billing_upgrade_requests` table in T02; MVP ships log-only + Integration notifier stub; DB persistence a follow-up if PO wants audit trail.
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.10 (endpoints) + §2.10 (3-table DDL) + §6 RBAC row `/api/settings/billing*` + `/api/billing*` + §7 error catalog; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C7 (AC — 4 endpoints listed) + §80 (daily-brief empty state) + §101 (seed current-month quota row).
+- **Living reference**: `src/modules/wa-templates/` (T25-slice-1 approved) — has port+adapter subdirs. `src/modules/departments/` (T21) for tier-gate SKIP_CROSS_DB_CHECKS pattern.
+
+**Scope — slice-1 (4 public endpoints)**
+
+| Method   | Path                                       | Purpose                                                                             |
+| -------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `GET`    | `/api/settings/billing`                    | Overview aggregation — tier snapshot (Opsi C-gated), current-month quota, recent invoices, active extras, `daily_brief_pdf_url_latest` (nullable) |
+| `POST`   | `/api/billing/upgrade-package`             | Validate target tier → log + call `UpgradeNotifierPort.notify(...)` → return 202 Accepted `{requestId, status:'pending_manual_review', requestedAt}` |
+| `GET`    | `/api/billing/invoices/:id/download`       | Fetch `billing_invoices` row → verify tenant → resolve `pdf_url` object-storage key → stream via `ObjectStoragePort` with `Content-Type: application/pdf` + `Content-Disposition: attachment; filename="invoice-<number>.pdf"` |
+| `GET`    | `/api/billing/daily-brief/latest.pdf`      | **404 in slice-1** with `code: 'DAILY_BRIEF_NOT_AVAILABLE'` per MVP §80 empty-state — W3 worker not built yet |
+
+**Data model** (already migrated via T02, verified `prisma/schema.prisma:382-434` — do NOT touch schema)
+- `billing_quotas` @ spec `docs/spec/02-hotel-core.md:651-666`: `id`, `hotelId`, `periodStart (DATE, first-of-month)`, `outboundQuotaTotal`, `outboundUsed`, `threshold80EmittedAt`, `threshold100EmittedAt`, `resetAt`, timestamps. UNIQUE(hotel_id, period_start). No `daily_brief_pdf_url_latest` column — slice-1 returns null for that field (see GAP T27-#5).
+- `billing_invoices` @ 667-682: `id`, `hotelId`, `invoiceNumber (UNIQUE)`, `periodStart/End`, `amountIdr (Decimal 14,2)`, `status ∈ {issued, paid, overdue, void}` (CHECK), `pdfUrl (nullable VARCHAR 500)`, `issuedAt`, `paidAt`.
+- `billing_extras` @ 684-694: `id`, `hotelId`, `type`, `qty`, `amountIdr`, `purchasedAt`, `expiresAt`.
+
+**RBAC** (spec §6:812 — `/api/settings/billing*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **NO** · staff: **NO**.
+- `POST /api/billing/upgrade-package` + downloads: same RBAC (MVP §C7 lists all 4 as `gm_admin`).
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])` (T21/T25 verified pattern).
+
+**Business rules**
+- **Overview aggregation** (`GET /api/settings/billing`):
+  - Tier snapshot: read `hotels.tier_id → tiers` join. **Opsi C**: cross-DB join impossible when `SKIP_CROSS_DB_CHECKS=true`. Return `tier: null` (with observability WARN at prod+flag=true — mirror T21 Q-C-02 pattern from `departments.service.ts:55-64`).
+  - Current-month quota: `findLatestQuota(hotelId, currentPeriodStart)` where `periodStart = first-day-of-month(now())`. If no row exists (first month or MVP §101 seed missing), return `quota: null` — do NOT auto-create (that's W5 monthly-reset worker's job).
+  - Invoices: `listRecent(hotelId, {limit: 12})` — 12 most recent by `issuedAt DESC`. Fixed limit for slice-1 (no cursor pagination — invoices are few per hotel).
+  - Extras: `listActive(hotelId, now())` — where `expiresAt IS NULL OR expiresAt > now()`.
+  - Daily brief: `daily_brief_pdf_url_latest: null` in slice-1 (worker W3 not built).
+- **Upgrade request** (`POST /api/billing/upgrade-package`):
+  - Zod body: `{targetTier: 'professional' | 'luxury' | 'enterprise'}` (GAP T27-#2). Note: `'lite'` NOT in target enum (downgrade not supported in MVP; if PO wants, extend later).
+  - Generate `requestId = randomUUID()`.
+  - Call `upgradeNotifier.notify({requestId, hotelId, targetTier, userId: ctx.userId, requestedAt})` (log-only adapter for MVP).
+  - Return **202 Accepted** `{data: {requestId, status: 'pending_manual_review', requestedAt}}`.
+  - No DB persistence in slice-1 (GAP T27-#3).
+- **Invoice download** (`GET /api/billing/invoices/:id/download`):
+  - `loadOwnedInvoice(ctx, id)` — tenant scope + cross-tenant 404 leak-safe.
+  - If `invoice.pdfUrl` is null → 404 `INVOICE_PDF_NOT_AVAILABLE`.
+  - Object storage key resolution: `pdfUrl` field contains **storage key** (not full URL) per spec convention. `ObjectStoragePort.download(key)` returns Buffer (verify T08 adapter interface).
+  - If storage returns null / adapter throws NOT_FOUND-shaped error → 404 `INVOICE_PDF_NOT_FOUND` (storage race — pdfUrl set but file missing).
+  - Success: `reply.type('application/pdf').header('Content-Disposition', 'attachment; filename="invoice-<invoiceNumber>.pdf"').send(buffer)`.
+- **Daily brief** (`GET /api/billing/daily-brief/latest.pdf`):
+  - Slice-1: throw `NotFoundError('Daily brief', 'latest', {code: 'DAILY_BRIEF_NOT_AVAILABLE'})` OR appropriate app-error.
+  - Slice-2 (when W3 lands): resolve latest key from `billing_quotas.daily_brief_pdf_url_latest` (new column) OR convention `daily-briefs/{hotelId}/{YYYY-MM-DD}.pdf`.
+
+**Files to create**
+```
+src/modules/billing/
+├── billing.types.ts                                    (DomainBillingOverview, DomainInvoice,
+│                                                        DomainQuota, DomainExtra, DomainTierSnapshot,
+│                                                        UpgradeRequestResult, wire DTOs)
+├── billing.schema.ts                                   (zod: UpgradePackageBodySchema,
+│                                                        InvoiceIdParamSchema, no list-query schemas)
+├── billing.serializer.ts                               (Prisma rows → snake_case wire;
+│                                                        Decimal → string for amountIdr)
+├── billing.repository.ts                               (Prisma direct — findLatestQuota,
+│                                                        findInvoiceById, listRecentInvoices,
+│                                                        listActiveExtras)
+├── billing.service.ts                                  (overview aggregation + upgrade + invoice
+│                                                        download + daily brief 404;
+│                                                        SKIP_CROSS_DB_CHECKS tier gate mirror T21;
+│                                                        consumes UpgradeNotifierPort + ObjectStoragePort)
+├── billing.routes.ts                                   (Fastify plugin: 4 handlers; thin;
+│                                                        streaming reply for invoice; 202 for upgrade)
+├── ports/
+│   └── upgrade-notifier.port.ts                        (interface UpgradeNotifierPort.notify(input))
+├── adapters/
+│   └── log-only-upgrade-notifier.adapter.ts            (MVP stub — winston structured log per
+│                                                        T25 adapter pattern; returns
+│                                                        {requestId, notifiedAt})
+├── index.ts                                            (barrel — plugin + service class +
+│                                                        factory + port interface +
+│                                                        LogOnly adapter class + wire types;
+│                                                        eslint-disable pattern from T25 index.ts)
+└── __tests__/
+    ├── billing.service.test.ts                                (unit; mock repo + mock upgrade port +
+    │                                                           mock ObjectStoragePort;
+    │                                                           overview shape with quota null case +
+    │                                                           tier null case (Opsi C flag=true);
+    │                                                           upgrade returns 202 + calls port;
+    │                                                           invoice happy + pdfUrl null + tenant 404;
+    │                                                           daily brief 404 slice-1)
+    ├── billing.routes.test.ts                                 (unit; Fastify inject;
+    │                                                           happy + 401 + 403 dept_head/staff +
+    │                                                           404 cross-tenant + PDF Content-Type +
+    │                                                           Content-Disposition assertions)
+    ├── log-only-upgrade-notifier.adapter.test.ts              (unit; verify log payload shape +
+    │                                                           returns {requestId, notifiedAt})
+    └── billing.repository.integration.test.ts                 (testcontainers real Postgres;
+                                                                seed hotels + 2 months of quotas +
+                                                                3 invoices in different statuses +
+                                                                2 extras (1 active + 1 expired);
+                                                                UNIQUE(hotel_id, period_start) proven;
+                                                                UNIQUE(invoice_number) proven;
+                                                                status CHECK proven; tenant isolation)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1 held). Zero migration touches. Zero env changes (**reuse existing `SKIP_CROSS_DB_CHECKS`** for tier gate — no new flag).
+
+**T27-slice-1 DoD**
+- [ ] 4 public endpoints wired: GET overview · POST upgrade-package · GET invoice download · GET daily-brief latest.
+- [ ] Zod schemas at boundary: `UpgradePackageBodySchema.strict()` with `targetTier ∈ {'professional','luxury','enterprise'}` + `InvoiceIdParamSchema` with UUID.
+- [ ] Tenant scope: `hotelId` from `ctx.hotelId` on every query; cross-tenant 404 (leak-safe) proven on invoice download.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on all 4; `dept_head` + `staff` → 403 (verified via routes test).
+- [ ] Overview aggregation: parallel `Promise.all([tier, quota, invoices, extras])` for latency; graceful nulls where source missing.
+- [ ] Tier snapshot: reuse `SKIP_CROSS_DB_CHECKS` env — when `true`, service returns `tier: null` + winston WARN on prod+flag=true (mirror `departments.service.ts:55-64`). When `false` (post-Opsi-A restoration), read `hotels.tier_id → tiers` join and populate.
+- [ ] Upgrade endpoint: 202 Accepted, `{data: {requestId, status:'pending_manual_review', requestedAt}}` envelope; `upgradeNotifier.notify(...)` called with structured payload.
+- [ ] Invoice download: streams as `application/pdf` with `Content-Disposition: attachment; filename="invoice-<number>.pdf"`; 404 on missing row / null pdfUrl / storage-not-found.
+- [ ] Daily brief: 404 in slice-1 with `code: 'DAILY_BRIEF_NOT_AVAILABLE'` per MVP §80.
+- [ ] `ObjectStoragePort` consumed via constructor injection — DO NOT touch `src/core/storage/` internals; wire in barrel factory (`buildBillingService(db, {objectStorage, upgradeNotifier?, logger, skipCrossDbChecks, nodeEnv})`).
+- [ ] Winston logger scoped via `req.log.info({module:'billing', action, correlationId})` (T21 pattern).
+- [ ] Unit tests: full branch coverage — overview shape with quota-null + tier-null (Opsi C flag=true) + tier populated (flag=false path); upgrade calls port + returns 202; invoice happy + pdfUrl-null + storage-not-found + cross-tenant 404; daily brief 404.
+- [ ] Integration test: real Postgres via testcontainers; seed 2 hotels × 2-month quota history + 3 invoices with varied statuses + 2 extras (1 active + 1 expired); prove UNIQUE(hotel_id, period_start) + UNIQUE(invoice_number) + status CHECK + tenant isolation.
+- [ ] Line coverage ≥ 80% on new files (target 95%+ per T21/T25 precedent).
+- [ ] `make check` PASS with baseline = 363/1/364 (T25-merged) or 312/1/313 (pre-T25 if T25 not yet merged at SUBMIT). Declare baseline in SUBMIT explicitly.
+- [ ] `pnpm test:integration` PASS; all pre-existing suites regression-clean (departments/wa-templates/tickets/notifications/visits/guests).
+- [ ] Drift scans clean (T21/T25 pattern).
+- [ ] Named exports only; barrel exposes public API only.
+- [ ] Zero touch on `src/entrypoints/api.ts` + `src/core/config/env.ts` + `prisma/migrations/` + `src/core/storage/**` + `src/shared/socket/**` (T21 Override #1 + no cross-cutting changes).
+- [ ] `Decimal.js` amount serialization to string — do NOT emit `Decimal` object as JSON (broken JSON). Serializer converts `amountIdr.toString()` for wire.
+
+**PM notes for Executor C**
+
+- **Living reference**: `src/modules/wa-templates/` (T25) for port+adapter subdirs pattern + barrel eslint-disable pattern (both accepted at T25 VERDICT); `src/modules/departments/` (T21) for `SKIP_CROSS_DB_CHECKS` tier-gate + startup WARN pattern (mirror `service.ts:55-64` in billing service constructor).
+- **T08 `ObjectStoragePort` consumption**: import from `@core/storage/object-storage.port.js`. Verify method signature (probably `download(key: string): Promise<Buffer | null>` or similar) before designing service call site. Consume via constructor + factory wiring in barrel.
+- **`Decimal` field serialization**: Prisma returns `Decimal` object for `amountIdr` — MUST convert to string in serializer (`row.amountIdr.toString()` or `row.amountIdr.toFixed(2)` for consistent precision). JSON-emitting Decimal directly produces `{}` or vendor-specific shape.
+- **Session context**: import `SessionUser`, `SessionRole`, `TenantContext` from `@plugins/tenant-guard.js`. `ctx.userId` needed for `upgradeNotifier.notify(...)`.
+- **Error hierarchy**: `NotFoundError` (invoice/PDF 404), `ForbiddenError` (RBAC), `ValidationError` (400 auto), `ConflictError` (unused in slice-1), `BusinessRuleError` (unused unless upgrade tier-jump rule added — GAP T27-#2). No new error classes needed.
+- **No new env in slice-1**: reuse `SKIP_CROSS_DB_CHECKS`. No `BILLING_STUB_TIER` or similar.
+- **`Promise.all` in overview**: parallelize the 4 aggregation queries for latency — but wrap each in individual try/catch OR use `Promise.allSettled` if any single source failure should not fail the whole overview. PM lean: **fail-open** on Opsi C tier read (already null-returned), fail-closed on quota/invoice/extras queries (they're all local DB, failure is genuine).
+- **Fixture strategy for integration test**: use T05 seed HOTEL_A + create HOTEL_B mid-test; seed `billing_quotas` current-month + prior-month per hotel to prove `findLatestQuota` filter; seed 3 invoices with statuses `issued`/`paid`/`overdue` (skip `void` for slice-1 unless test convenience); 2 extras (1 active, 1 expired via `expiresAt < now()`).
+- **Streaming vs Buffer for invoice PDF**: MVP ship Buffer (`reply.type('application/pdf').send(buffer)`). Streaming with backpressure is a slice-2 optimization if PDFs get large (>5MB); T08 adapter interface likely returns Buffer anyway.
+- **Baseline math for SUBMIT**: state your `make check` baseline explicitly — depends on whether T25 has merged at SUBMIT time.
+- **Branch + commit**: `feat/settings-billing` · `feat(billing): T27 slice-1 overview + upgrade + invoice download + daily-brief-empty`.
+- **PLAN expectations**: session-start gate + files list + approach + GAP responses. Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5 all resolved — do NOT re-raise.
+- **Estimated size**: ~6-8h (biggest task yet — 3 tables + 4 endpoints + 2 ports + tier gate + streaming + upgrade flow). **CHECKPOINT WAJIB** if crossing ~4h with >4 files still incomplete.
+
+**Expected GAPs — surface in PLAN before coding**
+
+- **T27-#1** — Tier data source under Opsi C. Options: (A) return `tier: null` in overview + FE renders "tier unavailable" state; (B) add `BILLING_STUB_TIER` env for DEV UX with hardcoded matrix; (C) call Auth `/api/hotels/me` HTTP roundtrip. **PM lean: A** — mirrors T21 Q-C-02 SKIP_CROSS_DB_CHECKS pattern (no new env), simplest, forward-compatible with Opsi A restoration.
+- **T27-#2** — Upgrade payload shape. Spec §1.10 doesn't specify. Options: (A) `{targetTier: 'professional'|'luxury'|'enterprise'}` minimum; (B) `{targetTier, notes?: string}` for hotel context; (C) unrestricted `{tier: string}` and let Qooma team validate. **PM lean: A** — enforce enum at zod, no free-form fields. Downgrade (`'lite'`) NOT accepted (not in MVP).
+- **T27-#3** — Upgrade request persistence. Options: (A) log-only via port + return 202 with `requestId` (no DB record); (B) persist in `billing_extras` with `type='upgrade_request_<tier>'` (semantically odd); (C) escalate to Slot A for new migration. **PM lean: A** — matches spec phrasing "Backend confirms with Qooma team" (it's a notification, not self-serve). Audit trail via winston log + Integration relay stub for MVP.
+- **T27-#4** — Invoice PDF Content-Disposition filename. Options: (A) `invoice-<invoiceNumber>.pdf` (spec-natural — uses invoice_number UNIQUE); (B) `invoice-<id>.pdf`; (C) FE-supplied via query. **PM lean: A**.
+- **T27-#5** — Daily brief endpoint slice-1 behavior. Options: (A) 404 always with `code:'DAILY_BRIEF_NOT_AVAILABLE'` per MVP §80 empty state; (B) attempt convention-based key `daily-briefs/{hotelId}/latest.pdf` on storage and 404 if missing; (C) escalate to Slot A for `daily_brief_pdf_url_latest` column addition to `billing_quotas`. **PM lean: A** — slice-1 doesn't build the worker, so honestly reflect the state. When W3 worker lands (post-T10), evaluate B vs C.
+- **T27-#6** — Overview `Promise.all` failure mode. Options: (A) `Promise.all` — any failure kills the whole overview (500); (B) `Promise.allSettled` — each source resolves independently, missing ones become null; (C) tier-fail-open but quota/invoice/extras-fail-closed. **PM lean: C** — tier is already null-tolerant under Opsi C, other queries are local DB and failure is genuine.
+
+Awaiting PM C ACK before coding begins.
 
 <!--
 TEMPLATE — copy untuk task baru:
