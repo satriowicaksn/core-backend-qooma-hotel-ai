@@ -2770,6 +2770,69 @@ src/modules/knowledge/
 
 Awaiting PM C ACK before coding begins.
 
+#### PLAN T24-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+4 JSON endpoints — `GET /api/settings/knowledge` (list with `?is_active` / `?category` / `?tag` filters) + `POST` (create) + `PATCH /:id` (update) + `DELETE /:id` (delete). Prisma direct (ADR-0001) — `knowledge_entries` has NO UNIQUE + NO CHECK constraints (simplest business rules yet). RBAC `requireRole([gm_admin])` slice-1 (dept_head 403; reuses Q-T22-#2 escalation). Snake_case wire; `tags: string[]` pass-through; permissive `category` + `tags` per-element bounds. CSV import DEFERRED to slice-2 (reuses Q-T22-#1 `@fastify/multipart` escalation). No port/adapter. No transaction. Zero cross-cutting touches.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.5 endpoints (lines 174-176) + §2.7 DDL (581-598) + §6:807 RBAC ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C4 (AC) + §4.6 (dept_head scoping — same ambiguity as Q-T22-#2) ✓
+- Parent docs spot-read: `src/modules/agents/` (T28 thinnest single-entity CRUD twin — `loadOwned` + tenant scope), `src/modules/departments/` (T21 tenant/repo conventions), `src/modules/voice/` (T29 defensive-narrow patterns), `src/plugins/tenant-guard.ts` + `rbac.ts`, `src/core/errors/app-errors.ts` (`NotFoundError` L42 + `ValidationError` L27; no ConflictError needed), `prisma/schema.prisma:325-341` (KnowledgeEntry model — verified: `title VARCHAR(255)`, `content Text`, `category VARCHAR(80) nullable`, `tags String[] default []`, `isActive default true`; no UNIQUE + no CHECK) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T21/T25/T27/T28/T29/T22 ✓ (living references — T22 merged as of `2d41120`) — all approved and merged
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **513/1/514** on `main` (post-T22-merge PR #15 `2d41120`) ✓
+- Scaffolder risk: **none** — no `pnpm create`; **no new dependency** (multipart deferred per Q-T22-#1 which covers T24 too); no schema.prisma edit; no env change; no migration touch
+
+**GAP responses** — accept all 5 PM leans; no new escalations
+
+- **Q-T24-#1 (CSV deferral)** → **Accepting PM lean**: slice-1 JSON-only; reuses **Q-T22-#1** open at PARENT §3b (batched multipart ratify covers T22/T23/T24). No new PARENT §3b entry.
+- **Q-T24-#2 (dept_head RBAC)** → **Accepting PM lean**: `requireRole([gm_admin])` only; dept_head 403; reuses **Q-T22-#2** open at PARENT §3a (spec §6:807 uses identical "yes (dept-relevant content allowed)" phrasing as menu §6:806 + MVP §4.6 same schema-vs-spec gap on missing `department_id` FK). No new §3a entry.
+- **Q-T24-#3 (`tags` validation)** → **Accepting PM lean**: `z.array(z.string().min(1).max(40)).max(20)` bounded per-element + max array length. Matches Q-C-03 / Q-T25-#3 permissive-with-bounds pattern.
+- **Q-T24-#4 (`category` validation)** → **Accepting PM lean**: `z.string().min(1).max(80).nullable().optional()`. Matches DDL VARCHAR(80) NULL + Q-T25-#2 / Q-T29-#2 permissive-name discipline.
+- **Q-T24-#5 (FTS `?q=` slice-1)** → **Accepting PM lean**: NOT in slice-1. Spec §1.5 lists only CRUD verbs; GIN index at `to_tsvector(title||content)` exists in DDL but no endpoint spec'd. Follow-up ticket if PO/FE wants FTS surface.
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1/Q-T22-#1..#2 all resolved or open elsewhere — not re-raising.
+
+**Files to create** (as per ASSIGNMENT §Files to create)
+```
+src/modules/knowledge/
+├── knowledge.types.ts                    (DomainKnowledgeEntry, EntryRow, EntryWire,
+│                                            list filters, response envelopes)
+├── knowledge.schema.ts                   (zod: CreateEntryBodySchema.strict +
+│                                            UpdateEntryBodySchema.strict.refine-non-empty +
+│                                            EntryIdParamSchema + ListEntriesQuerySchema;
+│                                            title 1-255, content 1-10000, category 1-80 nullable,
+│                                            tags array bounded per Q-T24-#3)
+├── knowledge.serializer.ts               (Prisma row → snake_case wire; tags pass-through)
+├── knowledge.repository.ts               (Prisma direct — findMany, findById, create,
+│                                            update, delete)
+├── knowledge.service.ts                  (list w/ filter composition + create + update +
+│                                            delete; loadOwned helper mirror T21/T28;
+│                                            buildKnowledgeWhere pure fn for testability)
+├── knowledge.routes.ts                   (Fastify plugin: 4 handlers; thin)
+├── index.ts                              (barrel: routes plugin + service + factory + wire types)
+└── __tests__/
+    ├── knowledge.service.test.ts                (unit; mock repo; zod parsers +
+    │                                              filter composition + CRUD + cross-tenant 404)
+    ├── knowledge.routes.test.ts                 (unit; Fastify inject; 200/201/204 +
+    │                                              401/403/404/400 matrix)
+    └── knowledge.repository.integration.test.ts (testcontainers real Postgres; seed 2 hotels
+                                                    × varied entries; list filters (is_active /
+                                                    category / tag); tags array round-trip;
+                                                    tenant isolation; CRUD lifecycle)
+```
+
+**Files to modify**
+- **Zero** per ASSIGNMENT DoD.
+
+**Approach**
+Mirror T28/T29 layout — thinnest single-entity module. Service constructor `(repo)` — no port/adapter. **List**: `buildKnowledgeWhere(ctx, filters)` pure function composes `where: { hotelId, ...(isActive/category/tag conditions) }`; `tag` filter uses Prisma `tags: { has: '<value>' }` (single-element array-contains). super_admin bypass matches T21/T22 (`ctx.isSuperAdmin ? {} : { hotelId: ctx.hotelId }`). **Create**: `hotel_id` server-set from `ctx.hotelId`; zod strict body accepts `title` (1-255 required) + `content` (1-10000 required) + `category` (Q-T24-#4 permissive nullable optional) + `tags` (Q-T24-#3 bounded array optional) + `is_active` (boolean optional). Return 201 with created row. **Update**: `loadOwned(ctx, id)` (T21 pattern with `NotFoundError` + `assertHotelOwnership` for cross-tenant 404 leak-safety); Prisma update with allowlist delta; 200. **Delete**: `loadOwned` + repo delete; 204. **No P2002 catch** (no UNIQUE at DB); **no ConflictError** (no delete-conflict). Serializer: pass-through `tags: string[]` (Prisma guarantees array shape); snake_case fields including `hotel_id` per T21/T25 wire convention. RBAC `requireRole([gm_admin])` on all 4 handlers. Winston log via `req.log.info({module:'knowledge', action, correlationId})` per T21/T25/T27/T28/T29/T22 pattern.
+
+**Est.**: ~2-3h (smallest task since T29 — simpler than T29 actually, no stub /test guard branch). Straight-line to SUBMIT if all tests land clean.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
