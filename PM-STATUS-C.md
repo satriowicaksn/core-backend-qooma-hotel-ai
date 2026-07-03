@@ -3911,6 +3911,135 @@ Step 8 — Verdict: **APPROVED**
 
 **Final remaining Slot C task**: **T30 Analytics (Luxury-gated)** — 8 endpoints, same Opsi C hard-block as T26. Three-state wire precedent from T26 applies (`is_luxury_gate: boolean | null` + `tier: TierName | null` instead of misleading `false` defaults). Ready to assign when you're ready.
 
+### ASSIGNMENT T30 — Analytics (slice-1, 3 core endpoints + T26 three-state tier-gate) — claimed by exec-C (Satrio) at 2026-07-03 H0
+
+- **Routed from**: PM C verbal "continue to next T" + T26 VERDICT line 3900 explicit endorsement — "three-state wire pattern is Slot C precedent … Applies to T30 Analytics". Final remaining Slot C task per line 3912. Self-select per EXECUTOR-PROTOCOL §0.3 route (B).
+- **Branch (to create on PLAN ACK)**: `feat/analytics`
+- **Slice ruling**: **slice-1 = 3 core spec-detailed endpoints** (`overview` + `tickets` + `high-alert`) + tier-gate stubbed via T26 three-state pattern. **Slice-2 deferred**: `departments` + `peak-hours` + `top-requests` + `satisfaction` (4 additional aggregations). **Slice-3 deferred**: `export` (binary Excel/PDF generation — needs new dep + PO ratify).
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.4 (endpoints lines 119-158) + §6:800 RBAC + §7:832 error catalog (`TIER_GATE`); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C10 (AC) + §4.4 (tier-gated analytics rule) + §149 (test guidance).
+- **Living reference**: `src/modules/feature-flags/` (T26 approved — three-state wire pattern for Opsi C tier metadata; PM ratified as Slot C precedent), `src/modules/billing/` (T27 — `TierName` type + `SKIP_CROSS_DB_CHECKS` Q-C-02 WARN pattern), `src/modules/tickets/` (Slot B merged — canonical `tickets` table + local Prisma aggregation source for all analytics).
+
+**Scope — slice-1 (3 endpoints)**
+
+| Method | Path                        | Purpose                                                              |
+| ------ | --------------------------- | -------------------------------------------------------------------- |
+| `GET`  | `/api/analytics/overview`   | KPI card: total tickets, resolution rate, avg satisfaction, avg response time |
+| `GET`  | `/api/analytics/tickets`    | Volume-per-day time series, filtered by `?from`/`?to`/`?period`      |
+| `GET`  | `/api/analytics/high-alert` | High-alert dept analysis per spec §1.4 Q-CONTRACT-21 shape           |
+
+**Deferred to T30-slice-2**: `departments`, `peak-hours`, `top-requests`, `satisfaction` (4 more read endpoints, same aggregation pattern).
+**Deferred to T30-slice-3**: `export` (binary Excel/PDF — needs `exceljs` or `pdfkit` dep + PO ratify per CLAUDE.md §11).
+
+**Data model** (already merged via T02 + Slot B tickets — do NOT touch schema)
+- `tickets` @ `prisma/schema.prisma:174-213` — analytics source. Fields used slice-1: `hotelId`, `departmentId`, `status`, `complaintType`, `isHighAlert`, `resolvedSatisfaction`, `createdAt`, `closedAt`.
+- No new tables. All computation is `Prisma.$queryRaw` OR `groupBy` on existing tickets.
+
+**RBAC** (spec §6:800 — `/api/analytics/*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **yes with own-dept slice** (spec §6:800 lists dept_head as "own-dept slice"). Slice-1 treats dept_head same as gm_admin (no own-dept filter yet — see GAP T30-#3). Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin', 'dept_head'])`.
+- **Tier gate**: 403 with `TIER_GATE` code when `hotel.tier !== 'luxury'` (spec §1.4 explicit).
+
+**Business rules**
+- **Tier gate**: reads `hotel.tier` via cross-DB join. Under Opsi C `SKIP_CROSS_DB_CHECKS=true`: **skip enforcement** (tier data null → cannot compute 403); response wire includes `meta.tier: null` + `meta.is_luxury_gate: null` (T26 three-state precedent). Under flag=false: real tier read → `ForbiddenError({reason: 'TIER_GATE'})` 403 if not luxury.
+- **Common query params**: `?from` (ISO date), `?to` (ISO date), `?period` ('day'|'week'|'month'|'custom'). Default: `from=30d ago`, `to=today`, `period=day`.
+- **Overview**: aggregate over date range — `totalTickets` (count), `resolutionRate` (closed/total), `avgSatisfaction` (avg of resolved_satisfaction non-null), `avgResponseTimeMinutes` (avg of `closedAt - createdAt` for closed tickets).
+- **Tickets time-series**: group by `date_trunc('day', createdAt)` (day period); count per day; return `{date, count}` array in date order.
+- **High-alert per Q-CONTRACT-21**: per-department aggregation over date range — for each dept, count high-alert tickets vs total; compute `current_period_rate` + `prev_period_rate` (same-length prev window) + `alert_threshold_exceeded` (rate > 0.15 default threshold); `salah_kamar_count` = count where `complaint_type IN ('general', 'staff_attitude')` (proxy for "wrong-room" slice-1 stub — see GAP T30-#5); `trend_7d` = last-7-day per-day count array. Alert summary aggregates across depts.
+- **Common tenant scope**: all queries filtered by `hotelId: ctx.hotelId` (super_admin bypass via `isSuperAdmin`).
+
+**Files to create**
+```
+src/modules/analytics/
+├── analytics.types.ts                   (KPI wires, tier-gate meta shape three-state,
+│                                          period enum, filter types, response envelopes)
+├── analytics.schema.ts                  (zod: common ?from/?to/?period query schema
+│                                          + endpoint-specific query schemas)
+├── analytics.serializer.ts              (KPI aggregation rows → snake_case wire;
+│                                          meta.tier + meta.is_luxury_gate three-state)
+├── analytics.repository.ts              (Prisma direct — 3 methods: overviewAgg,
+│                                          ticketsByDay, highAlertByDept.
+│                                          Uses $queryRaw for date_trunc + agg SQL.)
+├── analytics.service.ts                 (3 endpoint methods; consumes repo + tier port;
+│                                          Q-C-02 WARN on prod+flag=true)
+├── analytics.routes.ts                  (Fastify plugin: 3 handlers; thin)
+├── index.ts                             (barrel: plugin + service + factory + wire types)
+└── __tests__/
+    ├── analytics.service.test.ts               (unit; mock repo; branch coverage on
+    │                                             three endpoints + Opsi C bypass +
+    │                                             Q-C-02 WARN)
+    ├── analytics.routes.test.ts                (unit; Fastify inject; 200/400/401/403 +
+    │                                             tier-gate 403 mocked from service)
+    └── analytics.repository.integration.test.ts (testcontainers real Postgres;
+                                                    seed tickets with varied
+                                                    departments/statuses/dates/high-alert;
+                                                    verify aggregation results;
+                                                    tenant isolation)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1). `env.ts` reuses `SKIP_CROSS_DB_CHECKS`. Schema + migrations + core + plugins + shared untouched. No new dependencies (binary export deferred to slice-3).
+
+**T30-slice-1 DoD**
+- [ ] 3 endpoints wired.
+- [ ] Zod query params: common `?from`/`?to`/`?period`; `.strict()`; ISO date validation on `from`/`to`; period enum.
+- [ ] Tier-gate: three-state wire under Opsi C flag=true (`meta.tier: null`, `meta.is_luxury_gate: null`); real 403 `TIER_GATE` under flag=false.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin', 'dept_head'])`; staff → 403.
+- [ ] Tenant scope: `hotelId: ctx.hotelId` on every aggregation.
+- [ ] Q-C-02 startup WARN on prod+flag=true (T21/T27/T26 pattern).
+- [ ] Response envelope: `{data: <endpoint-specific>, meta: {tier, is_luxury_gate, from, to, period}}`.
+- [ ] Winston logger scoped.
+- [ ] Unit tests full branch coverage.
+- [ ] Integration test: real Postgres with seeded tickets; verify all 3 aggregations.
+- [ ] Line coverage ≥ 80%.
+- [ ] `make check` PASS baseline **622/1/623** (post-T26-merge on `main`).
+- [ ] Drift scans clean.
+- [ ] Named exports only.
+- [ ] Zero touch on foundation surface. No new deps.
+
+#### PLAN T30-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+3 core analytics endpoints (`GET /api/analytics/overview` + `/tickets` + `/high-alert`). Real Prisma aggregation over `tickets` table (local DB — Slot B merged). Tier gate stubbed via **T26 three-state wire precedent** — `meta.tier: TierName | null` + `meta.is_luxury_gate: boolean | null` under Opsi C flag=true; real 403 `TIER_GATE` under flag=false. Common `?from`/`?to`/`?period` query params with 30d/today/day defaults. Slice-2 wires 4 more read endpoints (`departments`/`peak-hours`/`top-requests`/`satisfaction`); slice-3 wires `export` binary (needs new dep).
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.4 (endpoints + tier gate + query params + Q-CONTRACT-21 high-alert shape) + §6:800 RBAC + §7:832 `TIER_GATE` ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C10 (AC) + §4.4 (tier-gated analytics rule) ✓
+- Parent docs spot-read: `src/modules/feature-flags/` (T26 three-state wire pattern PM-ratified as precedent), `src/modules/billing/` (T27 `TierName` type + Q-C-02 WARN), `src/modules/tickets/` (Slot B — canonical tickets DB with `isHighAlert`/`resolvedSatisfaction`/`complaintType`/`closedAt` fields verified at `prisma/schema.prisma:180-200`), `src/plugins/tenant-guard.ts` + `rbac.ts` (`dept_head` in allowed list slice-1 per spec §6:800), `src/core/errors/app-errors.ts` (`ForbiddenError` for `TIER_GATE`), `src/core/config/env.ts` (`SKIP_CROSS_DB_CHECKS` reused) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T21/T25/T27/T28/T29/T22/T24/T23/T26 ✓ (T26 three-state precedent) — all merged; Slot B tickets ✓
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **622/1/623** on `main` (T29+T24+T23+T26 all merged) ✓
+- Scaffolder risk: **none** — no `pnpm create`; **no new dependency** slice-1 (export binary deferred to slice-3); no schema.prisma edit; no env change (reuse `SKIP_CROSS_DB_CHECKS`); no migration
+
+**GAPs / questions**
+
+- **GAP T30-#1** — Tier-gate behavior under `SKIP_CROSS_DB_CHECKS=true`.
+  - **Options**: A) Skip 403; response includes `meta.tier: null` + `meta.is_luxury_gate: null` (T26 three-state precedent); data still computed; B) Fail-closed 403 always under Opsi C (safe-strict — but breaks all DEV analytics access); C) Fail-open with `is_luxury_gate: true` (misleading default — anti-pattern per T26 tightenings).
+  - **My intent**: **A** — PM explicitly ratified T26 three-state as durable pattern for T30 (VERDICT line 3900); response includes `meta.tier: null` + `meta.is_luxury_gate: null` under flag=true; data computed from local tables normally; startup WARN on prod+flag=true.
+- **GAP T30-#2** — Response envelope shape. Spec §1.4 examples don't show a wrapper.
+  - **Options**: A) `{data: <endpoint-specific>, meta: {tier, is_luxury_gate, from, to, period}}` — meta carries tier state + query echo for FE reconciliation; B) `{data: ...}` only, tier state on separate header; C) inline `_meta` inside `data`.
+  - **My intent**: **A** — matches T27 billing overview wrapping-with-meta discipline. `meta` is the natural home for tier state and query echo.
+- **GAP T30-#3** — `dept_head` "own-dept slice" per spec §6:800.
+  - **Options**: A) Slice-1 treats dept_head same as gm_admin (no own-dept filter yet); B) Slice-1 filters aggregations by `department_id = ctx.deptId` for dept_head; C) 403 dept_head slice-1.
+  - **My intent**: **A** — spec is vague on which endpoints per-dept-slice ("own-dept slice" phrasing is one-liner without semantics). Slice-1 uses `requireRole([gm_admin, dept_head])` but doesn't apply dept filter. If PO defines the semantic, slice-2 wires dept filter. Non-blocking (data is still tenant-scoped).
+- **GAP T30-#4** — `?period` semantics + defaults.
+  - **Options**: A) Default `from=30d-ago`, `to=today`, `period=day` (30d rolling window with day buckets); B) Require explicit `from`/`to` (400 if missing); C) Default `from/to=null` → return full history.
+  - **My intent**: **A** — matches typical dashboard UX; FE can override. `period='custom'` requires both from+to explicit.
+- **GAP T30-#5** — `salah_kamar_count` semantics for high-alert (spec §1.4 doesn't define).
+  - **Options**: A) Slice-1 stub: count of `complaint_type IN ('general', 'staff_attitude')` (proxy — real "wrong room" complaint category not in T02 CHECK); B) `null` slice-1, defer to spec clarification; C) Require new `complaint_type='wrong_room'` migration (foundation-scope).
+  - **My intent**: **A** — proxy count keeps the wire shape stable; when PO defines the actual mapping, one-line service change. Note in SUBMIT for PO ratify.
+- **GAP T30-#6** — `alert_threshold_exceeded` threshold value (spec doesn't define).
+  - **My intent**: Hardcode `0.15` (15%) slice-1 — reasonable industry default for hospitality complaint escalation. Constant `HIGH_ALERT_THRESHOLD = 0.15` exported for slice-2 tuning.
+- **GAP T30-#7** — 5 deferred endpoints + `export` (spec §1.4 lists 8 total).
+  - **My intent**: Defer 4 more read endpoints (`departments`/`peak-hours`/`top-requests`/`satisfaction`) to slice-2 (same pattern as slice-1, ~4 more service methods); defer `export` binary to slice-3 (needs `exceljs` or `pdfkit` dep + PO ratify per CLAUDE.md §11 WAJIB). This 3-slice split keeps each slice reviewable (~3-4h each).
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T21..Q-T27/Q-T28-#1/Q-T29-#1/Q-T22-#1..#2/Q-T24-#1..#5/Q-T23-#1..#7/Q-T26-#1..#7 all resolved or open elsewhere — not re-raising.
+
+**Approach**
+Mirror T26 layout (single-entity read-only module with SKIP_CROSS_DB_CHECKS pattern) — no port/adapter, no transaction, no state machine. Service constructor `(repo, opts = {skipCrossDbChecks, nodeEnv, logger?})` — Q-C-02 WARN at construction on prod+flag=true. Three service methods: `overview(ctx, query)` + `ticketsByDay(ctx, query)` + `highAlert(ctx, query)`. Each: (1) fetch aggregations via repo; (2) serialize KPI values + build `meta = {tier: null, is_luxury_gate: null, from, to, period}` under flag=true; (3) return. Repository uses Prisma `groupBy` where possible + `$queryRaw` for date_trunc SQL (Postgres). Routes: for each endpoint, `requireTenant → requireRole([gm_admin, dept_head]) → parse query → tier gate (skipped under flag=true) → service call → send`. Winston logs per T21 pattern. Tests: unit mock repo; integration testcontainer with 3 hotels × mixed ticket seed (varied dates, statuses, departments, high-alert flags, satisfaction scores) → verify KPI arithmetic.
+
+**Est.**: ~4-5h (medium — 3 spec-detailed endpoints + Prisma aggregation via $queryRaw for date_trunc + T26 three-state pattern application + 7 GAP decisions). CHECKPOINT if crossing ~4h with >3 files incomplete.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
