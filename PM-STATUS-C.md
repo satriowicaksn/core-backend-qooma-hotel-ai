@@ -12,18 +12,15 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **7/10 approved**
-- **Recent activity**:
-  - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
-  - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
-  - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
-  - **T28 Settings/agents (Min-3)** — **MERGED** (PR #14 `0e68a38`) ✓
-  - **T22 Menu CRUD (slice-1)** — **MERGED** (PR #15 `2d41120`) ✓
+- **Day**: H0 (2026-07-03) — Slot C **7/10 approved**; **T23-slice-1 assigned**
+- **Active tasks**:
   - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
-  - **T24 Knowledge CRUD (slice-1)** — **APPROVED attempt 1** (2026-07-03 H0). `feat/settings-knowledge` @ `975ec6a` awaiting PO merge. **Cleanest end-to-end task in Slot C** (0 tightenings + 0 new §3 + ~99% coverage). Zero PO ratifications needed.
-- **Branches**: `feat/settings-voice` (T29) + `feat/settings-knowledge` (T24), both awaiting PO merge
+  - **T24 Knowledge CRUD (slice-1)** — APPROVED attempt 1; `feat/settings-knowledge` @ `975ec6a` awaiting PO merge
+  - **T23 Menu bulk-availability (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 1 JSON endpoint (`POST /menu/bulk-availability`) added to existing menu module (T22 merged). CSV import deferred to T23-slice-2 reusing Q-T22-#1 batched multipart escalation.
+- **Recent merged**: T21+T25+T27+T28+T22.
+- **Branches**: `feat/settings-voice` (T29) + `feat/settings-knowledge` (T24) awaiting PO merge · `feat/menu-bulk-availability` (T23, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25+T27+T28+T22 merged; T29+T24 approved; **T23 fully unblocked (slice-1 = bulk-availability JSON; CSV multipart deferred to T23-slice-2 reusing Q-T22-#1)**; T22-slice-2 + T24-slice-2 gated on batched Q-T22-#1 PO ratify; T26+T30 hard-blocked at DEV by Opsi C tier-join.
+- **My queue (preview)**: T21+T25+T27+T28+T22 merged; T29+T24 approved; T23-slice-1 assigned; T22-slice-2 + T23-slice-2 + T24-slice-2 all gated on batched Q-T22-#1 multipart PO ratify; T26+T30 hard-blocked at DEV by Opsi C tier-join.
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -44,6 +41,7 @@
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
 | T24 | Knowledge CRUD + CSV import (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-knowledge` @ `975ec6a` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). **Cleanest end-to-end Slot C task**: PLAN 0 tightenings + 0 new PARENT §3 → SUBMIT 0 issues. `make check` **560/1/561** (+47 net: 34 service + 13 routes); `pnpm test:integration` **160/1/161** (all 10 suites regression-clean); coverage **~99% lines** module-wide (repo/service/serializer/schema all 100% lines). **Drift 0/9 + 0 eslint-disable** (4th consecutive Slot C — T28/T29/T22/T24 pattern). Zero PO ratifications needed for this task — all Qs reuse existing open items (Q-T22-#1 multipart, Q-T22-#2 RBAC). Integration test documents spec reality (case-sensitive ?category, Prisma `has` at index 2, default `tags:[]` shape). CSV import deferred to T24-slice-2 (batched multipart ratify with T22-slice-2 + T23). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
+| T23 | Menu bulk ops (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T23-slice-1 issued 2026-07-03 H0. Scope: **1 JSON endpoint** (`POST /api/settings/menu/bulk-availability` — bulk-set `is_available` + `available_window_from/to` on N items, N≤100). **Extends existing `src/modules/menu/` module** (T22 merged, PR #15) — additive changes; T22's 78 tests must still pass. Reuses T22 helpers: `refineAvailableWindow` composable schema helper + `hhmmToTime` codec + tenant-scoped `where: {id: {in}, hotelId}` filter. **Skipped enumeration leak-safe** — collapses cross-tenant + nonexistent to same `NOT_FOUND` code. Partial-success semantic (200 with `{updated, skipped[]}` summary; never 404). CSV import DEFERRED to T23-slice-2 (batched Q-T22-#1 multipart escalation). Files: 6 existing menu files MODIFIED (schema/repository/service/routes/types/index) + 2 new test files. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. 7 GAPs pre-surfaced (T23-#1..#7). Awaiting Executor C PLAN. |
 
 ---
 
@@ -3068,6 +3066,137 @@ Step 8 — Verdict: **APPROVED**
 - **Fully unblocked remaining**: **T23 Menu bulk ops** (`POST /menu/bulk-availability` JSON + `POST /menu/import-csv` multipart-deferred to T23-slice-2 reusing Q-T22-#1); **T22-slice-2 + T23-slice-2 + T24-slice-2** all gated on Q-T22-#1 `@fastify/multipart` PO ratify (batched).
 - **Hard-blocked at DEV** by Opsi C tier-join: T26 feature flags + T30 analytics.
 - **Next candidate**: T23-slice-1 (bulk-availability JSON endpoint — smallest remaining task; 1 endpoint + no port/adapter).
+
+---
+
+### ASSIGNMENT T23 — Menu bulk-availability (slice-1, JSON-only; CSV import deferred to slice-2) — issued by PM C at 2026-07-03 H0
+
+- **Routed from**: PM C queue selection from T24 VERDICT "Next candidate" line. Formal §8 queue empty — PM ASSIGNMENT authoritative.
+- **Branch (to create on claim)**: `feat/menu-bulk-availability`
+- **Slice ruling**: **slice-1 = 1 JSON endpoint** (`POST /api/settings/menu/bulk-availability`). **CSV import (`POST /api/settings/menu/import-csv`) DEFERRED to T23-slice-2** — same batched `@fastify/multipart` dep gate as T22-slice-2 + T24-slice-2 (Q-T22-#1 open at PARENT §3b). Single PO ratify unblocks all three CSV/multipart slices simultaneously.
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.5 endpoint at line 173 ("Bulk-set availability window for N items") + §6:806 RBAC (menu family, same as T22); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C3 (AC — 2 endpoints, `gm_admin`). Spec is intentionally thin on request/response shape — **PM design authority** on payload/response envelope (see business rules below).
+- **Living reference**: `src/modules/menu/` (T22 merged, PR #15 `2d41120`) — extends the existing menu module (not a new module). Reuses T22's `refineAvailableWindow` schema helper + `hhmmToTime`/`timeToHHmm` codec pair + `isPrismaUniqueViolation` pattern.
+
+**Scope — slice-1 (1 JSON endpoint, extends existing menu module)**
+
+| Method | Path                                       | Purpose                                                                             |
+| ------ | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `POST` | `/api/settings/menu/bulk-availability`     | Bulk-update `is_available` and/or `available_window_from/to` on N menu items in one call. Cross-tenant items reported in `skipped` array (leak-safe). |
+
+**Deferred to T23-slice-2 (CSV import)**
+- `POST /api/settings/menu/import-csv` — multipart CSV upload, uses shared `parseCsvWithSchema` from T09 (merged) + `@fastify/multipart` package.
+- Same prereq as T22-slice-2 + T24-slice-2 — batched PO ratify on Q-T22-#1.
+
+**Request body shape (PM design)** — enforce at zod:
+```json
+{
+  "item_ids": ["uuid1", "uuid2", ...],       // 1-100 items, all UUIDs
+  "is_available": true|false,                // optional
+  "available_window_from": "HH:mm" | null,   // optional; null clears
+  "available_window_to": "HH:mm" | null      // optional; null clears
+}
+```
+- **At least one** of `is_available` / `available_window_from` / `available_window_to` must be provided (`.refine(non-empty-delta)`).
+- **`available_window_from/to` cross-field rule** (reuse T22 `refineAvailableWindow` — both-or-neither + `from < to` when both set + skip refine when both null).
+- **`item_ids` bounds**: `z.array(z.string().uuid()).min(1).max(100)`.
+
+**Response shape (PM design)** — 200 with summary:
+```json
+{
+  "data": {
+    "updated": 42,
+    "skipped": [
+      { "item_id": "uuid-X", "reason": "NOT_FOUND" }
+    ]
+  }
+}
+```
+- `reason: 'NOT_FOUND'` for cross-tenant items OR items that don't exist — **leak-safe: DO NOT distinguish** (matches T21/T22/T24 cross-tenant 404 pattern).
+- No `reason: 'CROSS_TENANT'` code — collapses to `NOT_FOUND` for enumeration safety.
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `menu_items` @ spec `docs/spec/02-hotel-core.md:559-579`; Prisma model `MenuItem` @ `prisma/schema.prisma:301-326`. Only `isAvailable`, `availableWindowFrom`, `availableWindowTo` are mutated by this endpoint. Other fields untouched.
+
+**RBAC** (spec §6:806 — same as T22 menu family):
+- `super_admin`: yes · `gm_admin`: yes · **`dept_head`: SAME AS Q-T22-#2** ambiguity — slice-1 `gm_admin` + `super_admin` only, dept_head 403. **Reuse Q-T22-#2 escalation** (no new §3a entry).
+
+**Business rules**
+- **Tenant scope**: filter items to `where: {id: {in: item_ids}, hotelId: ctx.hotelId}` — Prisma `updateMany` operates only on matching rows. Items not matching (cross-tenant OR nonexistent) are collected into `skipped[]`.
+- **Skipped enumeration**: pre-fetch matching item IDs via `repo.findMatchingItemIds(item_ids, hotelId)` (returns Set), then compute `skipped = item_ids.filter(id => !matchingSet.has(id))` — each skipped item gets `{ item_id, reason: 'NOT_FOUND' }`.
+- **Partial success**: even if some items are skipped, updated items persist (best-effort semantic per admin UX). Return 200 with the summary — DO NOT return 4xx for partial-skip.
+- **Bulk update**: single `repo.bulkUpdateAvailability(matchingIds, hotelId, delta)` using Prisma `updateMany({where: {id: {in}, hotelId}, data: delta})` for efficiency (batch write, no N+1). Returns `{count}` from Prisma; the count IS the `updated` field.
+- **TIME field write**: reuse T22's `hhmmToTime` codec for `available_window_from/to` values on write; null passes through as null (clears the field).
+- **Empty `item_ids` array**: zod `.min(1)` rejects with 400 before reaching service.
+- **All-skipped edge case**: if `matchingIds.length === 0` (all cross-tenant OR nonexistent), still return 200 with `updated: 0` + `skipped` populated. Never 404.
+
+**Files to modify** (extends existing menu module — T22 merged foundation)
+- **`src/modules/menu/menu.schema.ts`** — ADD `BulkAvailabilityBodySchema` (`.strict()` + `.refine(at-least-one-of-3-fields)` + reuse `refineAvailableWindow` composable helper); ADD `parseBulkAvailabilityBody` parser.
+- **`src/modules/menu/menu.repository.ts`** — ADD `findMatchingItemIds(itemIds: string[], hotelId: string): Promise<string[]>` (uses `findMany({where, select: {id: true}})`); ADD `bulkUpdateAvailability(itemIds: string[], hotelId: string, delta: {isAvailable?, availableWindowFrom?, availableWindowTo?}): Promise<number>` (uses `updateMany`, returns count).
+- **`src/modules/menu/menu.service.ts`** — ADD `bulkAvailability(ctx, input): Promise<BulkAvailabilityResponse>` service method (composes findMatching → computes skipped → conditional bulkUpdate → returns summary).
+- **`src/modules/menu/menu.routes.ts`** — ADD `POST /settings/menu/bulk-availability` handler at the bottom of the plugin (mirror T22 handler discipline: `requireTenant → requireRole → parse → service → send`).
+- **`src/modules/menu/menu.types.ts`** — ADD `BulkAvailabilityBody`, `BulkAvailabilityDelta` (repo delta shape), `BulkAvailabilitySkippedItem`, `BulkAvailabilityResult`, `BulkAvailabilityResponse` types.
+- **`src/modules/menu/index.ts`** — re-export `BulkAvailabilityBody`, `BulkAvailabilityResponse` types (public API expansion — no new eslint-disable needed, just types).
+
+**Files to create** (new tests only — no new module files)
+- `src/modules/menu/__tests__/menu.bulk.service.test.ts` — new file for bulk service tests (keep existing `menu.service.test.ts` untouched — additive, easier code review).
+- `src/modules/menu/__tests__/menu.bulk.routes.test.ts` — new file for bulk route tests.
+- Extend `src/modules/menu/__tests__/menu.repository.integration.test.ts` with a new `describe('bulk', ...)` block (2-3 tests: happy multi-hotel skip + all-skipped + N=100 boundary).
+
+**T23-slice-1 DoD**
+- [ ] 1 endpoint wired: `POST /api/settings/menu/bulk-availability`.
+- [ ] Zod strict body: `item_ids` array 1-100 UUIDs; `is_active`/`available_window_*` optional; `.refine(at-least-one-delta-field)` rejects wholly-empty bodies; `refineAvailableWindow` reused for cross-field validation.
+- [ ] Tenant scope: filter by `hotelId: ctx.hotelId` on both pre-check and updateMany; cross-tenant items → `skipped: NOT_FOUND` (leak-safe, matches T21/T22 pattern).
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])`; dept_head + staff → 403.
+- [ ] Response envelope: `{data: {updated: number, skipped: [{item_id, reason: 'NOT_FOUND'}]}}` with 200 (not 204 — carries summary).
+- [ ] Partial-success semantic: skipped items don't fail the batch; updated items persist.
+- [ ] `available_window_from/to` null-clear support (T22 pattern reused via `hhmmToTime` codec).
+- [ ] Winston logger scoped via `req.log.info({module:'menu', action:'bulk-availability', itemCount, correlationId})` (T21/T22 pattern).
+- [ ] Unit tests: `menu.bulk.service.test.ts` covers happy N=3 all-updated + N=3 mixed skip/update + N=1 all-skipped + N=100 boundary + `at-least-one-delta-field` refine + `refineAvailableWindow` reuse; `menu.bulk.routes.test.ts` covers 200 happy + 401 no-tenant + 403 dept_head/staff + 400 empty item_ids + 400 refine.
+- [ ] Integration test: `menu.repository.integration.test.ts` extended with `describe('bulk', ...)` block — seed both HOTEL_A (3 items) + HOTEL_B (1 item); assert cross-tenant skip; assert `updated: 2, skipped: [{HOTEL_B_item_id, NOT_FOUND}]`; assert N=100 boundary rejects N=101; assert TIME null-clear round-trip.
+- [ ] Line coverage ≥ 80% on new lines (target ≥ 95% per Slot C precedent).
+- [ ] `make check` PASS with baseline **560/1/561** (post-T24-approved; recomputes if T29/T24 merge before SUBMIT).
+- [ ] `pnpm test:integration` PASS; all pre-existing suites regression-clean (including T22 menu 15 tests untouched).
+- [ ] Drift scans clean.
+- [ ] Named exports only; new types in `index.ts` re-exported as public API additions.
+- [ ] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. **No new dependencies added**.
+
+**PM notes for Executor C**
+
+- **Living reference**: `src/modules/menu/` (T22 approved+merged) — you extend this module. **Do NOT create a new `menu-bulk/` module** — the endpoint is under the same `/api/settings/menu/*` URL prefix + operates on the same `menu_items` table, so extending is the natural fit. This is the first Slot C task that modifies an existing module rather than creating new — additive changes only, T22's 78 tests must still pass.
+- **Reuse T22 building blocks**:
+  - `refineAvailableWindow` composable schema helper from `menu.schema.ts:64-85` (both-or-neither + `from < to`)
+  - `hhmmToTime` codec from `menu.serializer.ts:24-26` for TIME field write
+  - `assertHotelOwnership` NOT needed here (no `loadOwned` pattern; bulk uses `where: {id: {in}, hotelId}` filter instead)
+- **Prisma `updateMany` return shape**: `{count: number}` — this is the `updated` value. Do NOT compute `updated = matchingIds.length` (semantics differ if a race deletes an item between pre-check and updateMany — Prisma returns the actual count).
+- **Skipped enumeration algorithm**:
+  ```ts
+  const matching = await repo.findMatchingItemIds(input.item_ids, ctx.hotelId);
+  const matchingSet = new Set(matching);
+  const skipped = input.item_ids
+    .filter(id => !matchingSet.has(id))
+    .map(item_id => ({ item_id, reason: 'NOT_FOUND' as const }));
+  ```
+- **Session-context**: import `SessionUser`, `SessionRole`, `TenantContext` from `@plugins/tenant-guard.js` (same as T22).
+- **Error hierarchy**: `ValidationError` (400 auto via zod); `AuthError` (401 via requireTenant); `ForbiddenError` (403 via requireRole). No `NotFoundError` — this endpoint never 404s (skipped items are reported in the summary, not the error envelope).
+- **No port + adapter needed** — pure DB write, no external RPC. **Expected 0 eslint-disable** (5th consecutive Slot C module if held — T28/T29/T22/T24/T23 pattern).
+- **Fixture strategy for integration test**: seed HOTEL_A with 3 items (`id_a1`, `id_a2`, `id_a3`) + HOTEL_B with 1 item (`id_b1`). Call bulk with `[id_a1, id_a2, id_b1, 'random-uuid-1', 'random-uuid-2']` → expect `updated: 2, skipped: [{id_b1, NOT_FOUND}, {random-1, NOT_FOUND}, {random-2, NOT_FOUND}]`. Verifies both cross-tenant + nonexistent handling collapse to same `NOT_FOUND` (leak-safe).
+- **Test isolation**: bulk endpoint modifies `menu_items` shared with T22's tests. Use fresh containers OR ensure your test file gets its own describe-block setup/teardown — T22 tests are already merged so they're in the integration suite alongside yours.
+- **Baseline math for SUBMIT**: post-T24-approved is 560/1/561; if T24 (and/or T29) merges before your SUBMIT, delta recomputes.
+- **Branch + commit**: `feat/menu-bulk-availability` · `feat(menu): T23 slice-1 bulk-availability endpoint (extends menu module)`.
+- **PLAN expectations**: session-start gate + files list + approach + GAP responses. Q-B-01/-B-02/Q-C-01..-03/Q-T22-#1..#2/Q-T24-#1..#5/etc all resolved or open elsewhere — do NOT re-raise.
+- **Estimated size**: ~2-3h (smallest task since T29/T24 — 1 endpoint added to existing module, reuses T22 helpers). Straight-line to SUBMIT if tests land clean.
+
+**Expected GAPs — surface in PLAN before coding**
+
+- **T23-#1** — **CSV import deferral to slice-2**. Reuse **Q-T22-#1** batched multipart escalation. No new PARENT §3b entry needed. Slice-1 satisfies MVP §C3 for the JSON endpoint; import is a separate bullet.
+- **T23-#2** — **dept_head RBAC ambiguity**. Reuse **Q-T22-#2** escalation (spec §6:806 same phrasing for menu family). PM lean: `gm_admin + super_admin` only slice-1.
+- **T23-#3** — **`item_ids` max bound**. PM lean: `.max(100)` per request — reasonable admin batch size + prevents pathological memory-heavy requests. Alternatives: 50 (tighter), 500 (looser), unbounded (no). Confirm choice in PLAN.
+- **T23-#4** — **Skipped enumeration reason granularity**. PM lean: single `'NOT_FOUND'` code (leak-safe — matches T21/T22/T24 discipline: don't distinguish "doesn't exist" from "cross-tenant"). Alternatives: separate codes `'CROSS_TENANT'` vs `'NOT_FOUND'` (leaks enumeration signal). Confirm PM lean.
+- **T23-#5** — **Empty-delta rejection**. PM lean: zod `.refine(at-least-one-of-3-fields)` rejects with 400 (matches T21/T22/T24 `.refine(non-empty)` pattern — no valid use case for a bulk endpoint that does nothing).
+- **T23-#6** — **All-skipped edge case status code**. PM lean: 200 with `updated: 0 + skipped: [...]` (never 404 — spec says summary endpoint, 4xx would misrepresent a valid-request-with-zero-matches). Confirm.
+- **T23-#7** — **Response `data.skipped` ordering**. PM lean: preserve input order (filter over `input.item_ids` in the same order they arrived). Simpler for FE to reconcile against the request.
+
+Awaiting PM C ACK before coding begins.
 
 <!--
 TEMPLATE — copy untuk task baru:
