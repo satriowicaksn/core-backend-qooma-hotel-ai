@@ -1183,6 +1183,152 @@ Independently verified `src/core/storage/object-storage.port.ts:1-32` — surfac
 
 Proceed to coding on `feat/settings-billing`. Awaiting your SUBMIT.
 
+#### SUBMIT T27-slice-1 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Billing slice-1 — overview + upgrade + invoice download + daily-brief-empty
+Branch: `feat/settings-billing` @ `97f1615` (pushed to origin)
+Files changed: 13 new (0 modified — `api.ts`, `env.ts`, `prisma/migrations/`, `core/`, `shared/socket/`, `plugins/` all untouched per DoD)
+  - `src/modules/billing/billing.types.ts` (new)
+  - `src/modules/billing/billing.schema.ts` (new)
+  - `src/modules/billing/billing.serializer.ts` (new — includes `TIER_MATRIX` snapshot for flag=false trajectory)
+  - `src/modules/billing/billing.repository.ts` (new)
+  - `src/modules/billing/billing.service.ts` (new)
+  - `src/modules/billing/billing.routes.ts` (new)
+  - `src/modules/billing/ports/upgrade-notifier.port.ts` (new)
+  - `src/modules/billing/ports/billing-pdf-storage.port.ts` (new — Q-T27-#7 local port)
+  - `src/modules/billing/adapters/log-only-upgrade-notifier.adapter.ts` (new)
+  - `src/modules/billing/adapters/in-memory-billing-pdf-storage.adapter.ts` (new)
+  - `src/modules/billing/index.ts` (new — barrel + `buildBillingService` factory)
+  - `src/modules/billing/__tests__/billing.service.test.ts` (new — 20 tests)
+  - `src/modules/billing/__tests__/billing.routes.test.ts` (new — 13 tests)
+  - `src/modules/billing/__tests__/log-only-upgrade-notifier.adapter.test.ts` (new — 3 tests)
+  - `src/modules/billing/__tests__/in-memory-billing-pdf-storage.adapter.test.ts` (new — 3 tests)
+  - `src/modules/billing/__tests__/billing.repository.integration.test.ts` (new — 12 tests)
+
+**DoD self-check** (from ASSIGNMENT T27-slice-1 lines 980-999)
+- [x] 4 public endpoints wired — `billing.routes.ts:45,60,79,97`.
+- [x] Zod schemas at boundary: `UpgradePackageBodySchema.strict()` (Q-T27-#2 target_tier enum) + `InvoiceIdParamSchema` uuid — `billing.schema.ts:8-14,16-18`.
+- [x] Tenant scope: `hotelId` from `ctx.hotelId` on every query; cross-tenant 404 proven on invoice download via `loadOwnedInvoice → assertHotelOwnership` — service test `should 404 with distinct resource "Invoice" on cross-tenant fetch` + integration test `should 404 (Invoice resource) on cross-tenant fetch (leak-safe)`.
+- [x] RBAC: `requireRole(ctx, ['gm_admin'])` on all 4; `dept_head` + `staff` both 403; super_admin implicit — routes tests cover all 4 cases.
+- [x] Overview aggregation: tier via internal helper (fail-open via `Promise.resolve(null)` under flag=true) + `Promise.all` on the 3 local-DB queries `[quotaP, invoicesP, extrasP]` per Q-T27-#6 lean C.
+- [x] Tier snapshot: reuses `SKIP_CROSS_DB_CHECKS` env — flag=true returns null; prod+flag=true emits winston WARN once at construction (mirror `departments.service.ts:49-62` — same event `cross_db_check_skip` for grep across modules). Verified by unit test.
+- [x] Upgrade endpoint: 202 Accepted + `{data: {request_id, status:'pending_manual_review', requested_at}}`; `upgradeNotifier.notify(...)` called with `{requestId, hotelId, userId, targetTier, requestedAt}` (verified by unit test asserting `expect.objectContaining`).
+- [x] Invoice download: `application/pdf` + `Content-Disposition: attachment; filename="invoice-<sanitized number>.pdf"`. Distinct `NotFoundError` resource names discriminate the branches: `Invoice` (row missing / cross-tenant), `InvoicePdf` (pdfUrl null), `InvoicePdfFile` (storage-race). Sanitization regex `/[^A-Za-z0-9._-]/g → _` — routes test `should sanitize malformed invoiceNumber` exercises `INV/2026 "07"; nasty` → `INV_2026__07___nasty`.
+- [x] Daily brief 404 slice-1 with `NotFoundError('DailyBrief', 'latest')` per Q-T27-#5 lean A + PM tightening #1 (no invented `code`, discriminator via `details.resource`).
+- [x] `BillingPdfStoragePort` consumed via constructor injection. Q-T27-#7 local port (not `src/core/storage`) — barrel factory defaults to `InMemoryBillingPdfStorageAdapter`; production wiring can swap to a future foundation `ObjectStoragePort.download`-consuming adapter.
+- [x] Winston logger scoped via `req.log.info({module:'billing', action, correlationId})` in each handler (T21 pattern).
+- [x] Unit tests: overview 6 branch cases (tier-null, quota-null empty-state, quota populated, invoices serialized, extras active, daily_brief null slot); upgrade 202 + notifier called; invoice happy + null-url 404 + storage-race 404 + cross-tenant 404 + row-missing 404; daily brief always 404; Q-C-02 WARN prod+flag=true + no-WARN dev+flag=true.
+- [x] Integration test: real Postgres via testcontainers; seed 2 hotels × 2-month quota history for HOTEL_A + 3 invoices in `issued`/`paid`/`overdue` statuses + 2 extras (1 active + 1 expired) + minimal HOTEL_B; proves UNIQUE(hotel_id, period_start), UNIQUE(invoice_number), status CHECK, tenant isolation, invoices ORDER BY issuedAt DESC, extras active filter.
+- [x] Line coverage ≥ 80% — **overall 96.68% lines / 97.14% stmts across `src/modules/billing/**`** (routes 95.34%, service 97.22%, schema 100%, serializer 88.88%, repo 100%, adapters 100%/100%, index 100%).
+- [x] `make check` PASS with baseline **363/1/364 (T25-merged) + T10-merged = 371/1/372**; SUBMIT delta = **+40 unit** (411/1/412) + **+12 integration** (116/1/117).
+- [x] `pnpm test:integration` PASS — all pre-existing suites regression-clean (departments/wa-templates/tickets/notifications/visits/guests).
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes public API (routes plugin + `BillingService` + `buildBillingService` factory + both port interfaces + both adapter classes + DTO/wire types).
+- [x] Zero touch on `src/entrypoints/api.ts` + `src/core/config/env.ts` + `prisma/migrations/` + `src/core/storage/**` + `src/shared/socket/**` + `src/plugins/**`.
+- [x] `Decimal.toFixed(2)` serialization — `billing.serializer.ts:76,90` — matches DDL DECIMAL(14,2) precision + stable `"1500000.00"` wire shape. Verified by unit + integration tests.
+
+**3 PM tightenings — all held**
+- **#1 `NotFoundError` signature** — verified `src/core/errors/app-errors.ts:42-49`; `(resource: string, id?: string)` only, no `code` override. All 4 404 paths use distinct resource names (`Invoice` / `InvoicePdf` / `InvoicePdfFile` / `DailyBrief`) as wire discriminators; envelope stays uniform `code:'NOT_FOUND'` per spec §7. Unit tests assert on `details.resource` at each branch.
+- **#2 `Decimal.toFixed(2)`** — pinned in serializer (`serializeInvoice.amount_idr` + `serializeExtra.amount_idr`). Never `.toString()`. Tests assert exact `"1500000.00"` / `"99000.00"` output.
+- **#3 Tier flag=false null (no throw)** — `fetchTierSnapshot` returns `Promise.resolve(null)` under both flag branches; TODO(Opsi A) comment inlined at `billing.service.ts:146-149` calls out the migration path. WARN at construction is the safety net for prod+flag=true.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings — 4 inline eslint-disable in barrel for `no-restricted-imports` with justification comments; 2 for import, 2 for re-export; same T25 pattern)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 411 passed, 1 skipped, 412 total (baseline 371/1/372 + **+40**)
+- `pnpm test:integration`: **PASS** — 116 passed, 1 skipped, 117 total (baseline 104/1/105 + **+12**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/billing/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route/adapter (excl tests where used as jest assertion helpers): **0** (5 hits in `__tests__/` — all `throw new Error('expected throw')` pattern, T21/T25 precedent)
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `setTimeout` for delay pattern: **0**
+- Hardcoded URL / secret / wrap-Prisma interface: **0**
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no callback ingest; that's slice-2 or foundation).
+- Token encryption via `shared/utils/crypto`: **N/A** (no token storage).
+- PII masking in log: **N/A** (billing metadata is operational — `hotelId`/`userId`/`targetTier` — no guest PII).
+- `hotel_id` NEVER from body — sourced from `ctx.hotelId` in every service method (`overview`, `requestUpgrade`, `downloadInvoicePdf` via `loadOwnedInvoice`, `downloadDailyBriefPdf`). Zod strict rejects unknown fields.
+- **Filename sanitization** (Q-T27-#4 defense-in-depth) — `sanitizeFilename` in `billing.routes.ts:38-40` replaces any non-`[A-Za-z0-9._-]` char with `_`. Test proves `INV/2026 "07"; nasty` → `INV_2026__07___nasty`. Prevents CRLF header injection even though `invoiceNumber` DB column is VARCHAR(40) domain-constrained.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 40 new tests (20 service + 12 routes + 3 upgrade-notifier adapter + 3 pdf-storage adapter + 2 zod parser)
+- Integration: 12 new tests
+- Coverage (`src/modules/billing/**`, ran with `--coverageThreshold='{}'`):
+  ```
+  All files                                | 97.14 stmts | 76.66 branch | 95.34 funcs | 96.68 lines
+   billing.repository.ts                   | 100         | —            | 100         | 100
+   billing.routes.ts                       | 95.34       | 50           | 100         | 95.23
+   billing.schema.ts                       | 100         | 66.66        | 100         | 100
+   billing.serializer.ts                   | 88.88       | 60           | 75          | 88.88
+   billing.service.ts                      | 97.22       | 100          | 100         | 97.22
+   ports/*                                 | 100         | 100          | 100         | 100
+   adapters/*                              | 100         | 100          | 100         | 100
+   index.ts                                | 100         | 75           | 20          | 100
+  ```
+  Serializer branch/func gaps: `serializeTier` is exported but not exercised in tests (its use site is the flag=false dead branch today per PM tightening #3). Acceptable per T25 precedent (dead code kept for migration path).
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+GET /settings/billing
+< 200 OK
+< {"data":{
+    "tier": null,                        // Opsi C flag=true
+    "quota": { "period_start":"2026-07-01", "outbound_used":250, ... },
+    "invoices": [ ... ordered issuedAt DESC ... ],
+    "extras": [ { "type":"outbound_pack", ... } ],  // active only
+    "daily_brief_pdf_url_latest": null   // slice-1
+  }}
+
+POST /billing/upgrade-package  body {"target_tier":"luxury"}
+< 202 Accepted
+< {"data":{"request_id":"<uuid>","status":"pending_manual_review","requested_at":"..."}}
+# adapter emits: {module:"billing", event:"upgrade_notifier_stub", requestId, hotelId, userId, targetTier:"luxury", requestedAt}
+
+POST /billing/upgrade-package  body {"target_tier":"lite"}
+< 400 Bad Request  (Q-T27-#2 no downgrade)
+
+GET /billing/invoices/<id>/download   (row + pdfUrl + storage all present)
+< 200 OK
+< Content-Type: application/pdf
+< Content-Disposition: attachment; filename="invoice-INV-2026-07-001.pdf"
+< <pdf bytes>
+
+GET /billing/invoices/<id>/download   (row present, pdfUrl null)
+< 404 Not Found
+< {"code":"NOT_FOUND","message":"InvoicePdf not found: <id>","details":{"resource":"InvoicePdf","id":"<id>"}}
+
+GET /billing/invoices/<id>/download   (row present, pdfUrl set, storage miss)
+< 404 Not Found
+< {"code":"NOT_FOUND","details":{"resource":"InvoicePdfFile","id":"<id>"}}
+
+GET /billing/invoices/<id>/download   (HOTEL_A ctx, HOTEL_B invoice)
+< 404 Not Found
+< {"code":"NOT_FOUND","details":{"resource":"Invoice","id":"<id>"}}   # leak-safe
+
+GET /billing/daily-brief/latest.pdf
+< 404 Not Found
+< {"code":"NOT_FOUND","details":{"resource":"DailyBrief","id":"latest"}}   # slice-1 empty state
+```
+
+**Notes / questions for PM C**
+
+1. **Q-T27-#7 escalation ready to roll to PARENT** — `BillingPdfStoragePort` is local, `InMemoryBillingPdfStorageAdapter` provides tests + composition-root seam. When Slot A extends `ObjectStoragePort.download` (T-INFRA-06 candidate per PM ACK), migration is a one-line barrel swap. Local port + adapter deletion is one commit; billing service constructor untouched.
+2. **`TIER_MATRIX` in serializer + `serializeTier` currently unreferenced** — I inlined the spec §1.10 tier matrix in the serializer as future-facing code for when Opsi A restores. Currently the flag=true path (only live path today) returns `null` before reaching `serializeTier`. The dead-code trajectory is documented in `fetchTierSnapshot` TODO. If PM prefers stricter live-only code, I can remove `TIER_MATRIX` + `serializeTier` — say the word. Coverage impact: serializer would go from 88.88% lines to 100%.
+3. **Overview `Promise.all` failure mode** — implemented per Q-T27-#6 lean C: tier via a separate `Promise.resolve` (always resolves today; failure-mode reserved for slice-2/foundation Auth HTTP call) + `Promise.all` on the 3 local-DB queries. Any local-DB failure bubbles to route → 500. If PM prefers `Promise.allSettled` for the whole thing (make quota/invoices/extras fail independently), the change is small — but the current design matches the ACK.
+4. **`InMemoryBillingPdfStorageAdapter.put` is test-only** — it's `public` so tests can seed the store; there's no service consumer. If PM wants stricter surface control (module-internal), I can move the adapter to a `test-utils/` subfolder or expose via a separate barrel — but the current setup mirrors T25's `InMemoryAdapter` peek pattern from T08.
+5. **Upgrade `notes?: string` follow-up** — Q-T27-#2 explicitly rejected free-form fields. If FE later asks for a "hotel context" free-text field per PM's option B, that's a single zod field addition + notifier payload passthrough — flagging as a potential Q-T28 or upgrade-slice-2 concern.
+6. **Foundation `NotFoundError` extension nudge** (from PM tightening #1 foundation follow-up) — I noticed while implementing that distinct resource names work well for wire discrimination but require FE code to compare strings. If Slot A extends `NotFoundError(resource, id?, extraDetails?)`, we could carry a semantic hint like `{ subKind: 'INVOICE_PDF_NULL_URL' }`. Not blocking; PM's ratified discriminator pattern is spec-compliant today.
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
