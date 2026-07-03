@@ -105,6 +105,30 @@ export const UpdateItemBodySchema = refineAvailableWindow(
     }),
 );
 
+// T23-slice-1: bulk-availability body. Q-T23-#3 item_ids 1-100; reuses
+// refineAvailableWindow for the both-or-neither + strictly-less-than window
+// rule; Q-T23-#5 refines at least one delta field.
+export const BulkAvailabilityBodySchema = refineAvailableWindow(
+  z
+    .object({
+      item_ids: z.array(z.string().uuid()).min(1).max(100),
+      is_available: z.boolean().optional(),
+      available_window_from: hhmmField.nullable().optional(),
+      available_window_to: hhmmField.nullable().optional(),
+    })
+    .strict()
+    .refine(
+      (v) =>
+        v.is_available !== undefined ||
+        v.available_window_from !== undefined ||
+        v.available_window_to !== undefined,
+      {
+        message:
+          'at least one of is_available / available_window_from / available_window_to must be provided',
+      },
+    ),
+);
+
 export const CategoryIdParamSchema = z.object({
   id: z.string().uuid('category id must be a valid uuid'),
 });
@@ -134,6 +158,7 @@ export type CreateCategoryBody = z.infer<typeof CreateCategoryBodySchema>;
 export type UpdateCategoryBody = z.infer<typeof UpdateCategoryBodySchema>;
 export type CreateItemBody = z.infer<typeof CreateItemBodySchema>;
 export type UpdateItemBody = z.infer<typeof UpdateItemBodySchema>;
+export type BulkAvailabilityBody = z.infer<typeof BulkAvailabilityBodySchema>;
 
 export function parseCreateCategoryBody(raw: unknown): CreateCategoryBody {
   const result = CreateCategoryBodySchema.safeParse(raw);
@@ -169,6 +194,12 @@ export function parseItemId(raw: unknown): string {
   const result = ItemIdParamSchema.safeParse(raw);
   if (!result.success) throw toValidationError(result.error);
   return result.data.id;
+}
+
+export function parseBulkAvailabilityBody(raw: unknown): BulkAvailabilityBody {
+  const result = BulkAvailabilityBodySchema.safeParse(raw);
+  if (!result.success) throw toValidationError(result.error);
+  return result.data;
 }
 
 export function parseListMenuQuery(raw: unknown): MenuListFilters {

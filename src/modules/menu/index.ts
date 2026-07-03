@@ -9,12 +9,16 @@ import { MenuService } from './menu.service.js';
 export { menuRoutes, type MenuRoutesOptions } from './menu.routes.js';
 export { MenuService } from './menu.service.js';
 export type {
+  BulkAvailabilityBody,
   CreateCategoryBody,
   CreateItemBody,
   UpdateCategoryBody,
   UpdateItemBody,
 } from './menu.schema.js';
 export type {
+  BulkAvailabilityResponse,
+  BulkAvailabilityResult,
+  BulkAvailabilitySkippedItem,
   MenuCategoryResponse,
   MenuCategoryWire,
   MenuItemResponse,

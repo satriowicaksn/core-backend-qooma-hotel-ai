@@ -9,6 +9,7 @@ import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import {
+  parseBulkAvailabilityBody,
   parseCategoryId,
   parseCreateCategoryBody,
   parseCreateItemBody,
@@ -157,6 +158,25 @@ export const menuRoutes: FastifyPluginCallback<MenuRoutesOptions> = (fastify, op
     );
     await service.removeCategory(ctx, id);
     return reply.code(204).send();
+  });
+
+  fastify.post('/settings/menu/bulk-availability', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const body = parseBulkAvailabilityBody(req.body);
+    // itemCount only per PM ACK — do not log the full array (payload size +
+    // audit signal-to-noise).
+    req.log.info(
+      {
+        module: 'menu',
+        action: 'bulk-availability',
+        itemCount: body.item_ids.length,
+        correlationId: correlationIdOf(req),
+      },
+      'bulk update menu item availability',
+    );
+    const result = await service.bulkAvailability(ctx, body);
+    return reply.send(result);
   });
 
   done();

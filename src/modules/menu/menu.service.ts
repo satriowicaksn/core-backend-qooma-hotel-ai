@@ -9,6 +9,7 @@ import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.
 
 import type { MenuRepository } from './menu.repository.js';
 import type {
+  BulkAvailabilityBody,
   CreateCategoryBody,
   CreateItemBody,
   UpdateCategoryBody,
@@ -21,6 +22,9 @@ import {
   serializeMenuItem,
 } from './menu.serializer.js';
 import type {
+  BulkAvailabilityDelta,
+  BulkAvailabilityResponse,
+  BulkAvailabilitySkippedItem,
   MenuCategoryResponse,
   MenuCategoryRow,
   MenuItemResponse,
@@ -217,6 +221,37 @@ export class MenuService {
     await this.repo.deleteItem(id);
   }
 
+  /**
+   * T23-slice-1: bulk-update `is_available` / `available_window_from` /
+   * `available_window_to` across N items in one call. Cross-tenant + non-
+   * existent items collapse to a single `NOT_FOUND` skipped reason (Q-T23-#4
+   * leak-safe — same discipline as T21/T22/T24 cross-tenant 404). `hotel_id`
+   * is server-scoped from `ctx.hotelId`; item IDs from the body only feed
+   * the `WHERE id IN (...)` filter, never a hotel selection. Partial-success
+   * semantic: skipped items don't fail the batch, updated items persist.
+   * `updated` is the Prisma-authoritative `updateMany.count` — race-safe if
+   * an item is deleted between the pre-check and update.
+   */
+  async bulkAvailability(
+    ctx: TenantContext,
+    input: BulkAvailabilityBody,
+  ): Promise<BulkAvailabilityResponse> {
+    const matching = await this.repo.findMatchingItemIds(input.item_ids, ctx.hotelId);
+    const matchingSet = new Set(matching);
+    // Q-T23-#7: preserve input order for FE reconciliation against request.
+    const skipped: BulkAvailabilitySkippedItem[] = input.item_ids
+      .filter((id) => !matchingSet.has(id))
+      .map((item_id) => ({ item_id, reason: 'NOT_FOUND' as const }));
+
+    let updated = 0;
+    if (matching.length > 0) {
+      const delta = buildBulkDelta(input);
+      updated = await this.repo.bulkUpdateAvailability(matching, ctx.hotelId, delta);
+    }
+
+    return { data: { updated, skipped } };
+  }
+
   private async loadOwnedCategory(ctx: TenantContext, id: string): Promise<MenuCategoryRow> {
     const row = await this.repo.findCategoryById(id);
     if (!row) {
@@ -234,4 +269,26 @@ export class MenuService {
     assertHotelOwnership(ctx, row.hotelId, 'MenuItem');
     return row;
   }
+}
+
+// Body → Prisma delta. Three-way null semantic on TIME fields (T22 pattern):
+// undefined = omit (preserve current); null = clear; string = codec to Date.
+function buildBulkDelta(input: BulkAvailabilityBody): BulkAvailabilityDelta {
+  const delta: {
+    isAvailable?: boolean;
+    availableWindowFrom?: Date | null;
+    availableWindowTo?: Date | null;
+  } = {};
+  if (input.is_available !== undefined) {
+    delta.isAvailable = input.is_available;
+  }
+  if (input.available_window_from !== undefined) {
+    delta.availableWindowFrom =
+      input.available_window_from === null ? null : hhmmToTime(input.available_window_from);
+  }
+  if (input.available_window_to !== undefined) {
+    delta.availableWindowTo =
+      input.available_window_to === null ? null : hhmmToTime(input.available_window_to);
+  }
+  return delta;
 }

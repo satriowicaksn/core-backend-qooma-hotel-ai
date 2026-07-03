@@ -4,7 +4,12 @@
 
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import type { MenuCategoryRow, MenuCategoryWithItemsRow, MenuItemRow } from './menu.types.js';
+import type {
+  BulkAvailabilityDelta,
+  MenuCategoryRow,
+  MenuCategoryWithItemsRow,
+  MenuItemRow,
+} from './menu.types.js';
 
 export class MenuRepository {
   constructor(private readonly db: PrismaClient) {}
@@ -63,5 +68,39 @@ export class MenuRepository {
 
   async deleteItem(id: string): Promise<void> {
     await this.db.menuItem.delete({ where: { id } });
+  }
+
+  // T23-slice-1 bulk-availability support. Pre-fetch matching IDs from within
+  // the tenant scope so the service can compute the skipped[] array (leak-safe
+  // Q-T23-#4 — no distinction between cross-tenant and nonexistent). Uses
+  // .select for a cheaper read (only IDs deserialized).
+  async findMatchingItemIds(itemIds: string[], hotelId: string): Promise<string[]> {
+    const rows = await this.db.menuItem.findMany({
+      where: { id: { in: itemIds }, hotelId },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  // Prisma updateMany returns { count } — the authoritative updated tally
+  // even if a race between findMatchingItemIds and this call deletes an item.
+  async bulkUpdateAvailability(
+    itemIds: string[],
+    hotelId: string,
+    delta: BulkAvailabilityDelta,
+  ): Promise<number> {
+    const data: Prisma.MenuItemUncheckedUpdateManyInput = {};
+    if (delta.isAvailable !== undefined) data.isAvailable = delta.isAvailable;
+    if (delta.availableWindowFrom !== undefined) {
+      data.availableWindowFrom = delta.availableWindowFrom;
+    }
+    if (delta.availableWindowTo !== undefined) {
+      data.availableWindowTo = delta.availableWindowTo;
+    }
+    const res = await this.db.menuItem.updateMany({
+      where: { id: { in: itemIds }, hotelId },
+      data,
+    });
+    return res.count;
   }
 }

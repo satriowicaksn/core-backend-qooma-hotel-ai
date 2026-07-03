@@ -55,3 +55,24 @@ export interface MenuCategoryResponse {
 export interface MenuItemResponse {
   readonly data: MenuItemWire;
 }
+
+// T23-slice-1: bulk-availability endpoint types.
+export interface BulkAvailabilityDelta {
+  readonly isAvailable?: boolean;
+  readonly availableWindowFrom?: Date | null;
+  readonly availableWindowTo?: Date | null;
+}
+
+export interface BulkAvailabilitySkippedItem {
+  readonly item_id: string;
+  readonly reason: 'NOT_FOUND';
+}
+
+export interface BulkAvailabilityResult {
+  readonly updated: number;
+  readonly skipped: readonly BulkAvailabilitySkippedItem[];
+}
+
+export interface BulkAvailabilityResponse {
+  readonly data: BulkAvailabilityResult;
+}
