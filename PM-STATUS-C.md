@@ -1025,6 +1025,112 @@ src/modules/billing/
 
 Awaiting PM C ACK before coding begins.
 
+#### PLAN T27-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+4 endpoints: `GET /api/settings/billing` overview aggregation (tier snapshot via `SKIP_CROSS_DB_CHECKS` gate → null under Opsi C, mirror T21 Q-C-02) + `POST /api/billing/upgrade-package` (202 Accepted, log-only notifier stub) + `GET /api/billing/invoices/:id/download` (streams PDF as `application/pdf` w/ `Content-Disposition: attachment; filename="invoice-<number>.pdf"`) + `GET /api/billing/daily-brief/latest.pdf` (404 `DAILY_BRIEF_NOT_AVAILABLE` per MVP §80 empty-state — W3 worker deferred). Prisma direct (ADR-0001) over 3 tables. Two ports: `UpgradeNotifierPort` (log-only stub adapter, mirror T25's `IntegrationRelayPort` shape) + a **new local `BillingPdfStoragePort`** (see GAP #7 — core `ObjectStoragePort` lacks `download`). RBAC `requireRole(ctx, ['gm_admin'])`. `Decimal` amount serialized as string via `.toFixed(2)`. Tenant scope via `assertHotelOwnership` on invoice download (cross-tenant 404 leak-safe). Zero touch on `api.ts`/env/schema/migrations/`core/storage/`/`shared/socket/`.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.10 (endpoints + tier matrix + quota semantics + daily brief empty state), §2.10 (3-table DDL lines 651-694), §6 RBAC row `/api/settings/billing*`, §7 error catalog (`WA_TEMPLATE_LOCKED` line 829 — separate area) ✓; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C7 (4 endpoints) + §80 (daily-brief empty state) ✓
+- Parent docs spot-read: `src/modules/wa-templates/` (T25 living reference: port+adapter subdirs, factory pattern, eslint-disable barrel pattern, adapter unit test discipline), `src/modules/departments/` (T21 living reference: SKIP_CROSS_DB_CHECKS + startup WARN at `service.ts:55-64`), `src/plugins/tenant-guard.ts` (`assertHotelOwnership`, `TenantContext`), `src/plugins/rbac.ts` (`requireRole` super_admin implicit), `src/core/errors/app-errors.ts` (`NotFoundError`, `ForbiddenError`), `src/core/config/env.ts` (`SKIP_CROSS_DB_CHECKS` already present — no new env), `src/core/storage/object-storage.port.ts` (verified: `upload` + `delete` only, **no `download`** — see GAP #7), `prisma/schema.prisma:382-434` (3 billing models) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T08 ✓ (storage port merged — but download absent, GAP #7) · T21 ✓ (Q-C-02 pattern) · T25 ✓ (port+adapter twin) — all approved and merged
+- `make typecheck` clean ✓ (post-T25 + T10 merge) · `make lint` clean ✓ · `make test-unit` **371/1/372** ✓
+- Scaffolder risk: **none**
+
+**GAP responses** — accept all 6 PM leans + new GAP #7 for storage-port gap
+
+- **Q-T27-#1 (tier data source)** → **Accepting PM lean A**: `tier: null` under `SKIP_CROSS_DB_CHECKS=true` + winston WARN on prod+flag=true (mirror `departments.service.ts:55-64`). No new env. FE renders "tier unavailable" state.
+- **Q-T27-#2 (upgrade payload)** → **Accepting PM lean A**: `z.object({ target_tier: z.enum(['professional','luxury','enterprise']) }).strict()`. Downgrade (`'lite'`) rejected at zod boundary.
+- **Q-T27-#3 (upgrade persistence)** → **Accepting PM lean A**: log-only + notifier port + return 202 `{data: {request_id, status: 'pending_manual_review', requested_at}}`. No DB write in slice-1.
+- **Q-T27-#4 (PDF filename)** → **Accepting PM lean A**: `invoice-<invoiceNumber>.pdf`. Filename value sanitized to `[A-Za-z0-9._-]` at handler layer to prevent header injection (defense-in-depth even though `invoiceNumber` DB column is VARCHAR(40) already constrained by domain).
+- **Q-T27-#5 (daily brief slice-1)** → **Accepting PM lean A**: `NotFoundError('Daily brief', 'latest', { code: 'DAILY_BRIEF_NOT_AVAILABLE' })` → 404. Route reserves URL; when W3 worker lands, swap handler body.
+- **Q-T27-#6 (overview failure mode)** → **Accepting PM lean C**: `Promise.allSettled` on the tier call ONLY (fail-open → null), `Promise.all` for the 3 local-DB calls (fail-closed → 500 bubbles). Implementation: run tier via a try/catch that maps rejection to `null` + logs warn; then `Promise.all([quotaP, invoicesP, extrasP])`. Cleaner than mixed-`allSettled` for one arm.
+- **GAP T27-#7 (NEW)** — **`ObjectStoragePort` missing `download` method**. Verified `src/core/storage/object-storage.port.ts` exposes only `upload` + `delete`. PM ASSIGNMENT §business rules line 917 assumes `ObjectStoragePort.download(key)` exists, but DoD line 998 forbids touching `src/core/storage/**`.
+  - **Options**: A) define local `BillingPdfStoragePort` interface in `src/modules/billing/ports/billing-pdf-storage.port.ts` with method `download(key: string): Promise<Buffer | null>`; provide `InMemoryBillingPdfStorageAdapter` for tests; production wiring uses a small adapter wrapping AWS SDK `GetObjectCommand` (deferred — bootstrap DEP-4 concern). Slice-1 ships port + in-memory adapter + composition seam. Foundation follow-up: extend `ObjectStoragePort` with `download` (Slot A ticket), then billing barrel swaps to consume core port. B) escalate to Slot A for `ObjectStoragePort.download` addition now, pause T27-slice-1 until that lands. C) skip the invoice-download endpoint from slice-1 and defer to slice-2.
+  - **My intent**: **A** — local port keeps Slot C scope clean, ships slice-1 in full, foundation follow-up is a small extend. Precedent: Q-T25-#5 handled a similar spec/foundation gap by shipping local behaviour with a foundation follow-up.
+
+**Files to create**
+```
+src/modules/billing/
+├── billing.types.ts                                    (DomainBillingOverview,
+│                                                        DomainTierSnapshot, DomainQuota,
+│                                                        DomainInvoice, DomainExtra,
+│                                                        UpgradeRequestResult, BillingWire etc.)
+├── billing.schema.ts                                   (zod: UpgradePackageBodySchema.strict(),
+│                                                        InvoiceIdParamSchema uuid)
+├── billing.serializer.ts                               (Prisma rows → snake_case wire;
+│                                                        Decimal → string via .toFixed(2))
+├── billing.repository.ts                               (Prisma direct — findLatestQuota,
+│                                                        findInvoiceById, listRecentInvoices,
+│                                                        listActiveExtras)
+├── billing.service.ts                                  (overview aggregation +
+│                                                        upgrade + invoice download +
+│                                                        daily brief 404; consumes
+│                                                        UpgradeNotifierPort +
+│                                                        BillingPdfStoragePort +
+│                                                        SKIP_CROSS_DB_CHECKS gate)
+├── billing.routes.ts                                   (Fastify plugin: 4 handlers;
+│                                                        streaming reply for invoice
+│                                                        w/ Content-Type + Disposition;
+│                                                        202 for upgrade; 404 for daily-brief)
+├── ports/
+│   ├── upgrade-notifier.port.ts                        (interface UpgradeNotifierPort;
+│                                                        notify(input) → {requestId, notifiedAt})
+│   └── billing-pdf-storage.port.ts                     (interface BillingPdfStoragePort;
+│                                                        download(key) → Buffer | null;
+│                                                        GAP T27-#7 local port)
+├── adapters/
+│   ├── log-only-upgrade-notifier.adapter.ts            (MVP stub, winston structured log)
+│   └── in-memory-billing-pdf-storage.adapter.ts        (test-friendly Map-backed impl;
+│                                                        production impl wrapping AWS
+│                                                        deferred to composition-root
+│                                                        or Slot A foundation extend)
+├── index.ts                                            (barrel — plugin + service + factory
+│                                                        + ports + adapters + wire types;
+│                                                        eslint-disable pattern from T25)
+└── __tests__/
+    ├── billing.service.test.ts                                (unit; mock repo + mock upgrade port
+    │                                                           + mock storage port;
+    │                                                           overview shape branches (tier-null +
+    │                                                           quota-null + populated);
+    │                                                           upgrade → 202 + notifier called;
+    │                                                           invoice happy + pdfUrl null + storage
+    │                                                           null + cross-tenant 404;
+    │                                                           daily brief 404 slice-1;
+    │                                                           Q-C-02 prod+flag warn (adapted for billing))
+    ├── billing.routes.test.ts                                 (unit; Fastify inject;
+    │                                                           happy + 401 + 403 dept_head/staff +
+    │                                                           super_admin allow + 404 cross-tenant +
+    │                                                           PDF Content-Type + Content-Disposition
+    │                                                           assertions + 202 upgrade envelope shape +
+    │                                                           daily-brief 404 code)
+    ├── log-only-upgrade-notifier.adapter.test.ts              (unit; verify log payload key set +
+    │                                                           returns {requestId, notifiedAt})
+    ├── in-memory-billing-pdf-storage.adapter.test.ts          (unit; put/get round-trip, missing key
+    │                                                           returns null)
+    └── billing.repository.integration.test.ts                 (testcontainers real Postgres;
+                                                                seed 2 hotels × 2 months of quotas +
+                                                                3 invoices varied statuses + 2 extras;
+                                                                UNIQUE(hotel_id, period_start) +
+                                                                UNIQUE(invoice_number) + status CHECK +
+                                                                tenant isolation + invoices ORDER BY
+                                                                issuedAt DESC + extras active filter)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1). `src/core/config/env.ts` untouched (reuses `SKIP_CROSS_DB_CHECKS`). `src/core/storage/**` untouched (GAP #7 local port). `prisma/migrations/` untouched. `src/shared/socket/**` untouched.
+
+**Approach**
+Mirror T25 layout: `types/schema/serializer/repository/service/routes/index` + `ports/` + `adapters/` subdirs (this time with TWO ports/adapters). `BillingService` constructor `(repo, upgradeNotifier, pdfStorage, opts)` where `opts = {skipCrossDbChecks, nodeEnv, logger}`. Overview aggregation: (1) tier via internal helper that either returns `null` (flag=true) or would call `IntegrationTierPort` (flag=false path — code path exists but throws `not implemented` since Auth adapter is slice-2 concern; not exercised in flag=true tests); WARN once at construction on prod+flag=true; (2) `Promise.all` for `[quotaP, invoicesP, extrasP]` — all local DB, failure bubbles; (3) serialize + assemble `{data: {...}}` with `daily_brief_pdf_url_latest: null` slice-1. Upgrade: validate body → generate `requestId = randomUUID()` → call `upgradeNotifier.notify({requestId, hotelId: ctx.hotelId, targetTier: body.target_tier, userId: ctx.userId, requestedAt: new Date()})` → return `reply.code(202).send({data: {request_id, status: 'pending_manual_review', requested_at}})`. Invoice download: `loadOwnedInvoice(ctx, id)` (findById + assertHotelOwnership) → if `pdfUrl` null → `NotFoundError('Invoice PDF', id, {code:'INVOICE_PDF_NOT_AVAILABLE'})` → `pdfStorage.download(pdfUrl)` → if `null` → `NotFoundError('Invoice PDF file', id, {code:'INVOICE_PDF_NOT_FOUND'})` → route sets `Content-Type: application/pdf` + sanitized `Content-Disposition` + sends Buffer. Daily brief: unconditional 404 slice-1. Serializer: `amountIdr.toString()` (Decimal → string) matches Q-T27-#5 lean. Tests: unit branch coverage on 5+ cases per DoD; integration testcontainer for DB constraints + tenant isolation.
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5 already resolved per prior tasks — not re-raising.
+
+**Est.**: ~6–7h (biggest task yet — 4 endpoints + 3 tables + 2 ports/adapters + streaming reply + SKIP_CROSS_DB_CHECKS gate reuse). CHECKPOINT WAJIB if crossing ~4h with >4 files still incomplete.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
