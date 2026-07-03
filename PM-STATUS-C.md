@@ -12,10 +12,10 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **5/10 approved**; **T22-slice-1 assigned**
+- **Day**: H0 (2026-07-03) — Slot C **5/10 approved**; **T22-slice-1 wip**
 - **Active tasks**:
   - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
-  - **T22 Menu CRUD (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 6 JSON endpoints (Categories CRUD + Items CRUD with pre-signed URL image_url). **Multipart deferred to T22-slice-2** (needs `@fastify/multipart` dep — escalated to PARENT §3b for PO ratify).
+  - **T22 Menu CRUD (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 1 tightening (`price_idr` zod max = 9999999999.99 per DECIMAL(12,2), not 99999999999.99). All 6 GAP responses accepted PM leans. Executor C coding on `feat/settings-menu`. Multipart deferred to T22-slice-2 (Q-T22-#1 open at PARENT §3b for PO ratify).
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -34,7 +34,7 @@
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
-| T22 | Menu CRUD + categories + multipart image (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T22-slice-1 issued 2026-07-03 H0. Scope: **6 JSON endpoints** (Categories CRUD + Items CRUD; `image_url` accepted as pre-signed URL string) + `CATEGORY_HAS_ITEMS` 409 + `CATEGORY_NAME_TAKEN` 409 + `Decimal.toFixed(2)` price + TIME `HH:mm` + `available_window` cross-field validation. **Multipart image upload DEFERRED to T22-slice-2** — `@fastify/multipart` NOT installed (verified `package.json`); needs PO ratification per CLAUDE.md §11 WAJIB. Escalating to PARENT §3b. RBAC gm_admin + super_admin only slice-1 (dept_head spec ambiguity Q-T22-#2 → PARENT §3a). Nested list `{data:{categories:[{...items:[...]}]}}` per Q-T22-#3 lean A. Files: 6 module + 1 barrel + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; **no new deps in slice-1**. 6 GAPs pre-surfaced (T22-#1..#6). Awaiting Executor C PLAN. |
+| T22 | Menu CRUD + categories + multipart image (**slice-1 wip**) | wip (PLAN ACK'd with 1 tightening) | — | PLAN ACK'd 2026-07-03 H0. Scope: **7 JSON endpoints** (Categories CRUD + Items CRUD, corrected from ASSIGNMENT header 6). All 6 GAP responses accepted PM leans. **1 tightening**: `price_idr` zod max = `9999999999.99` (DECIMAL(12,2) = 10 digits before decimal) — exec plan had `99999999999.99` (13 digits, one order too high). Multipart deferred to T22-slice-2 (Q-T22-#1 open at PARENT §3b). RBAC gm_admin + super_admin only slice-1 (Q-T22-#2 → PARENT §3a). App-layer `countItemsInCategory` + P2003 FK Restrict backstop for delete-category race. TIME `HH:mm` round-trip with integration test proof. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -2397,6 +2397,42 @@ Mirror T25/T27 layout (two-entity module with cross-entity guards). Service cons
 **Est.**: ~6-8h (biggest task tied with T27). CHECKPOINT WAJIB if crossing ~4h with >4 files still incomplete. Straight-line if all tests + zod refines land clean.
 
 Awaiting PM C ACK.
+
+##### PM C ACK — T22-slice-1 PLAN APPROVED with 1 tightening (proceed to coding, 2026-07-03 H0)
+
+**Ratifications**: session-start gate discipline ✓ (independent Prisma schema verification confirmed UNIQUE + CHECKs + FK Restrict all shipped by T02 — no Q-T25-#5-style gap to escalate). Files layout ✓ mirrors T25/T27 two-entity pattern. All 6 GAP responses accept PM leans cleanly with reasoning. Baseline-shift handling ✓ (states both 450 and 483 scenarios). Approach paragraph is dense and precise; cross-tenant guards + loadOwned + P2002/P2003 catches + TIME field round-trip all correctly reasoned. Endpoint count 7 (not 6 as I miscounted in ASSIGNMENT header — exec's tally is correct).
+
+**Tightening #1 — `price_idr` zod max value off by one order of magnitude**
+
+Exec plan L2395: `z.number().nonnegative().max(99999999999.99)` — that's **11 nines before decimal = DECIMAL(13,2)**. But Prisma model + spec §2.6:566 declare `DECIMAL(12,2)` = 12 total digits with 2 decimals = **10 digits before decimal = max `9999999999.99`** (~9.99B IDR). Correction:
+```ts
+const priceIdrField = z.number().nonnegative().max(9999999999.99);  // DECIMAL(12,2)
+```
+9.99B IDR is a realistic per-item max for any menu item (roughly $700K USD). Boundary test: `9999999999.99` accepts + `10000000000.00` rejects. Integration test should assert both boundaries against the DB CHECK too (belt-and-suspenders).
+
+**Coding checklist reminders** (things easy to miss)
+
+- **`countItemsInCategory` must use Prisma `.count()`** (not `.findMany().length` or `.findFirst`). T21/T25/T28 pattern — cheaper, no memory pressure. Method signature: `countItemsInCategory(categoryId: string): Promise<number>` returning `db.menuItem.count({where: {categoryId}})`.
+- **`ensureCategoryBelongsToHotel` uses `.count()` not `.findFirst`** — cheaper, no result deserialize. Method: `count({where: {id: categoryId, hotelId}}) > 0` returning `boolean`. On false, service throws `NotFoundError('MenuCategory', categoryId)` (leak-safe — don't reveal cross-tenant category existence).
+- **Delete-category race**: your app-layer pre-check + P2003 FK Restrict backstop pattern is correct + matches T25 Option B discipline. Do NOT add a Serializable transaction here (over-engineering for a low-concurrency settings surface). The pre-check + backstop combo guarantees data integrity even under race.
+- **TIME field round-trip**: Postgres `@db.Time` is timezone-naive; Prisma returns a `Date` object with an epoch date part on read. Serializer must slice `HH:mm` (5 chars from `toISOString()` or `Date` UTC hours/minutes). Integration test must explicitly assert `parseHHmm(from) < parseHHmm(to)` round-trip preservation across write+read (e.g. write `'06:00'` → read back `'06:00'`, not `'05:59'` or `'07:00'`). Watch for local timezone drift on the test machine (use UTC helpers consistently).
+- **`image_url` accepts `null` OR `undefined` OR string**: zod `z.string().url().max(500).nullable().optional()`. Update body: pass through `null` to clear image (Prisma allows setting nullable field to null); omit to preserve existing. Test both branches.
+- **`refine` composition for `available_window`**: two `.refine()` calls chained is fine; alternatively single `.refine()` with combined predicate. Either way, zod issues surface as clean field messages.
+- **List query filter**: `?is_active=true` filters categories only per Q-T22-#6 lean A; nested items always fully included per category. If category has 0 active items, still return the category shell (empty `items: []`) — unless PO says otherwise.
+- **Serializer patterns to reuse**: `Decimal.toFixed(2)` for `price_idr` matches T27 `billing.serializer.ts:71`; snake_case wire matches T21/T25/T27/T28/T29; `hotel_id` included in wire for consistency with T21/T25 convention.
+- **Immutable field allowlist**: zod `.strict()` rejects `hotel_id`, timestamps, `id` — belt-and-suspenders + JSDoc invariant on `createItem`/`createCategory` service methods per T27/T29 pattern.
+- **Baseline math for SUBMIT**: state which baseline explicitly — 450/1/451 (pre-T29-merge) or 483/1/484 (post-T29-merge). Compute delta from that baseline. Same discipline as prior tasks.
+- **Expected eslint-disable**: **0** (no port/adapter, matches T28/T29 pattern — 3rd consecutive Slot C module with 0 if held).
+- **pnpm-store note**: `pnpm install --frozen-lockfile` + `pnpm prisma:generate` if types missing. Standard.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (all foundation untouched).
+- Q-T22-#1 (multipart) + Q-T22-#2 (RBAC) already escalated at ASSIGNMENT time (`bd81e00`) — no new PARENT §3 entries needed at ACK.
+- No new foundation nudges — standard patterns throughout. Clean module.
+
+**Mid-task CHECKPOINT trigger**: reiterating exec's own — post CHECKPOINT if crossing ~4h with >4 files still incomplete. This is tied with T27 for biggest task.
+
+Proceed to coding on `feat/settings-menu`. Awaiting your SUBMIT.
 
 <!--
 TEMPLATE — copy untuk task baru:
