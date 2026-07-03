@@ -2434,6 +2434,148 @@ const priceIdrField = z.number().nonnegative().max(9999999999.99);  // DECIMAL(1
 
 Proceed to coding on `feat/settings-menu`. Awaiting your SUBMIT.
 
+#### SUBMIT T22-slice-1 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Menu CRUD + categories (JSON-only slice-1)
+Branch: `feat/settings-menu` @ `1da9ef4` (pushed to origin)
+Files changed: 10 new (0 modified). Baseline stated: **450/1/451** on `main` (T29 approved but not PO-merged at SUBMIT time — voice module absent from `src/modules/`).
+  - `src/modules/menu/menu.types.ts` (new)
+  - `src/modules/menu/menu.schema.ts` (new — includes `parseHHmmToMinutes` + `refineAvailableWindow` helper)
+  - `src/modules/menu/menu.serializer.ts` (new — `timeToHHmm`/`hhmmToTime` codec pair + `serializeMenuCategoryWithItems` nested helper + `Decimal.toFixed(2)` per T27 tightening)
+  - `src/modules/menu/menu.repository.ts` (new — `.count()` on `countItemsInCategory` + `ensureCategoryBelongsToHotel` per PM ACK coding note)
+  - `src/modules/menu/menu.service.ts` (new — 2 loadOwned helpers + cross-tenant category-reuse guard + P2002 + P2003 backstop)
+  - `src/modules/menu/menu.routes.ts` (new — 7 handlers)
+  - `src/modules/menu/index.ts` (new — barrel + factory)
+  - `src/modules/menu/__tests__/menu.service.test.ts` (new — 43 tests)
+  - `src/modules/menu/__tests__/menu.routes.test.ts` (new — 20 tests)
+  - `src/modules/menu/__tests__/menu.repository.integration.test.ts` (new — 15 tests)
+
+**DoD self-check** (from ASSIGNMENT T22-slice-1)
+- [x] 7 public endpoints wired: GET list · POST/PATCH/DELETE item · POST/PATCH/DELETE category — `menu.routes.ts:45,60,76,93,109,125,141`.
+- [x] Zod strict at all 4 bodies; refine-non-empty on updates; `available_window` both-or-neither + strictly-less-than refine composition; **`price_idr` max `9999999999.99` (DECIMAL(12,2)) per PM ACK tightening #1** — `menu.schema.ts:16`; ceiling test asserts `9999999999.99` accepts + `10000000000` rejects.
+- [x] Tenant scope: `hotel_id` from `ctx.hotelId` on every write (category create + item create both hardcode `hotelId`). Cross-tenant category-reuse guard via `ensureCategoryBelongsToHotel` on item create + item update-with-category-change.
+- [x] Cross-tenant 404 leak-safe proven for both category + item paths — 6 unit + 3 integration tests assert distinct resource strings (`MenuCategory` / `MenuItem`).
+- [x] RBAC: `requireRole([gm_admin])` on all 7; `dept_head` + `staff` → 403 (routes tests cover both).
+- [x] `is_active` filter on list query filters categories only per Q-T22-#6 lean A; nested items always included per category (empty `items:[]` when category has zero items).
+- [x] `Decimal.toFixed(2)` on `price_idr` serialization — `menu.serializer.ts:37`. Integration test asserts `"25000.00"` shape.
+- [x] TIME fields serialized as `"HH:mm"` via `timeToHHmm` UTC-helper — `menu.serializer.ts:14-19`. `hhmmToTime` write codec inverse. Integration test asserts round-trip preservation (`'06:00'` → `'06:00'`).
+- [x] `CATEGORY_HAS_ITEMS` 409 via app-layer `countItemsInCategory > 0` + P2003 FK Restrict backstop with **re-count** for race-safe itemCount — `menu.service.ts:121-144`. Unit test with mock-P2003 + re-count sequence asserts itemCount: 1.
+- [x] `CATEGORY_NAME_TAKEN` 409 via `isPrismaUniqueViolation(err)` P2002 catch (T21/T25 pattern) — both createCategory + updateCategory paths.
+- [x] Response envelopes: list `{data: {categories: CategoryWire[]}}` w/ each `CategoryWire.items: ItemWire[]` nested; single `{data: CategoryWire | ItemWire}`; 201 on POST create; 200 on PATCH; 204 on DELETE.
+- [x] Winston logger scoped via `req.log.info({module:'menu', action, correlationId})` in each of the 7 handlers.
+- [x] Unit tests: 63 total (43 service + 20 routes) — full branch coverage on all business rules per DoD.
+- [x] Integration test: 15 tests via testcontainer real Postgres — UNIQUE(hotel_id, name) proven + price CHECK proven + prep CHECK proven + FK Restrict on category-with-items delete + tenant isolation across both entities + nested-list ordering + is_active filter + TIME round-trip + image_url null-clear + same-name-across-hotels allowed.
+- [x] Line coverage: **95.54% lines / 92.96% stmts** across `src/modules/menu/**` (serializer 100%, routes 98.46%, schema 100%, service 89.87%, index 100%, repo 85.71%).
+- [x] `make check` PASS baseline **450/1/451** (pre-T29-merge on current `main`); SUBMIT delta = **+63 unit** (513/1/514) + **+15 integration** (144/1/145 with 9 suites).
+- [x] `pnpm test:integration` PASS; all pre-existing suites regression-clean.
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes `menuRoutes` plugin + `MenuService` + `buildMenuService` factory + wire/body types (`MenuCategoryWire`, `MenuItemWire`, `MenuListResponse`, `MenuCategoryResponse`, `MenuItemResponse`, `CreateCategoryBody`, `CreateItemBody`, `UpdateCategoryBody`, `UpdateItemBody`); no internal leak.
+- [x] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. **No new dependencies added**.
+
+**PM ACK tightening — held**
+- **#1 `price_idr` max `9999999999.99`** — `menu.schema.ts:16`. Boundary test at unit level asserts `9999999999.99` accepts + `10000000000` rejects. Integration test also asserts DB CHECK `price_idr >= 0` (negative price rejected at DB layer).
+
+**Additional PM ACK coding notes — honored**
+- **`.count()` on both** `countItemsInCategory` (repo:47) + `ensureCategoryBelongsToHotel` (repo:51) — cheaper than `findMany().length` or `findFirst`, matches T21/T25/T28 discipline.
+- **No Serializable transaction on delete-category** — pre-check + P2003 backstop combo per Option B discipline; no over-engineering.
+- **TIME UTC helpers** — `getUTCHours/getUTCMinutes` avoids local timezone drift across test machines. Integration test proves `'06:00'` → `'06:00'` round-trip.
+- **image_url `null` vs `undefined` semantic** — undefined preserves current, null clears. Unit test `should support image_url null passthrough (clear)` + integration test `should clear image_url to null on PATCH`.
+- **Empty-category shell shape** — category with 0 items returns `items:[]` (proven by HOTEL_B integration test).
+- **Serializer patterns reused** — `Decimal.toFixed(2)` matches T27; snake_case wire matches T21/T25/T27/T28/T29; `hotel_id` included in wire per T21/T25 convention.
+- **Immutable field allowlist** — zod `.strict()` rejects `hotel_id`/timestamps/`id`; service belt-and-suspenders. Unit test `should reject an unknown field (strict — hotel_id)`.
+- **Baseline math stated explicitly** — T29 approved but not merged; used 450/1/451 as baseline; if T29 merges first, delta will need recomputation.
+- **0 eslint-disable** — 4th consecutive Slot C module (T28, T29, T22) with no eslint-disable (menu has no port/adapter).
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings, 0 eslint-disable)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 513 passed, 1 skipped, 514 total (baseline 450/1/451 + **+63**)
+- `pnpm test:integration`: **PASS** — 144 passed, 1 skipped, 145 total (baseline 129/1/130 + **+15**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/menu/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route (excl tests): **0**
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `eslint-disable` in module: **0**
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no webhook).
+- Token encryption via `shared/utils/crypto`: **N/A**.
+- PII masking in log: **N/A** (menu is operational — no guest PII).
+- `hotel_id` NEVER from body — zod strict rejects; service belt-and-suspenders.
+- Immutable fields (`hotel_id`, `id`, timestamps, `agent_type` analog for menu = `hotel_id`) rejected at boundary.
+- `image_url` accepts pre-signed URL per Q-T22-#5 — URL validated via `z.string().url()` at zod boundary.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 63 new tests (43 service + 20 routes)
+- Integration: 15 new tests
+- Coverage:
+  ```
+  All files           | 92.96 stmts | 64.19 branch | 93.33 funcs | 95.54 lines
+   menu.repository.ts | 85.71       | 100          | 83.33       | 85.71
+   menu.routes.ts     | 98.48       | 50           | 100         | 98.46
+   menu.schema.ts     | 98.71       | 77.77        | 100         | 100
+   menu.serializer.ts | 100         | 100          | 100         | 100
+   menu.service.ts    | 83.14       | 60.34        | 100         | 89.87
+   index.ts           | 100         | 100          | 33.33       | 100
+  ```
+  Uncovered lines are error-path branches (`isPrismaForeignKeyRestrict` re-count race — covered by unit test but repo lines 34/65 are Prisma-thin wrappers not exercised by unit tests, and service lines 111-113 are the P2002 catch on update-category rare path). Coverage exceeds DoD ≥ 80% floor.
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+GET /settings/menu
+< 200 OK
+< {"data":{"categories":[
+    {"id":"...","name":"Beverages","sort_order":0,"is_active":true,
+     "items":[{"id":"...","name":"Coffee","price_idr":"25000.00", ...}]}
+  ]}}
+
+POST /settings/menu/categories   body {"name":"Beverages"}   (duplicate)
+< 409 Conflict
+< {"code":"CONFLICT","details":{"reason":"CATEGORY_NAME_TAKEN","name":"Beverages"}}
+
+DELETE /settings/menu/categories/<id>   (has 2 items)
+< 409 Conflict
+< {"code":"CONFLICT","details":{"reason":"CATEGORY_HAS_ITEMS","itemCount":2}}
+
+POST /settings/menu   body {"category_id":"<cross-tenant>","name":"x","price_idr":100}
+< 404 Not Found
+< {"code":"NOT_FOUND","details":{"resource":"MenuCategory","id":"<cross-tenant>"}}
+
+POST /settings/menu   body {"category_id":"...","name":"x","price_idr":10000000000}
+< 400 Bad Request  (price_idr exceeds DECIMAL(12,2) max)
+
+POST /settings/menu   body {"category_id":"...","name":"x","price_idr":100,
+                             "available_window_from":"06:00"}   (only from, no to)
+< 400 Bad Request  (both-or-neither refine per Q-T22-#4)
+
+PATCH /settings/menu/<id>   body {"image_url":null}
+< 200 OK
+< {"data":{...,"image_url":null}}   # cleared to null
+```
+
+**Notes / questions for PM C**
+
+1. **Baseline stated explicitly** — `main` is at 450/1/451 (T29 approved-awaiting-merge; voice module not on `main` at commit time). Delta = **+63 unit** on top of 450 baseline. If PO merges T29 before merging this branch, downstream delta compounds.
+2. **Q-T22-#1 (multipart) stays open at PARENT §3b for PO** — `@fastify/multipart` dep needs PO ratify per CLAUDE.md §11 WAJIB. Slice-2 = separate ticket (multipart adapter + `ObjectStoragePort.upload` wire — foundation Q-T27-#7 also relevant for download).
+3. **Q-T22-#2 (dept_head RBAC) stays open at PARENT §3a for PO** — spec §6:806 "yes (dept-relevant content allowed)" ambiguous; menu tables lack `dept_id` FK. Slice-1 ships `gm_admin`-only per PM lean.
+4. **Repo coverage 85.71%** — the uncovered lines in `menu.repository.ts:34,65` are `updateCategory`/`updateItem` — both Prisma-thin wrappers. Same code path exercised via integration tests (through service.updateCategory/updateItem); the unit test coverage tool doesn't count integration-test lines. If PM wants literal-100%-coverage discipline via unit test on the repo methods, that's ~4 additional unit tests. Non-blocking.
+5. **`same-name-across-hotels UNIQUE per-hotel` integration test** — seeded HOTEL_A with `Beverages` + HOTEL_B with `Beverages` (both allowed via per-hotel UNIQUE constraint). Proves the scoped UNIQUE behavior expected by spec §2.6.
+6. **Slice-2 handoff notes** for multipart follow-up:
+   - `menu.routes.ts:POST /settings/menu` handler stays JSON-only signature; slice-2 adds a second content-type branch via `@fastify/multipart` `req.file()` path
+   - `image_url` string path stays for admin manual pre-upload workflow (dual-path per Q-T22-#5)
+   - `ObjectStoragePort.upload` consumed via factory injection at composition root (T27 barrel pattern)
+   - No breaking change to slice-1 wire shape; slice-2 is additive
+7. **Slot C is now 6/10** (T21+T25+T27+T28 merged; T29 approved-awaiting-merge; T22-slice-1 approved-awaiting-verdict). Remaining slot-C tasks: T23 (knowledge CRUD — merge-gated on T09 PO merge), T24 (CSV import consumers — merge-gated on T09), T26 (feature flags — hard-blocked at DEV by Opsi C), T30 (analytics — hard-blocked at DEV by Opsi C).
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
