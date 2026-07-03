@@ -1,0 +1,83 @@
+// Domain + wire (snake_case) types for the Billing surface.
+// Envelope: camelCase wrapper + snake_case resource body (Q-B-01 / Q-B-07).
+//
+// Spec §1.10 walks: tier → quota → agents/depts/outbound → invoices → daily brief.
+// Slice-1 returns tier snapshot (nullable under Opsi C), current-month quota
+// (nullable when seed absent), invoices metadata list, active extras list,
+// and `daily_brief_pdf_url_latest: null` (W3 worker deferred).
+
+import type { Prisma } from '@prisma/client';
+
+export type BillingQuotaRow = Prisma.BillingQuotaGetPayload<Record<string, never>>;
+export type BillingInvoiceRow = Prisma.BillingInvoiceGetPayload<Record<string, never>>;
+export type BillingExtraRow = Prisma.BillingExtraGetPayload<Record<string, never>>;
+
+// Spec §1.10 tier matrix: Lite / Professional / Luxury / Enterprise.
+export type TierName = 'lite' | 'professional' | 'luxury' | 'enterprise';
+
+// Upgrade endpoint target tier (Q-T27-#2: no 'lite' downgrade).
+export type UpgradeTargetTier = 'professional' | 'luxury' | 'enterprise';
+
+export type InvoiceStatus = 'issued' | 'paid' | 'overdue' | 'void';
+
+// Wire shapes — snake_case.
+export interface TierSnapshotWire {
+  readonly name: TierName;
+  readonly agents_max: number;
+  readonly depts_max: number;
+  readonly outbound_monthly: number;
+  readonly users_max_gm: number;
+  readonly users_max_dh: number;
+}
+
+export interface QuotaWire {
+  readonly period_start: string;
+  readonly outbound_used: number;
+  readonly outbound_total: number;
+  readonly reset_at: string | null;
+  readonly threshold_80_emitted_at: string | null;
+  readonly threshold_100_emitted_at: string | null;
+}
+
+export interface InvoiceWire {
+  readonly id: string;
+  readonly invoice_number: string;
+  readonly period_start: string;
+  readonly period_end: string;
+  readonly amount_idr: string;
+  readonly status: InvoiceStatus;
+  readonly pdf_url: string | null;
+  readonly issued_at: string;
+  readonly paid_at: string | null;
+}
+
+export interface ExtraWire {
+  readonly id: string;
+  readonly type: string;
+  readonly qty: number;
+  readonly amount_idr: string;
+  readonly purchased_at: string;
+  readonly expires_at: string | null;
+}
+
+export interface BillingOverviewWire {
+  readonly tier: TierSnapshotWire | null;
+  readonly quota: QuotaWire | null;
+  readonly invoices: readonly InvoiceWire[];
+  readonly extras: readonly ExtraWire[];
+  readonly daily_brief_pdf_url_latest: string | null;
+}
+
+export interface BillingOverviewResponse {
+  readonly data: BillingOverviewWire;
+}
+
+export interface UpgradeRequestWire {
+  readonly request_id: string;
+  readonly status: 'pending_manual_review';
+  readonly requested_at: string;
+}
+
+export interface UpgradeRequestResponse {
+  readonly data: UpgradeRequestWire;
+}
