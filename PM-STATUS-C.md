@@ -12,15 +12,16 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **4/10 approved** (T21+T25+T27 merged; T28 approved-awaiting-merge)
+- **Day**: H0 (2026-07-03) — Slot C **4/10 approved+merged**; **T29 wip**
 - **Recent activity**:
   - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
   - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
   - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
-  - **T28 Settings/agents (Min-3)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-agents` @ `02a296d` awaiting PO merge. 10 files (6 module + 1 barrel + 3 tests). First Slot C module with **0 eslint-disable** (no port+adapter). Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics).
-- **Branches**: `feat/settings-agents` (T28, awaiting PO merge)
+  - **T28 Settings/agents (Min-3)** — **MERGED** (PR #14 `0e68a38`) ✓
+  - **T29 Settings/voice groundwork** — PLAN ACK'd 2026-07-03 H0 with 2 tightenings + Q-T29-#1 spec-ambiguity escalation. Exec self-claimed from T28 VERDICT §0 preview. Executor C coding on `feat/settings-voice`.
+- **Branches**: `feat/settings-voice` (T29, wip)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25+T27 merged; T28 approved; T22/T23/T24 merge-gated on T09 PO merge; T29 fully unblocked (last fully-unblocked task); T26+T30 hard-blocked at DEV by Opsi C.
+- **My queue (preview)**: T21+T25+T27+T28 merged; T29 wip; T22/T23/T24 now fully unblocked (T09 CSV import merged + T08 storage merged); T26+T30 hard-blocked at DEV by Opsi C.
 
 ---
 
@@ -33,7 +34,8 @@
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
-| T28 | Settings/agents config (Min-3 enforcement) (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-agents` @ `02a296d` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **450/1/451** (+39 net: 30 service + 9 routes); `pnpm test:integration` **129/1/130** (all 8 suites regression-clean); coverage **97.65% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (first Slot C module without any — no port/adapter). All 4 tightenings held (tier-cap dropped; callback-form `$transaction` + Serializable isolation; `withSerializableRetry` on P2034/40001 with 0-20ms jitter; no-op idempotency returns current row 200). **Race-scenario integration test proves Serializable isolation** — exactly-one-succeeds under concurrent toggle-off with Min-3 floor preserved. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
+| T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
+| T29 | Settings/voice groundwork stub (**wip**) | wip (PLAN ACK'd with 2 tightenings) | — | Exec self-claimed from T28 VERDICT §0 preview + PM ratified. PLAN ACK'd 2026-07-03 H0. Scope: 3 endpoints (`GET /api/settings/voice` empty-default fallback + `PUT` upsert + `POST /test` stub with soft guard). No port/adapter (stub /test not external RPC; wave 2a task adds real SIP/Twilio adapter). 2 tightenings held: (a) POST /test guard uses `BusinessRuleError` 422 `VOICE_NOT_CONFIGURED` (not ValidationError 400 — precondition rule matches T25/T28 pattern); (b) winston observability at BOTH PUT + POST /test routes. **Q-T29-#1 spec-ambiguity escalated to PARENT §3a** (MVP §101 "always returns empty" vs spec §1.5 GET/PUT paired verbs — Slot C ships option B, PUT persists + GET reflects; idempotent to either PO resolution). GAP #2/#4/#5 all accept exec leans. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -1923,6 +1925,70 @@ Q-B-01/Q-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1 all resolved or ope
 
 Awaiting PM C ACK.
 
+##### PM C ACK — T29 PLAN APPROVED with 2 tightenings + 1 spec-ambiguity escalation (proceed to coding, 2026-07-03 H0)
+
+**Self-claim ratified** — T29 was named in T28 VERDICT §0 preview as "last fully-unblocked Slot C task". Self-authored ASSIGNMENT block follows my patterns cleanly; session-start gate + baseline 450/1/451 ✓. Files layout mirrors T28 (thinnest Slot C module template — no port/adapter for stub /test since CLAUDE.md §4 port requirement is for outbound RPC to real services, not stubbed groundwork; **exec's reasoning correct** — when wave 2a lands with real SIP/Twilio integration, THAT task adds the port + adapter). GAP responses #2, #4, #5 all accept clean rationale.
+
+**Tightening #1 — Q-T29-#3 use `BusinessRuleError` (422), not `ValidationError` (400)**
+
+Verified `src/core/errors/app-errors.ts:27-30` — `ValidationError` has hardcoded `code:'VALIDATION_ERROR'` + `statusCode:400`. It's semantically scoped to **request-shape validation** (malformed body, missing required field, bad type). The `POST /test` guard on `pbxType: null` is different — the **request itself is valid**; what's not met is a **domain precondition** ("must configure PBX before testing"). This is the "precondition-not-met domain rule" semantic that `BusinessRuleError` (422, T07-slice-1) was built for. Matches T25 `WA_TEMPLATE_LOCKED` + T28 `MIN_AGENTS_VIOLATION` precedent — same envelope shape (`code:'BUSINESS_RULE'` + `details.rule:'VOICE_NOT_CONFIGURED'`).
+
+**Corrected code**:
+```ts
+if (!row || row.pbxType == null) {
+  throw new BusinessRuleError('Voice PBX not configured', {
+    rule: 'VOICE_NOT_CONFIGURED',
+  });
+}
+```
+Not `ValidationError`. Wire envelope: `{code:'BUSINESS_RULE', message:'Voice PBX not configured', details:{rule:'VOICE_NOT_CONFIGURED'}}` — FE discriminates on `details.rule` (T25/T28 pattern).
+
+**Tightening #2 — winston observability at BOTH `PUT` and `POST /test` route layers**
+
+Exec's plan mentions winston log at `/test` for observability. Add: `PUT /api/settings/voice` also logs at handler with `{module:'voice', action:'upsert', pbxTypeSet: body.pbx_type != null, isActiveSet: body.is_active === true, correlationId}` — voice-config changes are settings-audit-worthy (T25 template edits are similarly logged). Not PII (pbx_type is 'sip'/'twilio' operational). Standard T21/T25/T27/T28 handler-log pattern.
+
+**Spec ambiguity escalation — Q-T29-#1 (GAP #1) rolls to PARENT §3a**
+
+Q-T29-#1 is a **genuine spec ambiguity** requiring PO clarification. MVP §101 line 81 says:
+> "voice_configs persistence — **keep the stub endpoint (always returns empty + pbx_type: null)**; real PBX config is wave 2a per ADD-23.7."
+
+Parenthetical "**always returns empty**" reads literally as exec's option (A): GET is a pure façade ignoring DB state. That would make PUT + persistence table pointless in slice-1. But spec §1.5 line 181 pairs `GET, PUT /api/settings/voice` as normal verbs, and the DDL exists with proper PK+columns, which supports exec's option (B) semantic reflection of DB state. The tension is real.
+
+**Ruling**: **Slice-1 ships exec's option (B)** — PUT persists + GET reflects DB state with empty-default fallback when no row. Rationale:
+1. Least-surprising API semantic (GET reflects what PUT wrote).
+2. If MVP §101 is literal-A ("always empty facade"), what does PUT even do? A no-op PUT with a persistence table is contradictory.
+3. Data collected now is available to wave 2a FE + real PBX integration without a migration to backfill.
+4. If PO rules literal-A, single-line service change (`get()` returns static empty regardless of DB) — zero regression risk on flip.
+
+**Register Q-T29-#1 in §3 → roll to PARENT §3a** (contract Q for PO — spec §1.5 vs MVP §101 phrasing reconciliation). Non-blocking for T29 merge; code is idempotent to either resolution (matches Q-T28-#1 handling discipline).
+
+**GAP #2 (pbx_type validation)** → **Option A confirmed** — permissive `z.string().min(1).max(40).nullable().optional()`. Matches DDL VARCHAR(40) + Q-C-01 permissive-JSONB / Q-T25-#2 permissive-name / Q-T28 permissive-agent_type patterns. Wave 2a will add real PBX types beyond current guess.
+
+**GAP #4 (test result envelope)** → **Option A confirmed** — `{data: {success: boolean, note: string}}`. `note` avoids `message` overload with AppError envelope. Q-B-01 canonical wrapper.
+
+**GAP #5 (`updated_at` in empty default)** → **Confirmed** — `updated_at: null` for shape uniformity. Type declares `updated_at: string | null`.
+
+**Coding checklist reminders** (things easy to miss)
+
+- **Prisma `@updatedAt` decorator**: verified `schema.prisma:461` — `updatedAt` auto-populates on any write via the decorator. Do NOT manually set it in `upsert.create/update` payloads (Prisma handles it).
+- **`config` defensive narrow**: same T28 pattern — non-object JSONB rows serialize to `{}` on wire. Slice-1 ingest path is zod-guarded (record shape), but defensive narrow protects against raw INSERT drift.
+- **`isActive` semantics on PUT**: if body omits `is_active`, upsert leaves current value (or Prisma schema default `false` on create). Don't force `false` on missing key — respect partial-update contract.
+- **`emptyDefault()` helper location**: place in serializer per exec plan; return static `{pbx_type: null, config: {}, is_active: false, updated_at: null}`. Never carries `hotel_id` since it's the caller's tenant scope, not part of the wire (or does it? Check T21/T27/T28 wire shape convention).
+- **Wire shape for `hotel_id`**: T21 departments wire includes `hotel_id`; T25 wa-templates wire includes `hotel_id`; T27 billing wire OMITS `hotel_id` (it's the caller's tenant context). Slice-1 T29 voice-config could go either way. **PM lean**: include `hotel_id` in wire for consistency with per-table settings endpoints (matches T21/T25 convention). Empty-default helper returns `hotel_id: ctx.hotelId` (the caller's) not null.
+- **Empty-body PUT**: `.refine(non-empty)` rejects entirely empty body. Test coverage for this branch.
+- **Empty-DB GET after empty-DB test**: sequence proves the empty-default is stable + not a side effect of prior writes.
+- **Baseline math for SUBMIT**: 450/1/451 post-T28 merge (PR #14 `0e68a38`) — exec noted correctly.
+- **Expected eslint-disable**: **0** (T28 precedent — no port/adapter → no barrel adapter import).
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (all foundation untouched).
+- Q-T29-#1 rolls to PARENT §3a (PO Q, non-blocking); Q-T28-#1 already at §3a still open.
+- No new foundation nudges from T29 — smallest task, standard patterns throughout.
+
+**Mid-task CHECKPOINT trigger**: unlikely needed at ~2-3h estimate. Straight-line to SUBMIT.
+
+Proceed to coding on `feat/settings-voice`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -2034,6 +2100,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-C-02        | `users.department_id` cross-DB check impossible under Opsi C dev-DB deviation (users lives in Auth DB, not `hotel_core_dev`). Skip in DEV or gate behind env flag? | T21 · exec-C PLAN GAP #2 | **open (PO ratify before staging)** — implementation shipping under safe defaults | `SKIP_CROSS_DB_CHECKS` env flag added to `core/config/env.ts` (`z.coerce.boolean().default(true)`). Service skips `users` count when flag is `true`; tickets check always runs. Startup WARN when flag is `true` + `NODE_ENV === 'production'` prevents silent prod ship. Root fix = PARENT §4 Opsi A / Prisma multi-schema (foundation, PO decision). Will roll up to PARENT §3b at T21 SUBMIT. |
 | Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
 | Q-T25-#5      | **Foundation gap**: spec §2.8:623 defines `wa_templates_hotel_name_unique UNIQUE (hotel_id, name) NULLS NOT DISTINCT` but the actual migrations (`20260701111952_init_hotel_core/migration.sql:209-225` + `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80`) DO NOT add it. Compare `menu_categories_hotel_name_unique` at `20260701111952_init_hotel_core/migration.sql:403` — present. Genuine omission in T02. | T25 · exec-C PLAN GAP #5 · discovered via spec/migration cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation fix** | Slot C T25-slice-1 ships Option B: `repo.countByHotelAndName(hotelId, name)` app-layer pre-check + P2002 catch as belt-and-suspenders (dead branch pre-fix, live post-fix). Foundation fix (add `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT` migration mirroring `menu_categories_hotel_name_unique`) rolls to Slot A. **When foundation lands**: no code change needed in Slot C — pre-check remains idempotent-safe; P2002 catch flips dead→live. Race window ~50ms per same-hotel same-name admin write documented in service JSDoc. |
+| Q-T29-#1      | **Spec ambiguity contract Q for PO**: MVP §101:81 says `voice_configs` "stub endpoint (**always returns empty + `pbx_type: null`**)". Literal reading = GET is a pure façade ignoring DB state → PUT + persistence table pointless in slice-1. But spec §1.5:181 pairs `GET, PUT /api/settings/voice` as normal verbs + DDL exists with PK+columns → supports GET reflects DB state. Which semantic? | T29 · PM C independent MVP §101 vs spec §1.5 cross-check | **open — PO ratify** (rolls to PARENT §3a) | Slot C T29 ships **Option B**: PUT persists + GET reflects DB with empty-default fallback when no row. Rationale: (a) least-surprising API, (b) MVP §101 literal-A makes PUT+table contradictory, (c) data collected now available to wave 2a without backfill migration, (d) if PO rules literal-A: single-line service change (`get()` returns static empty regardless of DB). Zero regression risk on flip. Non-blocking for merge; matches Q-T28-#1 idempotent-to-either-resolution discipline. |
 | Q-T27-#7      | **Foundation port gap**: `src/core/storage/object-storage.port.ts:1-32` exposes `upload` + `delete` only — **no `download` method**. T08 slice-1 comment explicitly says "Slice-1 surface … Signed URL generation deferred to slice-2", implying more slices were expected. T27 slice-1 needs invoice PDF download stream. | T27 · exec-C PLAN GAP #7 · discovered via spec/foundation cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation extension (T-INFRA-06 candidate)** | Slot C T27-slice-1 ships Option A: local `BillingPdfStoragePort` at `src/modules/billing/ports/billing-pdf-storage.port.ts` with `download(key): Promise<Buffer \| null>` + `InMemoryBillingPdfStorageAdapter` for tests + composition-root wiring. Production adapter deferred (DEP-4 or foundation extension). **Foundation fix (T-INFRA-06 candidate)**: extend core `ObjectStoragePort` with `download(key): Promise<Buffer \| null>` + implement on `S3Adapter` (SDK `GetObjectCommand`) + `InMemoryAdapter`. Small extension; matches T08's slice-1 trajectory. Also serves T22/T24 menu-image download + T27 daily-brief when W3 lands. **Migration path when foundation lands**: billing barrel swaps consumer to core port; local port + adapter deleted; billing service constructor untouched (structurally identical). Zero regression risk. |
 | Q-T28-#1      | **Contract Q for PO**: is there a hard tier-cap on `PATCH /api/settings/agents/:id` `is_active:true` that blocks activation beyond `tier.agents_max`? Spec §7 catalog (line 820-835) defines `MIN_AGENTS_VIOLATION` + `TIER_GATE` (resource-access, e.g. analytics) but NO `AGENTS_TIER_CAP` or similar 422 for over-activation. Spec §1.10 tier matrix uses "**3 min**" (Professional) + "**5 include**" (Luxury) wording + `billing_extras.type='extra_agent'` DDL comment at §2.10 line 686 suggests baseline-included counts with billing-time expansion (not hard-caps). Enforcing a hard cap at activation-time would block a hotel from activating agents they paid for via extras. | T28 · PM C independent spec review of exec ASSIGNMENT self-authored tier-cap enforcement · Q escalated to PARENT §3a | **open — PO ratify** (slice-1 ships Min-3 only) | Slot C T28-slice-1 enforces ONLY Min-3 (spec-explicit hard rule). Tier-cap enforcement dropped from scope; `TIER_MATRIX` import from billing NOT needed. If PO ruling introduces a hard cap: needs (a) spec §7 catalog addition (`AGENTS_TIER_CAP`?), (b) clarification on interaction with `billing_extras.extra_agent` (does purchasing an extra raise the cap? By 1 per row? By `qty`?), (c) follow-up ticket (T28-slice-2 or feature-flags T26 tier-gate module). **Slot C ships slice-1 clean today; slice-2 or feature-flags reintroduces tier-cap post-PO-ruling**. |
 
