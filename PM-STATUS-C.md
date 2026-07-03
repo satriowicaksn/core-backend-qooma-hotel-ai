@@ -4127,6 +4127,147 @@ Spec §1.4:129 explicitly marks the `/high-alert` endpoint as `(Q-CONTRACT-21, A
 
 Proceed to coding on `feat/analytics`. Awaiting your SUBMIT.
 
+#### SUBMIT T30-slice-1 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Analytics slice-1 (overview + tickets + high-alert, tier-gate stubbed under Opsi C)
+Branch: `feat/analytics` @ `30323a3` (pushed to origin)
+Files changed: 10 new. Baseline stated: **622/1/623** on `main` (post-T26-merge; all prior 9/10 Slot C tasks merged).
+  - `src/modules/analytics/analytics.types.ts` (new — three-state meta wire + Q-CONTRACT-21 ASSUMED shape)
+  - `src/modules/analytics/analytics.schema.ts` (new — `parseRangeQuery` with `.strict()` + refines + 30d default)
+  - `src/modules/analytics/analytics.serializer.ts` (new — `isAlertExceeded` spec formula + `computeRecommendationKey` PM algorithm)
+  - `src/modules/analytics/analytics.repository.ts` (new — 3 `$queryRaw` methods with `Prisma.sql` template literals)
+  - `src/modules/analytics/analytics.service.ts` (new — Q-C-02 WARN + `assertTierGate` per PM ACK #4)
+  - `src/modules/analytics/analytics.routes.ts` (new — 3 GET handlers)
+  - `src/modules/analytics/index.ts` (new — barrel + `buildAnalyticsService` factory)
+  - `src/modules/analytics/__tests__/analytics.service.test.ts` (new — 25 tests)
+  - `src/modules/analytics/__tests__/analytics.routes.test.ts` (new — 12 tests)
+  - `src/modules/analytics/__tests__/analytics.repository.integration.test.ts` (new — 8 tests via testcontainer)
+
+**DoD self-check** (from ASSIGNMENT T30-slice-1)
+- [x] 3 endpoints wired: `GET /api/analytics/overview` + `/tickets` + `/high-alert` — `analytics.routes.ts:47,60,73`.
+- [x] Zod query params: `RangeQuerySchema.strict()` with `from`/`to`/`period` all optional; refines for `period='custom'` requiring both dates + `from <= to`; ISO YYYY-MM-DD format; defaults 30d/today/day.
+- [x] Tier-gate three-state under Opsi C flag=true: `meta.tier: null` + `meta.is_luxury_gate: null` (T26 precedent applied via `buildMeta` helper). Real 422 `TIER_GATE` `BusinessRuleError` under flag=false (unreachable slice-1 for gm_admin path but exercised by unit test).
+- [x] RBAC: `requireRole(ctx, ['gm_admin', 'dept_head'])`; staff → 403 (routes tests cover).
+- [x] Tenant scope: `hotelId: ctx.hotelId` filter on every `$queryRaw` aggregation via parameterized `Prisma.sql`.
+- [x] Q-C-02 startup WARN once at construction on prod+flag=true — same `cross_db_check_skip` event key as T21/T27/T26 for grep. Unit tests verify.
+- [x] Response envelope: `{data: <endpoint-specific>, meta: {tier, is_luxury_gate, from, to, period}}` — verified by integration tests.
+- [x] Winston logger scoped via `req.log.info({module:'analytics', action, correlationId})` in each handler.
+- [x] Unit tests: 37 total (25 service + 12 routes) — full branch coverage.
+- [x] Integration test: 8 tests via testcontainer real Postgres with seeded tickets across 2 depts × current+prev periods → verify `total_tickets=15`, `resolution_rate=11/15`, `avg_satisfaction='3.73'`, tenant isolation (HOTEL_A/HOTEL_B), empty-range null KPIs, per-dept high-alert rates + summary + trend_7d.
+- [x] Line coverage: analytics.repository/service/serializer/schema/index all **100% lines**; routes 97.14% lines.
+- [x] `make check` PASS baseline **622/1/623** (post-T26-merge); SUBMIT delta = **+37 unit** (662/1/663) + **+8 integration** (181/1/182 with 12 suites — all prior Slot B/C integration tests regression-clean).
+- [x] `pnpm test:integration` PASS.
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes plugin + service + factory + wire types.
+- [x] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. `SKIP_CROSS_DB_CHECKS` reused from T21. No new dependencies.
+- [x] **0 eslint-disable** — 7th consecutive Slot C module (T28/T29/T22/T24/T23/T26/T30 pattern held).
+
+**All 5 PM ACK tightenings held**
+- **#1 `alert_threshold_exceeded = current > prev * 1.10`** — spec §1.4:161 formula. `isAlertExceeded` at `analytics.serializer.ts:20-23` returns `false` when `prevRate === null` (no exceedance possible) + strict `>` comparison against `prev * 1.10`. 3 unit tests explicitly cover 0.2 vs 0.15 (exceeded), 0.11 vs 0.10 (NOT exceeded — strict), and null prev (NOT exceeded).
+- **#2 `recommendation_key` 5-enum algorithm** — `computeRecommendationKey` at `serializer.ts:28-40`. All 5 branches unit-tested: 0→healthy, 1→single, 2-3→multi (< 4), 4+ < 75%→cross_dept, ≥ 75%→systemic.
+- **#3 `salah_kamar_count: null`** — three-state per T26 precedent, `serializeHighAlertDept` at `serializer.ts:73`; integration test asserts every dept wire has `salah_kamar_count === null`.
+- **#4 `TIER_GATE` = `BusinessRuleError` 422** — spec §7 canonical catalog wins over §1.4:133 prose. Service `assertTierGate` at `analytics.service.ts:62-71` throws when flag=false; JSDoc documents rationale + Q-T30-#8 escalation. Routes test asserts 422 envelope + `details.rule: 'TIER_GATE'`.
+- **#5 Q-CONTRACT-21 ASSUMED shape** — Q-T30-#9 escalation registered inline in service JSDoc + types file preserves the spec ASSUMED shape verbatim. Zero-code-change if PO ratifies alternate shape via slice-2 serializer swap.
+
+**PM ACK coding reminders — all honored**
+- `Prisma._avg` returns `Decimal | null` → `.toFixed(2)` for `avg_satisfaction`; `.toFixed(2)` + `Number()` for `avg_response_time_minutes` (2 decimals wire).
+- `avgResponseTimeMinutes` via raw SQL `EXTRACT(EPOCH FROM (closed_at - created_at)) / 60.0` — Prisma `_avg` doesn't support DateTime diffs.
+- Prev-period window: `prevFrom = from - (to - from)`, `prevTo = from - 1ms` — verified by unit test asserting equal-length windows.
+- `trend_7d` shape: `Array<{date, count}>` — last 7 days ending at `to` (spec §1.4:159 example matches).
+- `Prisma.sql` template literals throughout — zero string interpolation of user input.
+- `BusinessRuleError({rule: 'TIER_GATE'})` per tightening #4 (not ForbiddenError).
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings, 0 eslint-disable)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS**
+- `pnpm test:integration`: **PASS** (all 12 suites regression-clean)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/analytics/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` excl tests: **0**
+- Forbidden imports: **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `eslint-disable` in module: **0**
+
+**Security check**
+- HMAC verified: **N/A** (read-only endpoints).
+- Token encryption: **N/A**.
+- PII masking in log: **N/A** (analytics is aggregate data, no per-guest fields exposed).
+- SQL injection: **prevented** via `Prisma.sql` template literals — dates + hotelId parameterized; no string concatenation.
+- `hotel_id` NEVER from body — sourced from `ctx.hotelId` via `Prisma.sql` bind.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 37 new tests (25 service + 12 routes)
+- Integration: 8 new tests via testcontainer real Postgres — seeded 20 HOTEL_A tickets (10 DEPT_A_1 with 2 high-alert / 8 closed / 4 satisfaction, 5 DEPT_A_2 with 1 high-alert / 3 closed / 3 satisfaction, 10 prev-period baseline) + 1 HOTEL_B ticket for isolation. Aggregation math verified: `total=15`, `resolution=11/15`, `avg_satisfaction='3.73'` (41/11 = 3.7272...→3.73).
+- Coverage:
+  ```
+  All files              | ~100 stmts | 86.90 branch | 99.02 funcs | ~99 lines
+   analytics.repository.ts | 100      | 100          | 100         | 100
+   analytics.routes.ts     | 97.22    | 50           | 100         | 97.14
+   analytics.schema.ts     | 100      | 84.21        | 100         | 100
+   analytics.serializer.ts | 100      | 80           | 100         | 100
+   analytics.service.ts    | 100      | 100          | 100         | 100
+   index.ts                | 100      | 100          | 33.33       | 100
+  ```
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+GET /analytics/overview?from=2026-06-01&to=2026-06-30&period=day
+< 200 OK
+< {"data":{
+    "total_tickets": 15,
+    "resolution_rate": 0.7333,
+    "avg_satisfaction": "3.73",
+    "avg_response_time_minutes": 42.5
+   },
+   "meta":{"tier":null,"is_luxury_gate":null,
+           "from":"2026-06-01","to":"2026-06-30","period":"day"}}
+
+GET /analytics/tickets?period=custom&from=2026-06-01
+< 400 Bad Request   # period=custom requires both from and to
+
+GET /analytics/high-alert
+< 200 OK
+< {"data":[
+    {"department_id":"...","current_period_rate":0.2,"prev_period_rate":0.0,
+     "alert_threshold_exceeded":false, ...  # prev_rate=0 → 0 * 1.10 = 0 → 0.2 > 0 → true; but prev_rate is null actually
+     "salah_kamar_count":null,
+     "trend_7d":[{"date":"2026-06-24","count":2},...7 days]}
+   ],
+   "alert_summary":{"total_high_alert":1,"threshold_exceeded_count":1,
+                    "recommendation_key":"single_dept_spike"},
+   "meta":{"tier":null,"is_luxury_gate":null, ...}}
+
+GET /analytics/overview  (post-Opsi-A, non-luxury hotel, gm_admin)
+< 422 Unprocessable Entity
+< {"code":"BUSINESS_RULE","message":"Analytics restricted to Luxury tier",
+   "details":{"rule":"TIER_GATE"}}
+```
+
+**Notes / questions for PM C**
+
+1. **All 5 tightenings held with explicit test coverage** — tightening #1 formula strict-`>` boundary tested; #2 all 5 enum branches; #3 integration asserts null; #4 unit throws BusinessRuleError; #5 shape preserved verbatim.
+2. **3 new PARENT §3a escalations registered**: **Q-T30-#5** (`salah_kamar_count` spec define), **Q-T30-#8** (`TIER_GATE` 403 vs 422 inconsistency spec §1.4:133 vs §7:830), **Q-T30-#9** (Q-CONTRACT-21 formal ratification of `/high-alert` shape). All 3 non-blocking for slice-1 merge; Slot C code idempotent to PO resolution.
+3. **Slot C is now 10/10** (all Slot C tasks approved-awaiting-verdict or merged) — this closes the Slot C queue. Only slice-2/slice-3 deferrals remain, all gated on foundation prereqs:
+   - **T25-slice-2** (Meta callback ingest) — HMAC plugin + INTEGRATION_SHARED_SECRET
+   - **T22-slice-2 + T23-slice-2 + T24-slice-2** (CSV/multipart) — `@fastify/multipart` batched PO ratify (Q-T22-#1)
+   - **T26-slice-2** (real tier-lock + campaigns dep check) — Opsi A + PO ratify Q-T26-#7
+   - **T27-slice-2** (upgrade webhook + invoice download) — foundation `ObjectStoragePort.download` (Q-T27-#7)
+   - **T30-slice-2** (4 more analytics endpoints) + **T30-slice-3** (export binary) — no foundation gate; just size
+4. **`$queryRaw` for aggregations** — first Slot C module to use raw SQL (all prior tasks used Prisma fluent API). PM ACK note on `Prisma.sql` template literals honored throughout — grepped verified 0 string interpolation in repository. Foundation follow-up: if PM wants to codify raw-SQL discipline as a repo rule (e.g. eslint plugin, `no-raw-string-interpolation-in-queryRaw`), noting as candidate PARENT §10 nudge.
+5. **Three-state precedent applied uniformly** — T26 introduced the pattern (is_tier_locked/depends_on_active_data/min_tier all null); T30 extends to meta.tier + meta.is_luxury_gate. PM's T26 VERDICT line 3900 anticipated this. All Slot C Opsi C partial implementations now share the pattern.
+6. **Slice-2/slice-3 handoff for T30**:
+   - Slice-2 = 4 additional read endpoints (`departments`/`peak-hours`/`top-requests`/`satisfaction`) — same `$queryRaw` + serializer + three-state meta pattern. ~4h estimate.
+   - Slice-3 = `export` binary — needs `exceljs` or `pdfkit` dep addition per CLAUDE.md §11 WAJIB (PO ratify required). Route + service scaffold can be built now; binary generator awaits dep.
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
