@@ -12,11 +12,11 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **6/10 approved**; **T24-slice-1 assigned**
+- **Day**: H0 (2026-07-03) — Slot C **6/10 approved+merged**; **T24-slice-1 wip**
 - **Active tasks**:
   - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
-  - **T22 Menu CRUD (slice-1)** — APPROVED attempt 1; `feat/settings-menu` @ `1da9ef4` awaiting PO merge
-  - **T24 Knowledge CRUD + CSV import (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 4 JSON CRUD endpoints (list w/ filters + create + update + delete). CSV import deferred to T24-slice-2 (same multipart dep as T22-slice-2 — reuses Q-T22-#1 escalation).
+  - **T22 Menu CRUD (slice-1)** — **MERGED** (PR #15 `2d41120`) ✓
+  - **T24 Knowledge CRUD + CSV import (slice-1)** — PLAN ACK'd 2026-07-03 H0 with **0 tightenings + 0 new PARENT §3 escalations** (cleanest ACK Slot C has issued). Executor C coding on `feat/settings-knowledge`.
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -36,7 +36,7 @@
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
-| T24 | Knowledge CRUD + CSV import (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T24-slice-1 issued 2026-07-03 H0. Scope: **4 JSON CRUD endpoints** (list w/ ?is_active/?category/?tag filters + create + update + delete). No UNIQUE + no CHECK on `knowledge_entries` — simplest business rules yet. `tags` array pass-through; permissive `category` + `tags` per-element bounds. **CSV import DEFERRED to T24-slice-2** — same `@fastify/multipart` dep gate as T22-slice-2/T23; reuses existing Q-T22-#1 escalation (no new §3 entry). Dept_head RBAC ambiguity same as Q-T22-#2 (spec §6:807 identical phrasing) — reuses that escalation too. Files: 6 module + 1 barrel + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. 5 GAPs pre-surfaced (T24-#1..#5). Awaiting Executor C PLAN. |
+| T24 | Knowledge CRUD + CSV import (**slice-1 wip**) | wip (PLAN ACK'd, 0 tightenings) | — | PLAN ACK'd 2026-07-03 H0 — **cleanest ACK Slot C has issued**: 0 material tightenings, 0 new PARENT §3 escalations. All 5 GAP responses accept PM leans; Q-T24-#1 reuses Q-T22-#1 multipart escalation; Q-T24-#2 reuses Q-T22-#2 RBAC escalation; Q-T24-#3/#4/#5 all PM leans confirmed. Simplest business rules yet (no UNIQUE + no CHECK + no cross-entity guards + no state machine). Coding checklist reminders posted (category case-sensitivity default, tags array `has` operator empirical proof with 3+ tags, empty-array shape assertion, content bound rationale). Files: 6 module + 1 barrel + 3 tests. Expected 0 eslint-disable (4th consecutive Slot C module if held). Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -2832,6 +2832,38 @@ Mirror T28/T29 layout — thinnest single-entity module. Service constructor `(r
 **Est.**: ~2-3h (smallest task since T29 — simpler than T29 actually, no stub /test guard branch). Straight-line to SUBMIT if all tests land clean.
 
 Awaiting PM C ACK.
+
+##### PM C ACK — T24-slice-1 PLAN APPROVED (0 tightenings, proceed to coding, 2026-07-03 H0)
+
+**Cleanest PLAN Slot C has posted yet — 0 material tightenings, 0 new PARENT §3 escalations.**
+
+Ratifications:
+- **Session-start gate ✓** — independently verified `prisma/schema.prisma:325-341` KnowledgeEntry model (`title VARCHAR(255)`, `content Text`, `category VARCHAR(80) nullable`, `tags String[] default []`, `isActive default true`; no UNIQUE + no CHECK). Simplest schema shape in Slot C queue.
+- **Baseline math ✓** — 513/1/514 (post-T22-merge PR #15 `2d41120`) stated correctly.
+- **Files layout ✓** — mirrors T28/T29 thinnest single-entity twin (6 module + 1 barrel + 3 tests = 10 files, consistent Slot C pattern).
+- **All 5 GAP responses accept PM leans cleanly** — no new §3 entries (Q-T24-#1 reuses Q-T22-#1 multipart escalation; Q-T24-#2 reuses Q-T22-#2 RBAC escalation; Q-T24-#3/#4/#5 all PM leans confirmed).
+- **Approach paragraph ✓** — `buildKnowledgeWhere` pure function mirrors T21 `buildDepartmentWhere` + T22 `buildMenuCategoryWhere` (super_admin bypass + optional filter composition); Prisma `tags: { has: '<value>' }` correct operator for `String[]` array-contains; no P2002 catch (correct — no UNIQUE); pass-through `tags: string[]` (Prisma guarantees array shape from `String[] default []` column).
+
+**No new PARENT §3 escalations at ACK — first Slot C ACK to hit this milestone.** All GAPs either reuse existing open Qs (Q-T22-#1/-#2) or resolved as PM leans (T24-#3/#4/#5).
+
+**Coding checklist reminders** (things easy to miss on the smallest task — none material)
+
+- **`?category` filter case-sensitivity**: Prisma default is case-sensitive equality. If PO wants case-insensitive matching later, add `mode: 'insensitive'` to the filter — 1-line change. Slice-1: ship exact match. Test with `category='FAQ'` vs `'faq'` boundary in integration to document current behavior.
+- **`tags: { has: '<value>' }` integration test**: seed at least one entry with **3+ tags** and query for a tag at index 2+ to empirically prove Prisma's array-`has` operator works beyond the first element (not just [0]). Common testing pitfall.
+- **`tags` empty array shape**: Prisma returns `[]` (not `null`) for `String[] default []` when unset. Serializer pass-through is correct — FE gets consistent `[]` shape. Assert in unit test that a freshly-created entry with omitted `tags` field serializes to `tags: []`.
+- **`content` bound `1-10000` per ASSIGNMENT**: 10KB is generous for typical knowledge entries (~2000 words). If PO later flags longer procedure docs as a use case, bound is a 1-line raise. Not blocking today.
+- **Expected `eslint-disable`**: **0** — 4th consecutive Slot C module if held (T28 → T29 → T22 → T24 pattern).
+- **`loadOwned` helper reuse**: mirror T21/T28 pattern verbatim; resource name `'KnowledgeEntry'` for wire discrimination (T27 tightening #1 pattern).
+- **Field allowlist on update**: `.strict()` rejects `hotel_id`/`id`/timestamps; add JSDoc invariant on `create` service method per T27/T29 pattern.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface. Simplest cross-slot touch yet — nothing to worry about.
+- Q-T22-#1 (multipart batch ratify) + Q-T22-#2 (RBAC ambiguity) remain the only PARENT §3 opens for slot-C multi-task deferrals.
+- No new foundation nudges — standard patterns throughout.
+
+**Mid-task CHECKPOINT trigger**: unlikely needed at ~2-3h estimate (smallest task since T29 which shipped in one straight-line pass). If crossing ~3h with >2 files still incomplete, post CHECKPOINT.
+
+Proceed to coding on `feat/settings-knowledge`. Awaiting your SUBMIT.
 
 <!--
 TEMPLATE — copy untuk task baru:
