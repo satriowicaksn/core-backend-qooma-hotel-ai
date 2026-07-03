@@ -1989,6 +1989,132 @@ Parenthetical "**always returns empty**" reads literally as exec's option (A): G
 
 Proceed to coding on `feat/settings-voice`. Awaiting your SUBMIT.
 
+#### SUBMIT T29 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Settings/voice groundwork (GET + PUT + POST /test)
+Branch: `feat/settings-voice` @ `416e138` (pushed to origin)
+Files changed: 10 new (0 modified — cleanest Slot C task tied with T28)
+  - `src/modules/voice/voice.types.ts` (new)
+  - `src/modules/voice/voice.schema.ts` (new)
+  - `src/modules/voice/voice.serializer.ts` (new — includes `emptyVoiceConfig` helper)
+  - `src/modules/voice/voice.repository.ts` (new)
+  - `src/modules/voice/voice.service.ts` (new)
+  - `src/modules/voice/voice.routes.ts` (new)
+  - `src/modules/voice/index.ts` (new — barrel + `buildVoiceService` factory)
+  - `src/modules/voice/__tests__/voice.service.test.ts` (new — 20 tests)
+  - `src/modules/voice/__tests__/voice.routes.test.ts` (new — 12 tests)
+  - `src/modules/voice/__tests__/voice.repository.integration.test.ts` (new — 11 tests)
+
+**DoD self-check** (from ASSIGNMENT T29)
+- [x] 3 endpoints wired — `voice.routes.ts:38,52,71`.
+- [x] Zod strict body on PUT with `pbx_type`/`config`/`is_active`; `.refine(non-empty)` — `voice.schema.ts:14-23`.
+- [x] Tenant scope: PK `hotelId` from `ctx.hotelId` on all 3 endpoints — `voice.service.ts:24,30,42`.
+- [x] RBAC: `requireRole([gm_admin])` on all 3; dept_head/staff both 403; super_admin implicit — routes tests cover full matrix.
+- [x] GET returns empty defaults if no row (`voice.service.ts:26-28`); never 404. Integration test asserts.
+- [x] PUT is idempotent upsert — Prisma `upsert({where:{hotelId}, create, update})` on PK. Integration test proves partial-update preservation + same-input-twice convergence.
+- [x] POST /test guard: 422 `VOICE_NOT_CONFIGURED` `BusinessRuleError` (per PM tightening #1) when no row OR `pbxType` null. Unit + integration tests cover both branches.
+- [x] Winston observability at BOTH PUT + POST /test route layers per PM tightening #2 — `voice.routes.ts:58-65,78-80`.
+- [x] `make check` PASS baseline **450/1/451** (post-T28-merge); SUBMIT delta = **+33 unit** (483/1/484) + **+11 integration** (140/1/141).
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes `voiceRoutes` + `VoiceService` + `buildVoiceService` factory + wire/DTO types.
+- [x] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`.
+
+**2 PM tightenings — both held**
+- **#1 `BusinessRuleError` (422)** — `voice.service.ts:54-58`: `throw new BusinessRuleError('Voice PBX not configured', { rule: 'VOICE_NOT_CONFIGURED' })`. Not `ValidationError`. Wire envelope: `{code:'BUSINESS_RULE', details:{rule:'VOICE_NOT_CONFIGURED'}}` — matches T25/T28 precedent for domain-precondition rules.
+- **#2 winston observability at PUT + /test** — `voice.routes.ts:58-65` (`upsert` action with `pbxTypeSet` + `isActiveSet` flags for settings-audit posture) and `voice.routes.ts:78-80` (`test` action). All three handlers log with `{module:'voice', action, correlationId}` T21 pattern.
+
+**Additional PM ACK reminders honored**
+- **Prisma `@updatedAt`** — repo `upsert.create/update` payloads never set `updatedAt` manually; Prisma decorator handles it. Verified in code.
+- **`config` defensive narrow** — serializer narrows non-object JSONB to `{}` (`voice.serializer.ts:8-11`). Unit test asserts.
+- **`isActive` partial-update contract** — service delta only includes `isActive` when body has `is_active`; omitted key leaves persisted value untouched. Integration test asserts partial-update preservation (first PUT `is_active:true`, second PUT `config` only → `is_active` remains true).
+- **Empty-body PUT rejected at zod** — 1 unit + 1 route test.
+- **`emptyVoiceConfig(ctx.hotelId)`** — carries caller's hotelId (not null); `updated_at: null`. 1 unit + 1 integration test.
+- **Wire includes `hotel_id`** — T21/T25 convention held.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings — 0 eslint-disable in barrel; simplest slot-C module tied with T28)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 483 passed, 1 skipped, 484 total (baseline 450/1/451 + **+33**)
+- `pnpm test:integration`: **PASS** — 140 passed, 1 skipped, 141 total (baseline 129/1/130 + **+11**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/voice/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route (excl tests): **0** (test-file `throw new Error('expected throw')` — jest assertion pattern)
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `eslint-disable` in module: **0** (no port+adapter → no barrel restriction)
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no webhook).
+- Token encryption via `shared/utils/crypto`: **N/A**.
+- PII masking in log: **N/A** (voice config is operational — `pbx_type`/`is_active` are settings values; `config` JSONB contents may contain PBX credentials in future wave 2a → flagged in note #4 below for pre-wave-2a security review).
+- `hotel_id` NEVER from body — sourced from `ctx.hotelId` via PK; zod strict rejects `hotel_id` in body (belt-and-suspenders — test asserts).
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 32 new tests (20 service + 12 routes)
+- Integration: 11 new tests via testcontainer real Postgres — empty-default fallback, upsert create+update, partial-update preservation (first PUT sets pbx_type+is_active, second PUT sets only config → pbx_type+is_active preserved), same-input-twice idempotency, clearing pbx_type to null, permissive pbx_type across 4 values (`sip`, `twilio`, `custom_pbx_v2`, `genesys-cloud`), PK-per-hotel tenant isolation, /test 422 branches (no row / null pbx_type) + happy path.
+- Coverage:
+  ```
+  All files            | 98.95 stmts | 87.50 branch | 90.90 funcs | 98.85 lines
+   voice.repository.ts | 100         | 100          | 100         | 100
+   voice.routes.ts     | 97.05       | 66.66        | 100         | 96.96
+   voice.schema.ts     | 100         | 60           | 100         | 100
+   voice.serializer.ts | 100         | 100          | 100         | 100
+   voice.service.ts    | 100         | 100          | 100         | 100
+   index.ts            | 100         | 100          | 33.33       | 100
+  ```
+  service+repo+serializer at 100% lines/branches/funcs. Highest module-wide coverage of any Slot C task.
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+GET /settings/voice   (no row exists yet)
+< 200 OK
+< {"data":{"hotel_id":"<hotelId>","pbx_type":null,"config":{},"is_active":false,"updated_at":null}}
+
+PUT /settings/voice   body {"pbx_type":"sip","is_active":true}
+< 200 OK
+< {"data":{"hotel_id":"...","pbx_type":"sip","config":{},"is_active":true,"updated_at":"..."}}
+
+PUT /settings/voice   body {"config":{"host":"sip.example.com"}}   (subsequent partial)
+< 200 OK
+< {"data":{...,"pbx_type":"sip","is_active":true,"config":{"host":"sip.example.com"}}}   # pbx_type + is_active preserved
+
+PUT /settings/voice   body {"hotel_id":"attacker"}
+< 400 Bad Request   (zod strict rejects unknown field)
+
+PUT /settings/voice   body {}
+< 400 Bad Request   (refine non-empty)
+
+POST /settings/voice/test   (no row / pbx_type null)
+< 422 Unprocessable Entity
+< {"code":"BUSINESS_RULE","message":"Voice PBX not configured","details":{"rule":"VOICE_NOT_CONFIGURED"}}
+
+POST /settings/voice/test   (pbx_type set)
+< 200 OK
+< {"data":{"success":true,"note":"stub — PBX integration is wave 2a per ADD-23.7"}}
+```
+
+**Notes / questions for PM C**
+
+1. **Q-T29-#1 stays open at PARENT §3a for PO** — MVP §101 "always returns empty" phrasing vs spec §1.5 GET/PUT paired-verb semantic. Slice-1 ships option B (PUT persists + GET reflects). If PO rules option A (façade GET ignoring DB), the fix is a single-line service change (`get()` returns `emptyVoiceConfig(ctx.hotelId)` unconditionally) — zero regression risk on flip.
+2. **Slot C is now 5/10** with T21+T25+T27+T28 merged + T29 approved-awaiting-merge (if VERDICT approves). Remaining Slot C tasks (T22 menu, T23 knowledge, T24 CSV import consumers) all merge-gated on T09 PO merge (Slot A). T26 feature flags + T30 analytics hard-blocked at DEV by Opsi C.
+3. **Wave 2a PBX integration follow-up** — when the real SIP/Twilio adapter task lands (wave 2a per ADD-23.7), the pattern will be:
+   - Add `VoicePbxPort` interface + adapters at `src/modules/voice/ports/` + `adapters/`
+   - Barrel factory takes optional `pbxAdapter?: VoicePbxPort` (defaults to stub)
+   - `service.test()` calls `pbxAdapter.test(row.pbxType, row.config)` instead of returning the stub note
+   - Migration: 1-line service change + wire adapter at composition root (same pattern as T27 Q-T27-#7 local port)
+4. **`config` JSONB may carry PBX credentials in wave 2a** — flagging for pre-wave-2a security review: encryption at rest (per CLAUDE.md §6 WAJIB #1: "Token sensitif WAJIB enkripsi at-rest"). Slice-1 stores as plain JSONB — acceptable because slice-1 accepts no credential-shaped input (permissive JSONB but wave 2a spec is not yet defined). When wave 2a lands with real PBX credential fields, encryption pattern (mirroring `shared/utils/crypto.ts` if implemented) must land alongside.
+5. **`empty-default GET` is stable across sessions** — proven by integration test sequence: GET (empty) → GET again (still empty) → PUT (`sip`) → GET (`sip`) → GET again (`sip`). Confirms no side-effect between calls.
+6. **`serializer.emptyVoiceConfig` is exported for internal barrel/test consumption only** — not in the module's public barrel exports since it's an implementation detail for GET fallback. Test asserts shape via direct import.
+
+Requesting PM C VERDICT.
+
+
 <!--
 TEMPLATE — copy untuk task baru:
 
