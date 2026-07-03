@@ -3488,6 +3488,149 @@ Step 8 — Verdict: **APPROVED**
 - **T30 Analytics (Luxury-gated)** — hard-blocked at DEV by Opsi C tier-join (spec §1.4 `hotel.tier === 'luxury'` gate; same PARENT §4 constraint).
 - **Both need PO decision at PARENT §4 Opsi A / Prisma multi-schema restoration** to be fully implementable at DEV. Slot C can PLAN partial implementations behind `SKIP_CROSS_DB_CHECKS` gate (T21/T27 pattern) but tier-gating logic is inherently unusable without real tier data.
 
+### ASSIGNMENT T26 — Feature Flags (slice-1, tier-lock deferred under SKIP_CROSS_DB_CHECKS) — claimed by exec-C (Satrio) at 2026-07-03 H0
+
+- **Routed from**: PM C verbal "continue to next T" + T23 VERDICT line 3489 explicit green light — "Slot C can PLAN partial implementations behind `SKIP_CROSS_DB_CHECKS` gate (T21/T27 pattern) but tier-gating logic is inherently unusable without real tier data." Both remaining Slot C tasks (T26/T30) are Opsi C hard-blocked; T26 is smaller (2 endpoints vs T30's 8) so picking T26 first. Self-select per EXECUTOR-PROTOCOL §0.3 route (B). If PM prefers T30 or wait-for-PARENT-§4 instead, reject this claim.
+- **Branch (to create on PLAN ACK)**: `feat/settings-feature-flags`
+- **Slice ruling**: **slice-1 = 2 endpoints + tier-lock stubbed (Opsi C)** + dependency-check stubbed (no `campaigns` model in T02).
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.8 (endpoints lines 255-273) + §2.9 (`feature_flags` DDL) + §6:809 RBAC + §7:829 error catalog (`FEATURE_FLAG_DEPENDENCY_VIOLATION`); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C6 (AC — gm_admin) + §4.7 (dependency violation rule) + §101 line 100 ("seed default flags off for each existing hotel").
+- **Living reference**: `src/modules/agents/` (T28 approved — thinnest single-entity CRUD twin), `src/modules/departments/` (T21 — Q-C-02 `SKIP_CROSS_DB_CHECKS` startup WARN pattern), `src/modules/billing/` (T27 — Q-T27-#1 tier=null fail-open under Opsi C), `src/modules/wa-templates/` (T25 — `BusinessRuleError` for 422).
+
+**Scope — slice-1 (2 endpoints)**
+
+| Method  | Path                       | Purpose                                                                          |
+| ------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `GET`   | `/api/feature-flags`       | List 14 known flags per spec §1.8. Each carries `is_tier_locked` (stubbed `false` under Opsi C) + `depends_on_active_data` (stubbed `false` — no campaigns model yet) + current state (`is_enabled`/`config`). |
+| `PATCH` | `/api/feature-flags/:flag` | Toggle a flag. Body `{is_enabled?: boolean, config?: object}`. `.refine(non-empty)`. Upsert on UNIQUE(hotel_id, flag). Under Opsi C, tier check skipped (`SKIP_CROSS_DB_CHECKS=true` → no tier-lock 422). Dependency check stubbed to always-pass (no campaigns model). `?force=true` super_admin-only override reserved for slice-2 when dependency check is real. |
+
+**Deferred to T26-slice-2** (all need foundation prereqs):
+- **Tier-lock enforcement** — needs Opsi A restore or foundation `IntegrationTierPort` (Q-C-02 escalation).
+- **Dependency violation** — needs `campaigns` model in Prisma schema (foundation scope; not in current schema).
+- **`?force=true` super_admin override** — needs real dependency check to have a code path to bypass.
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `feature_flags` @ spec `docs/spec/02-hotel-core.md:568-580`; Prisma model `FeatureFlag` @ `prisma/schema.prisma:353-368`. Fields: `id`, `hotelId`, `flag (VARCHAR 80)`, `isEnabled (default false)`, `config (JSONB default {})`, `updatedAt`, `updatedBy (nullable FK to users)`. **UNIQUE(hotel_id, flag)** — natural upsert target per flag.
+
+**Known 14 flags** (from spec §1.8 lines 265-269):
+- Core: `multi_language`, `vip_profile`, `privacy_mode`, `outbound_quota_alerts`
+- Channels: `menu_ordering`, `wa_templates`, `voice_groundwork`
+- AI: `sentiment_detection`, `butler_anticipate`, `loyalty_integration`, `compensation_auto`, `post_stay_relationship`
+- Verification: `pending_verification`, `failed_verification_alert`
+- Remaining 5 unspec'd (in FE fixtures) — **slice-1 ships 14 known; slice-2 catches up with fixtures repo access** (see GAP T26-#2).
+
+**RBAC** (spec §6:809 — `/api/feature-flags*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **NO** · staff: **NO**.
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])`.
+
+**Business rules**
+- **GET**: list ALL 14 known flags for the tenant hotel, joined against `feature_flags` DB rows. If a flag has no DB row yet, return with defaults (`is_enabled: false`, `config: {}`, `updated_at: null`, `updated_by: null`). `is_tier_locked: false` slice-1 (tier data null under Opsi C — matches T27 Q-T27-#1 fail-open lean). `min_tier`: hardcoded per flag from a constant map (see GAP T26-#3). `depends_on_active_data: false` slice-1 (no campaigns model — GAP T26-#4).
+- **PATCH `:flag`**: zod strict body `{is_enabled?: boolean, config?: object}` with `.refine(non-empty)`; hotel_id from ctx; **flag path param must be one of the 14 known flags** (400 if not); Prisma upsert on UNIQUE(hotel_id, flag); `updatedBy = ctx.userId`. Under Opsi C: no tier check (would throw `BusinessRuleError({rule:'FEATURE_FLAG_TIER_LOCKED'})` under flag=false but slice-1 skips this branch entirely). No dependency check (no campaigns model). Return updated row.
+- **`?force=true`**: parsed but NOT effective in slice-1 (no dependency check to bypass). Documented in JSDoc for slice-2.
+
+**Files to create**
+```
+src/modules/feature-flags/
+├── feature-flags.types.ts              (DomainFeatureFlag, FeatureFlagRow, FeatureFlagWire,
+│                                          list response, single response types;
+│                                          KnownFlag = union type over 14 known strings)
+├── feature-flags.constants.ts          (KNOWN_FLAGS constant array of 14 strings;
+│                                          FLAG_MIN_TIER map — hardcoded per Q-T26-#3 lean;
+│                                          KNOWN_FLAGS_SET for O(1) validation)
+├── feature-flags.schema.ts             (zod: UpdateFlagBodySchema.strict.refine-non-empty +
+│                                          FlagParamSchema (validate against KNOWN_FLAGS_SET) +
+│                                          ListQuerySchema empty + force query param)
+├── feature-flags.serializer.ts         (Prisma row → snake_case wire;
+│                                          synthesize wire from KNOWN_FLAGS × DB rows
+│                                          left-join; slice-1 stubs is_tier_locked=false +
+│                                          depends_on_active_data=false)
+├── feature-flags.repository.ts         (Prisma direct — findManyByHotel, upsertFlag)
+├── feature-flags.service.ts            (list composition + patch upsert;
+│                                          Q-C-02 startup WARN on prod+flag=true)
+├── feature-flags.routes.ts             (Fastify plugin: 2 handlers; thin)
+├── index.ts                            (barrel — plugin + service + factory +
+│                                          KNOWN_FLAGS re-export + wire types)
+└── __tests__/
+    ├── feature-flags.service.test.ts               (unit; mock repo; branch coverage:
+    │                                                 list happy incl. no-DB-row defaults;
+    │                                                 patch upsert with new + existing;
+    │                                                 unknown flag 400; strict body reject;
+    │                                                 cross-tenant no leak via unique(hotel_id, flag);
+    │                                                 Q-C-02 WARN on prod+flag=true)
+    ├── feature-flags.routes.test.ts                (unit; Fastify inject; 200/400/401/403 matrix)
+    └── feature-flags.repository.integration.test.ts (testcontainers real Postgres;
+                                                       seed 2 hotels × varied flag states;
+                                                       UNIQUE(hotel_id, flag) proven;
+                                                       upsert idempotency; tenant isolation;
+                                                       updatedBy FK set on write)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1). `env.ts` **reuses existing `SKIP_CROSS_DB_CHECKS`** (added by T21) — no new env. Schema + migrations + core + plugins + shared/socket untouched. No new dependencies.
+
+**T26-slice-1 DoD**
+- [ ] 2 endpoints wired.
+- [ ] Zod schemas: `UpdateFlagBodySchema.strict().refine(non-empty)` accepting `is_enabled` + `config`; `FlagParamSchema` validates against `KNOWN_FLAGS_SET` (400 on unknown); `ListQuerySchema` allows `?force=true` boolFlag.
+- [ ] Tenant scope: `hotel_id` from `ctx.hotelId` on every write; upsert on UNIQUE(hotel_id, flag).
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on both; dept_head + staff → 403.
+- [ ] 14 known flags synthesized in list response even without DB row (default `is_enabled:false, config:{}`).
+- [ ] `is_tier_locked: false` slice-1 (Opsi C stub); `depends_on_active_data: false` slice-1 (no campaigns model).
+- [ ] `updatedBy = ctx.userId` on PATCH upsert.
+- [ ] `?force=true` parsed but no-op slice-1 (JSDoc'd for slice-2).
+- [ ] Response envelope: list `{data: FeatureFlagWire[]}`, single `{data: FeatureFlagWire}` per Q-B-01. 200 on both.
+- [ ] Snake_case wire via serializer.
+- [ ] Winston logger scoped via `req.log.info({module:'feature-flags', action, correlationId})`.
+- [ ] Unit tests: full branch coverage.
+- [ ] Integration test: real Postgres; UNIQUE + upsert idempotency + tenant isolation + updatedBy FK.
+- [ ] Line coverage ≥ 80%.
+- [ ] `make check` PASS baseline **513/1/514** (post-T22-merge; T23/T24/T29 approved-awaiting-merge).
+- [ ] Drift scans clean.
+- [ ] Named exports only.
+- [ ] Zero touch on foundation surface. No new deps.
+
+#### PLAN T26-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+2 endpoints (`GET /api/feature-flags` list + `PATCH /api/feature-flags/:flag` upsert). Ships 14 known flags per spec §1.8; DB rows synthesized left-join with defaults for absent rows. Tier-lock STUBBED to `false` under `SKIP_CROSS_DB_CHECKS=true` (matches T27 Q-T27-#1 fail-open pattern); dependency-check STUBBED to `false` (no `campaigns` model in T02). `?force=true` parsed but no-op slice-1. RBAC `requireRole([gm_admin])`. Zero touch on `api.ts`/env/schema/migrations/core/plugins/shared. `SKIP_CROSS_DB_CHECKS` env reused from T21 — no new env.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.8 (endpoints + tier-lock semantic + FEATURE_FLAG_DEPENDENCY_VIOLATION) + §2.9 (DDL) + §6:809 RBAC + §7:829 error catalog ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C6 (AC) + §4.7 (dependency violation rule with menu_ordering example) + §101 line 100 (seed guidance) ✓
+- Parent docs spot-read: `src/modules/agents/` (T28 — thinnest single-entity CRUD twin, no port/adapter), `src/modules/departments/` (T21 — Q-C-02 startup WARN pattern for prod+flag=true), `src/modules/billing/` (T27 — Q-T27-#1 tier=null fail-open under Opsi C); `src/plugins/tenant-guard.ts` + `rbac.ts`, `src/core/errors/app-errors.ts` (`ValidationError` + `BusinessRuleError` reserved for slice-2), `src/core/config/env.ts` (`SKIP_CROSS_DB_CHECKS` already present — reuse), `prisma/schema.prisma:353-368` (FeatureFlag — UNIQUE(hotel_id, flag) verified) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ (`BusinessRuleError` reserved) · T21/T25/T27/T28/T29/T22/T24/T23 ✓ — all approved
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **513/1/514** on `main` (T29+T24+T23 approved-awaiting-merge) ✓
+- Scaffolder risk: **none**
+
+**GAPs / questions**
+
+- **GAP T26-#1** — Tier-lock semantic under Opsi C `SKIP_CROSS_DB_CHECKS=true`.
+  - **Options**: A) `is_tier_locked: false` for ALL flags (fail-open UX — matches T27 Q-T27-#1 lean A tier=null pattern; FE renders all toggles enabled at DEV); B) `is_tier_locked: null` (three-state UX; FE renders "tier data unavailable"); C) Compute lock against a hardcoded default tier (e.g. `Professional`) — risky (surprises post-Opsi-A operators).
+  - **My intent**: **A** — matches T27 Q-T27-#1 precedent (tier=null → tier-related checks skipped + fail-open UX). Startup WARN on prod+flag=true (T21/T27 pattern) prevents silent prod ship.
+- **GAP T26-#2** — 14 known flags vs "remaining 5" unspec'd.
+  - **Options**: A) Ship the 14 explicit; document `remaining 5` deferred to slice-2 when FE fixtures accessible; B) Wait for FE fixtures list; C) Invent 5 plausible names.
+  - **My intent**: **A** — spec explicitly says "adding new flags is fine, renaming/removing breaks the FE settings page." Adding the missing 5 later is spec-safe. Slice-2 catches up.
+- **GAP T26-#3** — `min_tier` per flag (spec doesn't specify).
+  - **Options**: A) Hardcode all flags to `min_tier: 'lite'` (all-unlocked default; safest UX); B) Educated guesses (`multi_language`+`vip_profile`+AI-* flags → luxury); C) Pull from an unwritten spec addendum.
+  - **My intent**: **A** — spec is silent. All `min_tier: 'lite'` gives FE stable data + is easy to tighten later when spec clarifies per-flag tier gates. Not blocking.
+- **GAP T26-#4** — `depends_on_active_data` under no-campaigns-model schema.
+  - **Options**: A) Always `false` slice-1 (no dependency data source exists); B) Hardcode `menu_ordering: true` when any active `menu_items` exist (menu module merged); C) Escalate for `campaigns` model addition.
+  - **My intent**: **A** — spec §4.7 example uses "3 active campaigns" but `campaigns` model isn't in T02. MVP §4.7 says "Compute `depends_on_active_data` at read time so FE can show '3 campaigns using this' preview" — but with no source, `false` is honest slice-1. Slice-2 wires when campaigns model lands.
+- **GAP T26-#5** — PATCH body shape. Spec §1.8 doesn't specify.
+  - **Options**: A) `{is_enabled?: boolean, config?: Record<string, unknown>}` with `.refine(non-empty)` (partial-update contract); B) `{is_enabled: boolean}` only (no config edit slice-1); C) Full replacement `{is_enabled: boolean, config: object}` required both.
+  - **My intent**: **A** — matches Q-C-01 / T25 / T29 permissive-config pattern + `.refine(non-empty)` from T21/T24/T25/T29 update-body discipline. FE can toggle `is_enabled` alone or set per-flag config.
+- **GAP T26-#6** — `?force=true` slice-1 behavior. No dependency check → nothing to force.
+  - **Options**: A) Parse but no-op slice-1 (JSDoc'd); B) Reject with 400 `NOT_APPLICABLE_YET`; C) Silently ignore.
+  - **My intent**: **A** — parse via zod (`?force=true|false` boolFlag) + super_admin check at route (only super_admin can pass force=true; gm_admin gets 403 on the query param). No actual override path today. Slice-2 wires the real check.
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1/Q-T22-#1..#2/Q-T24-#1..#5/Q-T23-#1..#7 all resolved or open elsewhere — not re-raising.
+
+**Approach**
+Mirror T28/T29 layout (single-entity CRUD, no port/adapter, no transaction). Service constructor `(repo, opts = {skipCrossDbChecks, nodeEnv, logger?})` — Q-C-02 WARN at construction on prod+flag=true. **List**: build a `KNOWN_FLAGS × DB rows` left-join — for each of 14 known flags, look up matching DB row by `flag` column; if present, use row's `isEnabled`/`config`/`updatedAt`/`updatedBy`; if absent, synthesize defaults. Serialize each flag with `min_tier` from `FLAG_MIN_TIER` constant (all `'lite'` slice-1) + `is_tier_locked: false` + `depends_on_active_data: false`. **PATCH**: zod validates `flag` param against `KNOWN_FLAGS_SET` (400 if unknown); parse body `.strict().refine(non-empty)`; Prisma `upsert({where: {hotelId_flag}, create: {hotelId, flag, ...delta, updatedBy}, update: {...delta, updatedBy}})`; return updated wire. `?force=true` accepted via zod but not effective slice-1. Routes RBAC + winston + tenant scope. Tests: unit for list synthesis + upsert branches + Q-C-02 WARN + strict-body-reject + unknown-flag-400; integration for UNIQUE + upsert idempotency + tenant isolation + updatedBy FK.
+
+**Est.**: ~3-4h (medium — 2 endpoints but requires the KNOWN_FLAGS × DB left-join composition + Opsi C flag pattern + 6 GAP decisions to surface). Straight-line to SUBMIT if PM accepts the 6 leans without contested tightenings.
+
+Awaiting PM C ACK — especially on GAP T26-#1 (fail-open under Opsi C) + GAP T26-#3 (all-lite min_tier default) as these are the two most consequential slice-1 shape decisions.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
