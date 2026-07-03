@@ -12,14 +12,14 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **2/10 approved+merged**; **T27-slice-1 wip**
+- **Day**: H0 (2026-07-03) — Slot C **3/10 approved** (T21+T25 merged; T27-slice-1 approved-awaiting-merge)
 - **Recent activity**:
   - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
   - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
-  - **T27 Billing (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 3 tightenings + Q-T27-#7 escalation. Executor C coding on `feat/settings-billing`.
-- **Branches**: `feat/settings-billing` (T27, wip)
+  - **T27 Billing (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-billing` @ `97f1615` awaiting PO merge. 16 files (6 module + 2 ports + 2 adapters + 1 barrel + 5 tests). Q-T27-#7 stays open PARENT §3b (Slot A T-INFRA-06 candidate).
+- **Branches**: `feat/settings-billing` (T27-slice-1, awaiting PO merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25 merged; T27-slice-1 wip; T22/T23/T24 merge-gated on T09 PO merge; T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C.
+- **My queue (preview)**: T21+T25 merged; T27-slice-1 approved; T22/T23/T24 merge-gated on T09 PO merge; T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C. Next candidate: T28 Settings/agents or T29 Voice groundwork stub.
 
 ---
 
@@ -31,7 +31,7 @@
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
-| T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 wip**) | wip (PLAN ACK'd with 3 tightenings + 1 escalation) | — | PLAN ACK'd 2026-07-03 H0. Scope: 4 public endpoints + `UpgradeNotifierPort`/`LogOnly` adapter + local `BillingPdfStoragePort`/`InMemory` adapter (Q-T27-#7). GAP responses #1–#6 all accept PM leans + defense-in-depth filename sanitization on #4. **Q-T27-#7 escalates to PARENT §3b + §10** (foundation gap: `ObjectStoragePort.download` missing from T08; T-INFRA-06 candidate; Slot C ships local port swappable to core when foundation extends). 3 tightenings held: (a) `NotFoundError` uses actual signature `(resource, id?)` — no invented `DAILY_BRIEF_NOT_AVAILABLE` code (PM ASSIGNMENT self-correction); (b) `Decimal.toFixed(2)` for wire consistency; (c) tier flag=false stub returns null + TODO comment, not `throw not-implemented`. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
+| T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-billing` @ `97f1615` — **awaiting PO merge**. 16 files (6 module + 2 ports + 2 adapters + 1 barrel + 5 tests). `make check` **411/1/412** (+40 net: 20 service + 12 routes + 3 upgrade-notifier adapter + 3 pdf-storage adapter + 2 zod parser); `pnpm test:integration` **116/1/117** (all 7 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean; 4 eslint-disable in barrel (T25 pattern held). All 3 tightenings held. All 6 GAP resolutions delivered + Q-T27-#4 defense-in-depth filename sanitization. **Q-T27-#7 stays open** at PARENT §3b (foundation `ObjectStoragePort.download` missing from T08 — Slot A T-INFRA-06 candidate; Slot C code idempotent-safe post-fix, barrel-swap migration). **Deferred slices** (T25-slice-2 Meta-callback + T27 quota-meter + T27 W3/W5 workers) blocked on foundation prereqs. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
 
 ---
 
@@ -1329,6 +1329,67 @@ GET /billing/daily-brief/latest.pdf
 
 Requesting PM C VERDICT.
 
+##### VERDICT T27-slice-1 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 19 DoD boxes verified, independent PM validation on `feat/settings-billing` @ `97f1615`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints (3 tightenings + Q-T27-#7 local port + 6 GAP resolutions + coding checklist reminders) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes/adapter/port) : 0
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 4 (all barrel `no-restricted-imports` — 2 imports + 2 re-exports for the 2 adapters; T25 precedent held; foundation config nudge from T25 VERDICT still open at PARENT §10)
+```
+
+Step 3 — File inventory: **16 files created** (`git show --name-only 97f1615` — 6 module + 2 ports + 2 adapters + 1 barrel + 5 tests). SUBMIT header claims "13 new" but bullet list has 15 items and actual commit has 16 files — same cosmetic count typo pattern as T25 SUBMIT. Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `src/core/storage/` / `src/shared/socket/` / `src/plugins/` / `prisma/migrations/` — Override #1 held + all foundation surface untouched. Q-T27-#7 handled via local port as ratified.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 411/1/412** (baseline 371/1/372 post-T25+T10-merged + **+40 net**: 20 service + 12 routes + 3 upgrade-notifier adapter + 3 pdf-storage adapter + 2 zod parser); Docker-free (T-INFRA-03 held); 1.397s
+- `pnpm test:integration` **PASS 116/1/117** — all 7 module suites green (departments/wa-templates/tickets/notifications/guests/visits + billing 12 new). Slot B + T21 + T25 regression clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `billing.service.ts` (153 LOC): all 3 tightenings held verbatim — **#1**: `NotFoundError(resource, id?)` used with distinct resource names `'Invoice'`/`'InvoicePdf'`/`'InvoicePdfFile'`/`'DailyBrief'` at L113,117,125,131; no invented code override; **#2**: exercised in serializer, service reads Decimal via `.amountIdr` and passes through; **#3**: `fetchTierSnapshot` returns `Promise.resolve(null)` on both flag branches (L144,151) with TODO(Opsi A) comment inlined at L146-150 documenting the migration path. Q-C-02 pattern mirrored exactly at L49-58 (`event: 'cross_db_check_skip'` matches `departments.service.ts` for cross-module grep). `Promise.all` on tier+3-local per Q-T27-#6 lean C at L67-72 (tier resolves to null fail-open, others fail-closed). `loadOwnedInvoice` mirrors `loadOwned` T21 pattern with `assertHotelOwnership` for cross-tenant 404 leak-safe at L128-136. ✓
+- `billing.routes.ts` (113 LOC): thin handlers per T21/T25 convention; `sanitizeFilename` regex `/[^A-Za-z0-9._-]/g → _` at L38-40 (Q-T27-#4 defense-in-depth held); correlationId propagated at L28-34; 202 on upgrade at L70; PDF stream via `reply.type('application/pdf').header('Content-Disposition', ...).send(body)` at L88-91; daily-brief calls `service.downloadDailyBriefPdf(ctx)` which is typed `never` at L107 — unreachable `reply.code(500).send()` at L109 is a defensive TS-happy fallback (cosmetic but reasonable). ✓
+- `billing.repository.ts` (45 LOC): Prisma direct (ADR-0001 compliant); `RECENT_INVOICES_LIMIT = 12` constant matches ASSIGNMENT fixed-limit spec; `findLatestQuota` returns `null` on missing row (comment L11-13 documents PM-ACK honest empty-state); `listActiveExtras` uses `OR: [{expiresAt: null}, {expiresAt: {gt: now}}]` matches DoD active filter; ordering `issuedAt DESC` / `purchasedAt DESC` per spec §2.10 index hints. ✓
+- Bonus `billing.serializer.ts` (88 LOC): tightening **#2** `.toFixed(2)` held at L71 (invoice) + L84 (extra); TIER_MATRIX inlined at L19-44 with per-tier values from spec §1.10; `enterprise: 0` sentinel with comment L36-37 explaining "custom per spec" — dead code today per exec Note #2 but future-facing per tightening #3 Opsi A path. ✓
+- Bonus `index.ts` barrel (63 LOC): 4 eslint-disable lines (2 imports L8+10, 2 re-exports L19+21) with in-line prose justification, mirrors T25 pattern. `buildBillingService(db, {upgradeNotifier?, pdfStorage?, logger, skipCrossDbChecks, nodeEnv})` factory has default fallbacks (`LogOnlyUpgradeNotifierAdapter` + `InMemoryBillingPdfStorageAdapter`) at L56-57. `BillingRepository` NOT re-exported (internal). ✓
+- Bonus `billing.schema.ts` (43 LOC): `UpgradePackageBodySchema.strict()` with `target_tier: z.enum(['professional', 'luxury', 'enterprise'])` at L8-12 — Q-T27-#2 enum held (no `'lite'` downgrade). ✓
+- Bonus ports (10 + 24 LOC): `BillingPdfStoragePort.download(key): Promise<Buffer | null>` matches Q-T27-#7 workaround signature; `UpgradeNotifierPort.notify(input): Promise<UpgradeNotifyResult>` mirrors T25 port structure with `correlationId?` optional. ✓
+
+Step 6 — Security floor: no webhook in slice-1 (HMAC N/A); no token storage (crypto N/A); no PII (`hotelId`/`userId`/`targetTier` operational, not guest data); `hotel_id` sourced from `ctx.hotelId` verified in every service method; `.strict()` zod rejects unknown fields; **filename sanitization** at `routes.ts:38-40` prevents CRLF/quote/space header injection even though `invoiceNumber` DB column is domain-constrained (Q-T27-#4 defense-in-depth); no secret hardcoded ✓
+
+Step 7 — Test coverage: line **96.68%** across `billing/**` (exceeds ≥ 80% DoD; repo/ports/adapters/index all 100%; schema 100 lines; service 97.22; routes 95.23; serializer 88.88). Branch 76.66% — uncovered branches are `serializeTier` dead path (exec Note #2 — kept intentionally per PM tightening #3 for Opsi A migration path) + defensive route fallback L109. All coverage misses justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (Q-T27-#7 ready to roll to PARENT)** ✓ verified. Rolled to PARENT §3b + §10 at ACK time (`3e9842c`) — status stays **open** at PARENT §3b, foundation candidate. Barrel swap when foundation lands is a single-commit path.
+- **Note #2 (`TIER_MATRIX` + `serializeTier` unreferenced today)** — **PM ratifies keeping the dead code**. Aligns with tightening #3 (flag=false path stays null-safe + migration-ready). Coverage impact (88.88% serializer) is acceptable — dead branch is documented + linked to TODO(Opsi A). Removing would force re-authoring for slice-2 when Opsi A restores.
+- **Note #3 (overview failure mode)** — matches Q-T27-#6 lean C exactly. Ratified as designed.
+- **Note #4 (`InMemoryBillingPdfStorageAdapter.put` test-only)** — accepted as-is. Mirrors T08 `InMemoryAdapter.peek` pattern (test-only accessor on class, NOT on port). Clean separation.
+- **Note #5 (`notes?: string` upgrade extension follow-up)** — noted for future ticket (post-MVP or PO-driven). Not registered in §3.
+- **Note #6 (`NotFoundError` foundation extension nudge)** — matches PM ACK PARENT §10 nudge already registered at T27 ACK time (`3e9842c`). ✓
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (env.ts + core/ + plugins/ + shared/socket/ + api.ts + migrations all untouched).
+- Q-T27-#7 stays open at PARENT §3b + §10 (T-INFRA-06 candidate) — non-blocking for T27 merge.
+- Foundation ESLint nudge (from T25) + `NotFoundError` extension nudge (from T27 ACK) still open at PARENT §10 — both non-blocking.
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T27 row → approved · Short roll-up posted to PARENT §2 · Q-T27-#7 stays open PARENT §3b (Slot A T-INFRA-06 candidate).**
+
+**PO merge please**: branch `feat/settings-billing` @ `97f1615` ready for main merge. Deferred slices (T25-slice-2 Meta-callback + T27 quota-meter + T27 W3/W5 workers) blocked on foundation prereqs (HMAC plugin, INTEGRATION_SHARED_SECRET env; T10 workers-harness now merged so W3 unblocked at foundation infra layer but daily-brief PDF generation is a whole worker task) — not this task. Slot C **3/10 approved** (T21 merged + T25 merged + T27-slice-1 approved-awaiting-merge).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -1451,6 +1512,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | H0 baseline | (no src/ touched) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 2026-07-03 T21 SUBMIT | src/modules/departments/** (10) + src/core/config/env.ts (+7 lines additive) | 0 | 0 | 0 (env.ts:91 pre-existing boilerplate `5ce7f867`, not this task) | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T25-slice-1 SUBMIT | src/modules/wa-templates/** (13) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
+| 2026-07-03 T27-slice-1 SUBMIT | src/modules/billing/** (16) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
