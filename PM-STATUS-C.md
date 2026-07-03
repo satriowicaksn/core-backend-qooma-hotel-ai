@@ -1804,6 +1804,125 @@ Step 8 — Verdict: **APPROVED**
 
 **PO merge please**: branch `feat/settings-agents` @ `02a296d` ready for main merge. Q-T28-#1 (tier-cap semantics) needs PO ratification but non-blocking — code is idempotent to either resolution. Slot C **4/10 approved** (T21 merged + T25 merged + T27 merged + T28 approved-awaiting-merge). Next candidate: **T29 Voice groundwork stub** (last fully-unblocked task).
 
+### ASSIGNMENT T29 — Settings/voice groundwork (GET + PUT + POST /test) — claimed by exec-C (Satrio) at 2026-07-03 H0
+
+- **Routed from**: PM C verbal direction ("continue to next T") + §0 preview line 23 "T29 fully unblocked (last fully-unblocked task)". Self-select per EXECUTOR-PROTOCOL §0.3 route (B).
+- **Branch (to create on PLAN ACK)**: `feat/settings-voice`
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.5 (endpoints) + §2.12 (DDL `voice_configs`) + §6 RBAC row `/api/settings/voice*`; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C9 (AC — 3 endpoints listed) + §101 line 172 ("**`voice_configs`** persistence — keep the stub endpoint; real PBX config is wave 2a per ADD-23.7") + §80 (deferred to wave 2a).
+- **Living reference**: `src/modules/agents/` (T28 approved — same simplicity, no port/adapter, single-table upsert semantic differs but layout mirrors). `src/modules/departments/` for zod strict pattern.
+- **Groundwork positioning**: spec explicitly flags T29 as "wave 2a groundwork only". Slice-1 = persistence + stub /test — NO PBX integration, NO port/adapter for actual SIP/Twilio wire-up, NO connection retry logic. FE settings page renders + saves; real PBX integration is wave 2a per ADD-23.7.
+
+**Scope (3 endpoints)**
+
+| Method | Path                        | Purpose                                                                                          |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET`  | `/api/settings/voice`       | Get voice config for tenant hotel. Returns default `{pbx_type: null, config: {}, is_active: false}` if row absent (never 404) |
+| `PUT`  | `/api/settings/voice`       | Upsert voice config (hotel_id PK). Accepts `pbx_type` / `config` / `is_active` — all optional     |
+| `POST` | `/api/settings/voice/test`  | Stub connection test — winston log + return `{success: true, note: 'stub — PBX integration is wave 2a'}` |
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `voice_configs` @ `docs/spec/02-hotel-core.md:715-725`; verified `prisma/schema.prisma:456-466`. PK = `hotelId` (one row per hotel — natural upsert target). Fields: `pbxType (VARCHAR 40 nullable)`, `config (JSONB default {})`, `isActive (default false)`, `updatedAt`. Relation: `hotel Hotel @relation(fields:[hotelId], references:[id], onDelete: Cascade)`.
+- **No CHECK constraint** on `pbx_type` at DB — spec §2.12 lists `'sip'|'twilio'|…` as example but permissive (Q-C-01 pattern).
+
+**RBAC** (spec §6:813 — `/api/settings/voice*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **NO** · staff: **NO**.
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])` (T21/T25/T27/T28 verified pattern).
+
+**Business rules**
+- **GET**: read `voice_configs` for `ctx.hotelId`. If no row → return `{data: {pbx_type: null, config: {}, is_active: false, updated_at: null}}` (empty-state default per MVP §101 stub-endpoint guidance). Never 404.
+- **PUT (upsert)**: hotel_id from `ctx.hotelId` (PK); zod strict body accepts `{pbx_type?: string | null, config?: Record<string,unknown>, is_active?: boolean}` — `.refine(non-empty)`. Prisma `upsert({where:{hotelId}, create: {...}, update: {...}})` — atomic. Returns fresh row as `{data: VoiceConfigWire}` with `200`.
+- **POST /test**: stub — no actual PBX connection. Requires current config to have `pbxType` set; if null → `ValidationError('Voice PBX not configured', {reason:'VOICE_NOT_CONFIGURED'})` → 400 (soft guard; FE UX signal). See GAP T29-#3. Winston log at route layer for observability. Return `{data: {success: true, note: 'stub — PBX integration is wave 2a per ADD-23.7'}}` with `200` on happy path.
+
+**Files to create**
+```
+src/modules/voice/
+├── voice.types.ts                                  (DomainVoiceConfig, VoiceConfigRow,
+│                                                     VoiceConfigWire, TestResultWire,
+│                                                     response envelopes)
+├── voice.schema.ts                                  (zod: UpsertVoiceBodySchema.strict.refine-non-empty)
+├── voice.serializer.ts                              (Prisma row → snake_case wire;
+│                                                     empty-default helper for GET no-row case;
+│                                                     defensive config narrow to {} on non-object)
+├── voice.repository.ts                              (Prisma direct — findByHotel, upsert)
+├── voice.service.ts                                 (get with default-fallback empty state;
+│                                                     upsert wrapping; test stub with soft guard)
+├── voice.routes.ts                                  (Fastify plugin: 3 handlers; thin)
+├── index.ts                                         (barrel — plugin + service + factory + wire types)
+└── __tests__/
+    ├── voice.service.test.ts                              (unit; mock repo; branches:
+    │                                                       get-empty-default, get-populated, upsert
+    │                                                       partial+full, test happy + test guard 400)
+    ├── voice.routes.test.ts                               (unit; Fastify inject; happy + 401 +
+    │                                                       403 dept_head/staff + 400 test-guard)
+    └── voice.repository.integration.test.ts               (testcontainers real Postgres;
+                                                             upsert idempotency, tenant isolation
+                                                             via PK-per-hotel, permissive pbx_type)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched. Env + schema + migrations + core + plugins + shared untouched. No new ports/adapters (stub /test is inline, not external RPC — CLAUDE.md §4 port requirement is for outbound RPC to real services, not stubbed groundwork).
+
+**T29 DoD**
+- [ ] 3 endpoints wired.
+- [ ] Zod strict body on PUT; `.refine(non-empty)`.
+- [ ] Tenant scope: PK `hotelId` from `ctx.hotelId` on all 3 endpoints.
+- [ ] RBAC: `requireRole([gm_admin])` on all 3.
+- [ ] GET returns empty defaults if no row; never 404.
+- [ ] PUT is idempotent upsert; multiple PUTs converge to same state.
+- [ ] POST /test guard: 400 `VOICE_NOT_CONFIGURED` when `pbxType` null.
+- [ ] `make check` PASS baseline **450/1/451** (post-T28-merge); delta in SUBMIT.
+- [ ] Drift scans clean.
+- [ ] Named exports only.
+- [ ] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`.
+
+#### PLAN T29 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+3 endpoints: `GET /api/settings/voice` (empty-default fallback), `PUT /api/settings/voice` (upsert), `POST /api/settings/voice/test` (stub with soft guard when `pbxType` null). Prisma direct (ADR-0001). No ports/adapters (stub, not real PBX RPC per wave 2a defer). RBAC `requireRole([gm_admin])`. Tenant scope via PK. Zero cross-cutting touches.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.5 + §2.12 + §6:813 ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C9 + §101:172 (stub endpoint guidance) + §80 (wave 2a defer) ✓
+- Parent docs spot-read: `src/modules/agents/` (T28 layout — thinnest slot-C module, no port/adapter), `src/modules/departments/` (T21 upsert-shape reference for integration test), `src/plugins/tenant-guard.ts` + `rbac.ts`, `src/core/errors/app-errors.ts` `ValidationError`, `prisma/schema.prisma:456-466` (VoiceConfig — PK is hotelId) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T21/T25/T27/T28 ✓ (living references) — all approved and merged
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **450/1/451** ✓
+- Scaffolder risk: **none**
+
+**Approach**
+Mirror T28 layout (no port/adapter, no state machine, no transaction). Service constructor `(repo)`. **GET**: `repo.findByHotel(hotelId)` → serialize if present, else return `emptyDefault()` (helper in serializer returning static empty wire). **PUT**: `repo.upsert(hotelId, delta)` using Prisma `upsert({where:{hotelId}, create: {hotelId, ...delta}, update: {...delta}})`. All fields optional in delta; upsert fills defaults from Prisma schema (`isActive: false`, `config: {}`, `pbxType: null` remains null unless set). **POST /test**: fetch current via `repo.findByHotel`; if row is null OR `pbxType` null → throw `ValidationError('Voice PBX not configured', {reason:'VOICE_NOT_CONFIGURED'})` (400); else return stub result wire. Winston log at route layer per T21/T25/T27/T28 pattern. Tests: unit for empty-default branch, upsert partial/full, /test guard branches; integration for upsert idempotency + PK-per-hotel tenant isolation + permissive `pbx_type` (any string incl `'sip'`/`'twilio'`/`'custom_pbx_v2'`).
+
+**GAPs / questions**
+
+- **GAP T29-#1** — GET behavior when no row exists. MVP §101:172 says "keep the stub endpoint (always returns empty + `pbx_type: null`)". Two readings:
+  - (A) GET ALWAYS returns empty stub regardless of DB state — ignores DB, pure façade.
+  - (B) GET honestly reads DB; returns empty defaults ONLY when no row exists. PUT persists; subsequent GET reflects PUT.
+  - **My intent**: **B** — spec §1.5 lists `GET, PUT /api/settings/voice` as paired verbs; if GET ignored PUT, pair is nonsensical. MVP §101 phrasing "keep the stub endpoint" means the ENDPOINT exists as a stub (not that the response ignores state). Empty stub ONLY when no row.
+
+- **GAP T29-#2** — `pbx_type` validation. Spec §2.12 example values `'sip'|'twilio'|…` are illustrative, DDL is VARCHAR(40) permissive.
+  - **Options**: A) permissive `z.string().min(1).max(40).nullable().optional()`; B) enum-lock `['sip','twilio']`; C) permissive with soft-lint WARN.
+  - **My intent**: **A** — matches DDL + spec "…" open-set signal + Q-C-01 pattern. Wave 2a will add real PBX types beyond current guess.
+
+- **GAP T29-#3** — POST /test guard on `pbxType: null`. Options:
+  - (A) 400 `VOICE_NOT_CONFIGURED` `ValidationError` — FE gets a clear UX signal.
+  - (B) Return `{success: false, note: 'no PBX configured'}` with 200 — treat "test unconfigured" as valid observability result.
+  - (C) Return `{success: true, note: 'stub — always succeeds'}` unconditionally.
+  - **My intent**: **A** — matches user intent (clicked "test" expecting to test something). 200-with-success:false ambiguous; 200-always-success:true misleading when nothing configured.
+
+- **GAP T29-#4** — Test result envelope shape. Options:
+  - (A) `{data: {success: boolean, note: string}}` — canonical Q-B-01 wrapper.
+  - (B) `{data: {success: boolean, message: string}}` — reuse `message` naming.
+  - **My intent**: **A** with `note` — `message` reserved for AppError envelope; avoid overload.
+
+- **GAP T29-#5** — `updated_at` in empty-default wire. When no row exists, GET returns `updated_at: null`? Or omit the field entirely?
+  - **My intent**: `updated_at: null` for shape consistency (all-populated-or-empty shape uniform; FE renders "never configured" state). Type declares `updated_at: string | null`.
+
+Q-B-01/Q-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1 all resolved or open elsewhere — not re-raising.
+
+**Est.**: ~2-3h (smallest Slot C task — 3 stub endpoints, single-table upsert, no state machine, no port/adapter, no transaction).
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
