@@ -12,13 +12,11 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **8/10 approved** (only T26 + T30 remaining, both hard-blocked at DEV by Opsi C tier-join)
-- **Active tasks awaiting PO merge**:
-  - **T29 Settings/voice groundwork** — `feat/settings-voice` @ `416e138`
-  - **T24 Knowledge CRUD (slice-1)** — `feat/settings-knowledge` @ `975ec6a`
-  - **T23 Menu bulk-availability (slice-1)** — `feat/menu-bulk-availability` @ `d3ddc7a` — **cleanest streak** (PLAN 0 tightenings → SUBMIT 0 issues; 2nd consecutive after T24)
-- **Recent merged**: T21+T25+T27+T28+T22 (PRs #11-15).
-- **Branches**: 3 branches awaiting PO merge (T23/T24/T29).
+- **Day**: H0 (2026-07-03) — Slot C **8/10 merged**; **T26-slice-1 wip**
+- **Recent merged**: T21+T22+T23+T24+T25+T27+T28+T29 (PRs #11-18). All approved-awaiting-merge landed on `main`.
+- **Active task**:
+  - **T26 Feature flags (slice-1)** — Exec self-claimed under T23 VERDICT green-light for Opsi C partial. PLAN ACK'd 2026-07-03 H0 with **4 material tightenings** (`updated_by=null` under Opsi C to avoid FK failure; three-state `is_tier_locked`/`depends_on_active_data`/`min_tier` = `null` per T27 precedent, NOT `false`/`'lite'` defaults) + **Q-T26-#7 escalated to PARENT §3a** (contract Q — authoritative 19-flag list + per-flag min_tier map). Executor C coding on `feat/settings-feature-flags`.
+- **Branches**: `feat/settings-feature-flags` (T26, wip)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **My queue (preview)**: 8/10 approved; T22-slice-2 + T23-slice-2 + T24-slice-2 all gated on batched Q-T22-#1 multipart PO ratify; **T26 + T30 hard-blocked at DEV by Opsi C tier-join** (need PARENT §4 Opsi A/multi-schema decision to be implementable).
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
@@ -37,6 +35,7 @@
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
+| T26 | Feature flags (tier-gated, dependency check) (**slice-1 wip**) | wip (PLAN ACK'd with 4 tightenings) | — | Exec self-claimed under T23 VERDICT green-light for Opsi C partial. PLAN ACK'd 2026-07-03 H0 with **4 material tightenings**: (1) `updated_by = null` under Opsi C (avoid FK failure — verified FK exists at migration L535 to Auth users table); (2) `is_tier_locked: null` three-state (NOT `false` — T27 Q-T27-#1 precedent); (3) `depends_on_active_data: null` three-state (no campaigns model); (4) `min_tier: null` per flag (spec silent, don't invent values). **Q-T26-#7 escalated to PARENT §3a** — contract Q for PO on authoritative 19-flag list + per-flag min_tier map (spec §1.8:259 says "all 19 flags" but only enumerates 14). Slice-1 ships 14 documented flags with three-state `null` fields — slice-2 fills in when PO ratifies. Zero code change to wire shape at slice-2 (null → real value flip is transparent to FE). Files: 8 module + 3 tests. Reuses `SKIP_CROSS_DB_CHECKS` env. Zero touch on foundation. Awaiting Executor C SUBMIT. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
@@ -3631,6 +3630,86 @@ Mirror T28/T29 layout (single-entity CRUD, no port/adapter, no transaction). Ser
 
 Awaiting PM C ACK — especially on GAP T26-#1 (fail-open under Opsi C) + GAP T26-#3 (all-lite min_tier default) as these are the two most consequential slice-1 shape decisions.
 
+##### PM C ACK — T26-slice-1 PLAN APPROVED with 4 tightenings + Q-T26-#7 escalation (proceed to coding, 2026-07-03 H0)
+
+**Self-claim ratified** — T23 VERDICT explicitly authorized "PLAN partial implementations behind SKIP_CROSS_DB_CHECKS gate (T21/T27 pattern)". Exec picked the smaller Opsi-C-blocked task first. Files layout mirrors T28 thinnest single-entity CRUD. Session-start gate discipline continued.
+
+**However, 4 material tightenings needed** — exec's PLAN uses `false` defaults where **`null` (three-state)** is correct per T27 precedent, mis-cites spec on flag count, and misses a runtime-blocking FK issue on `updated_by`.
+
+**Tightening #1 — `updated_by` FK BLOCKS integration test under Opsi C** (highest severity — SUBMIT would fail)
+
+Verified `prisma/migrations/20260701111952_init_hotel_core/migration.sql:535`:
+```sql
+ALTER TABLE "feature_flags" ADD CONSTRAINT "feature_flags_updated_by_fkey"
+  FOREIGN KEY ("updated_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+```
+The FK is real at DB level. Under Opsi C, `users` table lives in Auth DB (NOT `hotel_core_dev`) → writing `updated_by = ctx.userId` will FAIL with FK constraint violation at Postgres level. Your integration test seeded from testcontainer will hit this immediately.
+
+**Correction**: under `SKIP_CROSS_DB_CHECKS=true`, service passes `updatedBy: null` (already nullable per schema). Documented at service JSDoc + startup WARN (Q-C-02 pattern):
+```ts
+// Q-T26-#? Under Opsi C the users table isn't in hotel_core_dev — writing
+// updated_by would fail FK constraint. Service passes null slice-1;
+// slice-2 populates when Opsi A restores. Prod+flag=true WARN alerts
+// that audit trail is broken.
+const data = {
+  hotelId: ctx.hotelId,
+  flag,
+  ...delta,
+  updatedBy: this.skipCrossDbChecks ? null : ctx.userId,
+};
+```
+Integration test asserts `updated_by === null` under the flag=true default.
+
+**Tightening #2 — `is_tier_locked: null` NOT `false` (three-state matches T27 precedent)**
+
+Your GAP T26-#1 lean A cites "T27 Q-T27-#1 tier=null fail-open" — but T27 returned `tier: null` (three-state "unavailable"), NOT `tier: {some-default}`. Your proposal of `is_tier_locked: false` for ALL flags is misapplying the precedent: `false` means "definitely unlocked", which is a lie (we don't know — tier data unavailable). This ships MISLEADING data to FE; when Opsi A restores + PO defines `FLAG_MIN_TIER`, some flags will silently become locked for Lite hotels — a hidden UX regression.
+
+**Correct three-state pattern**: `is_tier_locked: boolean | null` where `null` = "tier data unavailable" (Opsi C slice-1) + FE renders appropriate "data pending" state; boolean = real computation (post-Opsi-A slice-2). No misleading defaults, no silent regression when real data lands.
+
+**Tightening #3 — `depends_on_active_data: null` NOT `false` (same three-state discipline)**
+
+Same rationale as #2. `false` = "definitely no dependencies" is a lie when the source data doesn't exist (no `campaigns` model in T02). `null` = "dependency status unavailable". When campaigns model lands + wiring happens, wire flips from `null` to real boolean without FE code changes.
+
+**Tightening #4 — `min_tier: null` per flag (spec silent → don't invent values)**
+
+Your GAP T26-#3 lean A hardcodes ALL flags to `min_tier: 'lite'` because "spec is silent". But shipping made-up data creates the same silent-regression problem: FE will render tier gates based on this data, and when PO defines real per-flag tier gates, hotels currently seeing "unlocked" flags at Lite tier will get gated out. Users see feature retreats mid-session.
+
+**Correction**: `FLAG_MIN_TIER` map declared but all values `null` slice-1. Wire type `min_tier: TierName | null`. FE renders `null` states as "tier requirement pending" (matches the `is_tier_locked: null` UX).
+
+`FLAG_MIN_TIER` constant map exists (structural placeholder) but populated in slice-2 when PO ratifies per-flag tiers.
+
+**Escalation — Q-T26-#7 (contract Q for PO)**
+
+Spec §1.8:259 explicitly says "**all 19 flags**". Your PLAN ships 14 known + defers 5 unspec'd. This will silently break FE render if FE fixtures hard-key against 19 names. Two issues need PO input:
+1. **Authoritative 19-flag list**: what are the missing 5 flag names? (`docs/spec/02-hotel-core.md` §1.8 enumerates only 14; spec §1.8:262 mentions "19 total").
+2. **Per-flag `min_tier` map**: spec §646 explicitly says "**migration-managed** (lookup table or hardcoded const)" — but the actual mapping isn't in the repo yet. PO/spec-owner needs to provide.
+
+Additionally spec §4.7 says `depends_on_active_data` should be true for `menu_ordering` when active campaigns exist — but campaigns model isn't in T02.
+
+**Register Q-T26-#7 in §3 → PARENT §3a** (contract Q for PO). Non-blocking for slice-1 (ship the 14 documented flags with `min_tier: null` + `depends_on_active_data: null`); when PO ratifies, slice-2 fills in the values without breaking wire shape.
+
+**Coding checklist reminders** (post the 4 tightenings + escalation)
+
+- **Wire type expansion**: `FeatureFlagWire` includes `is_tier_locked: boolean | null` + `depends_on_active_data: boolean | null` + `min_tier: TierName | null` (three-state each). Update `feature-flags.types.ts` accordingly.
+- **Startup WARN on prod+flag=true** — mirror `departments.service.ts:55-64` T21 pattern + `billing.service.ts:49-58` T27 pattern. Same event key `cross_db_check_skip` for cross-module grep. Fires ONCE at construction.
+- **Documented three-state contract in service JSDoc** — future reader understands why `null` is meaningful (not just "unset").
+- **Integration test seeds `updated_by = null`** at DB (via nullable column, no FK insertion needed). This proves the null-write path works and doesn't hit the FK.
+- **PATCH `flag` param validation**: `KNOWN_FLAGS_SET` includes ONLY the 14 documented flags — a PATCH on an unknown flag returns 400 `ValidationError('unknown flag: <name>')`. When PO ratifies the missing 5, extend `KNOWN_FLAGS` constant.
+- **`?force=true` slice-1** — parse via zod but no-op (no dependency check to force). JSDoc'd at route as "reserved for slice-2 when dependency check is real". If `super_admin` + `?force=true`, log via winston (audit trail) but no code change to service behavior.
+- **Baseline math**: 513/1/514 (post-T22-merge). If T29/T24/T23 merge before SUBMIT (they're already approved-awaiting-merge), delta recomputes to ~513 + T29's 33 + T24's 47 + T23's 29 = ~622. State the actual baseline at SUBMIT time.
+- **Expected `eslint-disable`**: **0** (6th consecutive Slot C module if held — T28/T29/T22/T24/T23/T26 pattern).
+
+**GAP #1/#3/#4 CORRECTED per tightenings above**. **GAP #2 (14 vs 19)**: rolls to Q-T26-#7 PO escalation. **GAP #5 (PATCH body shape)** ACCEPTED as-is (partial-update contract per T21/T24 pattern). **GAP #6 (`?force=true` no-op slice-1)** ACCEPTED as-is.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface — additive-safe (though `SKIP_CROSS_DB_CHECKS` reuse means slice-1 is safe under Opsi C DEV state; production requires Opsi A + slice-2).
+- Q-T26-#7 escalates to PARENT §3a (**PO contract Q**) — non-blocking for slice-1 merge; slice-2 depends on resolution.
+- No new PARENT §10 nudges.
+
+**Mid-task CHECKPOINT trigger**: unlikely at ~3-4h. Post if crossing ~4h with tightening #1 (`updated_by = null` codepath) or #2/#3/#4 (three-state wire types) still incomplete — these are the highest-risk changes from your original PLAN.
+
+Proceed to coding on `feat/settings-feature-flags`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -3742,6 +3821,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-C-02        | `users.department_id` cross-DB check impossible under Opsi C dev-DB deviation (users lives in Auth DB, not `hotel_core_dev`). Skip in DEV or gate behind env flag? | T21 · exec-C PLAN GAP #2 | **open (PO ratify before staging)** — implementation shipping under safe defaults | `SKIP_CROSS_DB_CHECKS` env flag added to `core/config/env.ts` (`z.coerce.boolean().default(true)`). Service skips `users` count when flag is `true`; tickets check always runs. Startup WARN when flag is `true` + `NODE_ENV === 'production'` prevents silent prod ship. Root fix = PARENT §4 Opsi A / Prisma multi-schema (foundation, PO decision). Will roll up to PARENT §3b at T21 SUBMIT. |
 | Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
 | Q-T25-#5      | **Foundation gap**: spec §2.8:623 defines `wa_templates_hotel_name_unique UNIQUE (hotel_id, name) NULLS NOT DISTINCT` but the actual migrations (`20260701111952_init_hotel_core/migration.sql:209-225` + `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80`) DO NOT add it. Compare `menu_categories_hotel_name_unique` at `20260701111952_init_hotel_core/migration.sql:403` — present. Genuine omission in T02. | T25 · exec-C PLAN GAP #5 · discovered via spec/migration cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation fix** | Slot C T25-slice-1 ships Option B: `repo.countByHotelAndName(hotelId, name)` app-layer pre-check + P2002 catch as belt-and-suspenders (dead branch pre-fix, live post-fix). Foundation fix (add `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT` migration mirroring `menu_categories_hotel_name_unique`) rolls to Slot A. **When foundation lands**: no code change needed in Slot C — pre-check remains idempotent-safe; P2002 catch flips dead→live. Race window ~50ms per same-hotel same-name admin write documented in service JSDoc. |
+| Q-T26-#7      | **Contract Q for PO — authoritative 19-flag list + per-flag `min_tier` map**. Spec §1.8:259+262 says "**all 19 flags**" but only enumerates 14 (Core 4 + Channels 3 + AI 5 + Verification 2). Spec §646 says `min_tier` is "migration-managed (lookup table or hardcoded const)" — actual mapping not in repo. Spec §4.7 says `depends_on_active_data` should be true for `menu_ordering` when active campaigns exist — but `campaigns` model isn't in T02. | T26 · PM C spec cross-check | **open — PO ratify** (T26-slice-1 ships 14 documented flags with three-state `null` fields; slice-2 fills in when PO ratifies) | Slot C T26-slice-1 ships the 14 known flags with `is_tier_locked: null` + `depends_on_active_data: null` + `min_tier: null` per flag (three-state UX matches T27 Q-T27-#1 precedent). PATCH validates `flag` param against `KNOWN_FLAGS_SET` = 14 documented flags → 400 on unknown. When PO ratifies: (a) 5 missing flag names → extend `KNOWN_FLAGS` constant; (b) per-flag `FLAG_MIN_TIER` map values; (c) `campaigns` model (foundation Slot A) for `depends_on_active_data` computation. Zero code change to wire shape when slice-2 lands — three-state `null` → real boolean/enum flip is transparent to FE. |
 | Q-T29-#1      | **Spec ambiguity contract Q for PO**: MVP §101:81 says `voice_configs` "stub endpoint (**always returns empty + `pbx_type: null`**)". Literal reading = GET is a pure façade ignoring DB state → PUT + persistence table pointless in slice-1. But spec §1.5:181 pairs `GET, PUT /api/settings/voice` as normal verbs + DDL exists with PK+columns → supports GET reflects DB state. Which semantic? | T29 · PM C independent MVP §101 vs spec §1.5 cross-check | **open — PO ratify** (rolls to PARENT §3a) | Slot C T29 ships **Option B**: PUT persists + GET reflects DB with empty-default fallback when no row. Rationale: (a) least-surprising API, (b) MVP §101 literal-A makes PUT+table contradictory, (c) data collected now available to wave 2a without backfill migration, (d) if PO rules literal-A: single-line service change (`get()` returns static empty regardless of DB). Zero regression risk on flip. Non-blocking for merge; matches Q-T28-#1 idempotent-to-either-resolution discipline. |
 | Q-T27-#7      | **Foundation port gap**: `src/core/storage/object-storage.port.ts:1-32` exposes `upload` + `delete` only — **no `download` method**. T08 slice-1 comment explicitly says "Slice-1 surface … Signed URL generation deferred to slice-2", implying more slices were expected. T27 slice-1 needs invoice PDF download stream. | T27 · exec-C PLAN GAP #7 · discovered via spec/foundation cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation extension (T-INFRA-06 candidate)** | Slot C T27-slice-1 ships Option A: local `BillingPdfStoragePort` at `src/modules/billing/ports/billing-pdf-storage.port.ts` with `download(key): Promise<Buffer \| null>` + `InMemoryBillingPdfStorageAdapter` for tests + composition-root wiring. Production adapter deferred (DEP-4 or foundation extension). **Foundation fix (T-INFRA-06 candidate)**: extend core `ObjectStoragePort` with `download(key): Promise<Buffer \| null>` + implement on `S3Adapter` (SDK `GetObjectCommand`) + `InMemoryAdapter`. Small extension; matches T08's slice-1 trajectory. Also serves T22/T24 menu-image download + T27 daily-brief when W3 lands. **Migration path when foundation lands**: billing barrel swaps consumer to core port; local port + adapter deleted; billing service constructor untouched (structurally identical). Zero regression risk. |
 | Q-T28-#1      | **Contract Q for PO**: is there a hard tier-cap on `PATCH /api/settings/agents/:id` `is_active:true` that blocks activation beyond `tier.agents_max`? Spec §7 catalog (line 820-835) defines `MIN_AGENTS_VIOLATION` + `TIER_GATE` (resource-access, e.g. analytics) but NO `AGENTS_TIER_CAP` or similar 422 for over-activation. Spec §1.10 tier matrix uses "**3 min**" (Professional) + "**5 include**" (Luxury) wording + `billing_extras.type='extra_agent'` DDL comment at §2.10 line 686 suggests baseline-included counts with billing-time expansion (not hard-caps). Enforcing a hard cap at activation-time would block a hotel from activating agents they paid for via extras. | T28 · PM C independent spec review of exec ASSIGNMENT self-authored tier-cap enforcement · Q escalated to PARENT §3a | **open — PO ratify** (slice-1 ships Min-3 only) | Slot C T28-slice-1 enforces ONLY Min-3 (spec-explicit hard rule). Tier-cap enforcement dropped from scope; `TIER_MATRIX` import from billing NOT needed. If PO ruling introduces a hard cap: needs (a) spec §7 catalog addition (`AGENTS_TIER_CAP`?), (b) clarification on interaction with `billing_extras.extra_agent` (does purchasing an extra raise the cap? By 1 per row? By `qty`?), (c) follow-up ticket (T28-slice-2 or feature-flags T26 tier-gate module). **Slot C ships slice-1 clean today; slice-2 or feature-flags reintroduces tier-cap post-PO-ruling**. |
