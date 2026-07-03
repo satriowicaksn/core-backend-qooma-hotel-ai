@@ -12,14 +12,15 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **3/10 approved** (T21+T25 merged; T27-slice-1 approved-awaiting-merge)
+- **Day**: H0 (2026-07-03) — Slot C **3/10 approved+merged**; **T28 wip**
 - **Recent activity**:
   - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
   - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
-  - **T27 Billing (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-billing` @ `97f1615` awaiting PO merge. 16 files (6 module + 2 ports + 2 adapters + 1 barrel + 5 tests). Q-T27-#7 stays open PARENT §3b (Slot A T-INFRA-06 candidate).
-- **Branches**: `feat/settings-billing` (T27-slice-1, awaiting PO merge)
+  - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
+  - **T28 Settings/agents (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 4 tightenings. Exec self-claimed from §0 preview + I ratified. **Scope tightened: Min-3 only** (tier-cap dropped pending PO Q-T28-#1). Executor C coding on `feat/settings-agents`.
+- **Branches**: `feat/settings-agents` (T28, wip)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25 merged; T27-slice-1 approved; T22/T23/T24 merge-gated on T09 PO merge; T28/T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C. Next candidate: T28 Settings/agents or T29 Voice groundwork stub.
+- **My queue (preview)**: T21+T25+T27 merged; T28 wip; T22/T23/T24 merge-gated on T09 PO merge; T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C.
 
 ---
 
@@ -31,7 +32,8 @@
 | --- | ---------------------------------- | -------- | -------------- | ------------------------------------- |
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
-| T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-billing` @ `97f1615` — **awaiting PO merge**. 16 files (6 module + 2 ports + 2 adapters + 1 barrel + 5 tests). `make check` **411/1/412** (+40 net: 20 service + 12 routes + 3 upgrade-notifier adapter + 3 pdf-storage adapter + 2 zod parser); `pnpm test:integration` **116/1/117** (all 7 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean; 4 eslint-disable in barrel (T25 pattern held). All 3 tightenings held. All 6 GAP resolutions delivered + Q-T27-#4 defense-in-depth filename sanitization. **Q-T27-#7 stays open** at PARENT §3b (foundation `ObjectStoragePort.download` missing from T08 — Slot A T-INFRA-06 candidate; Slot C code idempotent-safe post-fix, barrel-swap migration). **Deferred slices** (T25-slice-2 Meta-callback + T27 quota-meter + T27 W3/W5 workers) blocked on foundation prereqs. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
+| T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
+| T28 | Settings/agents config (Min-3 enforcement) (**wip**) | wip (PLAN ACK'd with 4 tightenings) | — | Exec self-claimed from §0 preview + PM ratified. PLAN ACK'd 2026-07-03 H0. **Scope tightened**: slice-1 enforces **ONLY Min-3** (spec-explicit); tier-cap enforcement dropped pending PO Q-T28-#1 (contract question rolled to PARENT §3a). GAP responses #1+#2 accepted (Serializable isolation + retry-on-40001); GAP #3/#4/#5 all N/A after tightening #1. Callback-form `$transaction` mandated (exec's array-form won't work for read-then-conditional-write). No-op idempotency: same-state toggle returns current row 200. 2 endpoints: `GET /api/settings/agents` list + `PATCH /:id` update. No port/adapter (pure DB read/write per CLAUDE.md §4). Files: 7 module + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -1540,6 +1542,91 @@ Q-B-01/Q-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7 all resolved — not re-rais
 
 Awaiting PM C ACK.
 
+##### PM C ACK — T28 PLAN APPROVED with 4 tightenings (proceed to coding, 2026-07-03 H0)
+
+**Self-claim ratified** — T28 was listed in my T27 VERDICT §0 preview as a next-candidate. Exec's self-authored ASSIGNMENT block follows my prior task patterns cleanly (routing note, spec anchors, living-reference cross-links, structured DoD). Session-start gate + baseline 411/1/412 ✓. Files layout mirrors T21 (no port/adapter — pure DB read/write, no external RPC — CLAUDE.md §4 does NOT require port for local DB). Independent spec/foundation cross-check discipline held (**6th consecutive** Slot C session).
+
+**Tightening #1 — DROP tier-cap enforcement from slice-1** (largest correction; new Q-T28-#1 registered)
+
+Independent spec review: `TIER_CAP_VIOLATION` code invented by exec is NOT in spec §7 error catalog. Only `MIN_AGENTS_VIOLATION` (line 827) is spec-explicit for agents. `TIER_GATE` (line 830) exists but is scoped to "Tier-restricted resource access (e.g. analytics for non-Luxury)" — that's a 403 pattern for feature gating, not a 422 capacity cap. Further: spec §1.10 tier matrix uses phrasing "**3 min**" (Professional) + "**5 include**" (Luxury), and the `billing_extras` DDL comment at §2.10 line 685-688 declares `type='extra_agent'` as a valid billing extra. Combined signal: **tier counts are baseline-included totals; additional agents are purchased via `billing_extras`, NOT blocked at activation**. Enforcing a hard tier-cap at `PATCH is_active:true` would break the billing model (block a paying-for-extras hotel from activating what they paid for). Similar PM-side self-correction as my T27 ASSIGNMENT's invented `DAILY_BRIEF_NOT_AVAILABLE` code — I originally endorsed tier-cap in the T28 ASSIGNMENT ratification implicit path; correcting now via independent spec re-read.
+
+**Ruling**:
+- **Slice-1 enforces ONLY Min-3**. `MIN_AGENTS_VIOLATION` (422 `BusinessRuleError` + `details.rule='MIN_AGENTS_VIOLATION'` + `details.activeAfter` + `details.minRequired: 3`).
+- Drop from scope: `TIER_CAP_VIOLATION`, `TIER_MATRIX` import from billing, `tierResolver` interface, tier-cap tests, flag=false tier-cap code path.
+- Service constructor simplifies to `(repo, opts = {logger?})` — no `skipCrossDbChecks`, no `nodeEnv`, no `tierResolver`. No startup WARN (nothing tier-related runs).
+- Registered as **Q-T28-#1** in §3 → rolls to **PARENT §3a** (contract question — PO decision needed on: is there ANY hard tier-cap on agent activation, or is `billing_extras.extra_agent` the mechanism? If cap exists, spec §7 needs `AGENTS_TIER_CAP` entry).
+- **Follow-up ticket** (if PO wants tier-cap): T28-slice-2 or feature-flags module (T26) — deferred pending spec clarification.
+
+Result: **GAPs #3, #4, #5 all become N/A** after tightening #1 (no tier-cap = no tier-check code path = no `TIER_MATRIX` reuse decision). Cleaner slice.
+
+**Tightening #2 — callback-form `$transaction`, not array-form**
+
+Exec's PLAN L1509 shows `db.$transaction([...], { isolationLevel: 'Serializable' })` — this is Prisma's array-batch form, which cannot express read-then-conditional-then-write logic (each element is a discrete query committed together, no imperative conditional). Min-3 requires: read count → conditional throw → write update → commit atomically. That's callback-form:
+```ts
+await db.$transaction(async (tx) => {
+  const activeCount = await tx.aiAgentConfig.count({
+    where: { hotelId: ctx.hotelId, isActive: true },
+  });
+  const activeAfter = activeCount - 1;
+  if (activeAfter < 3) {
+    throw new BusinessRuleError('Min 3 active agents required', {
+      rule: 'MIN_AGENTS_VIOLATION',
+      activeAfter,
+      minRequired: 3,
+    });
+  }
+  await tx.aiAgentConfig.update({ where: { id }, data: { isActive: false, ...delta } });
+}, { isolationLevel: 'Serializable' });
+```
+Confirm callback-form in coded service. Integration test proves race isolation via `Promise.all` on 2 concurrent toggle-off calls where target hotel has exactly 4 active — expected: one succeeds (goes to 3), other fails with `MIN_AGENTS_VIOLATION` OR retries and fails (both agents were "the 4th" from different transaction snapshots).
+
+**Tightening #3 — GAP #1 + GAP #2 acceptance + retry-helper shape**
+
+GAP #1 → **Option A confirmed** (Serializable isolation + retry-on-40001). Correct choice — Prisma-idiomatic + no raw SQL + integration-testable + matches T21/T25/T27 "no raw SQL" convention.
+
+GAP #2 → **Option A confirmed** (retry-once with jitter). 5-line helper shape:
+```ts
+async function withSerializableRetry<T>(fn: () => Promise<T>, jitterMs = 20): Promise<T> {
+  try { return await fn(); }
+  catch (err) {
+    if (isSerializationFailure(err)) {
+      await new Promise(r => setTimeout(r, Math.random() * jitterMs));
+      return fn();
+    }
+    throw err;
+  }
+}
+function isSerializationFailure(err: unknown): boolean {
+  return typeof err === 'object' && err !== null &&
+    ((err as { code?: string }).code === 'P2034' ||
+     (err as { meta?: { code?: string } }).meta?.code === '40001');
+}
+```
+Prisma throws `PrismaClientKnownRequestError` with `code='P2034'` for transaction serialization conflicts (Postgres SQLSTATE 40001). Belt-and-suspenders check on both P2034 + raw 40001. Retry uses same jitter across the range 0-20ms.
+
+**Tightening #4 — no-op PATCH idempotency + response shape**
+
+Same-state toggle (`is_active: true` on already-active row) or empty-body-effective PATCH (no delta after ignoring server-set fields) should return the current row with **200** (idempotent-safe), NOT 400 or 304. Zod `.refine(non-empty)` still rejects an entirely empty body (as per exec's plan). But an update body like `{ is_active: true }` on an already-active agent should pass through as no-op (no transaction wrapper needed — no state change to guard). Test coverage: `should return current row on same-state toggle-on` + `should return current row on same-state toggle-off`.
+
+**Coding checklist reminders** (things easy to miss)
+
+- **Field allowlist on update**: zod strict rejects `hotel_id`/`agent_type`/`name`/timestamps at boundary — but ALSO explicitly do NOT read these off the parsed body in the service, even if they'd fall through. JSDoc invariant on the update method (T21/T25/T27 pattern).
+- **`config` JSONB serialization**: pass through as-is via `as unknown as Prisma.InputJsonValue` (T21 pattern). No inner shape validation in slice-1 — permissive.
+- **`capacity` bounds**: `z.number().int().min(1).max(100)` (as exec proposed). Test both floors + ceiling.
+- **Integration test seed**: HOTEL_A with **4 active + 1 inactive** for the crucial toggle-off race scenario (start at 4, race two concurrent toggle-offs, exactly-one-succeeds proves the guard). Add HOTEL_B with 3 active for cross-tenant isolation.
+- **Retry test**: mock the transaction wrapper to throw a synthetic P2034 the first invocation then succeed — verify the helper retries once + eventual success. Then a second test where both attempts throw P2034 → verify the second error bubbles.
+- **Non-toggle patch outside transaction**: capacity-only or config-only PATCH runs plain `repo.update` (no race concern, no transaction wrapper). Only `is_active` transitions enter the serializable block.
+- **Baseline math for SUBMIT**: post-T27-merge (PR #13 `af02167`) baseline is **411/1/412** as exec noted. State delta explicitly.
+- **eslint-disable count expected**: 0 (no adapter, no barrel factory needs adapter import). Simpler barrel than T25/T27.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface. Simplest cross-slot touch of any Slot C task so far.
+- Q-T28-#1 tier-cap ambiguity rolls to PARENT §3a as a **contract question for PO**. Non-blocking for T28-slice-1 merge — slice-1 ships Min-3 only.
+
+**Mid-task CHECKPOINT trigger**: unlikely needed at ~4-5h estimate. If crossing ~4h with the transaction wrapper still incomplete, post CHECKPOINT.
+
+Proceed to coding on `feat/settings-agents`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -1652,6 +1739,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
 | Q-T25-#5      | **Foundation gap**: spec §2.8:623 defines `wa_templates_hotel_name_unique UNIQUE (hotel_id, name) NULLS NOT DISTINCT` but the actual migrations (`20260701111952_init_hotel_core/migration.sql:209-225` + `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80`) DO NOT add it. Compare `menu_categories_hotel_name_unique` at `20260701111952_init_hotel_core/migration.sql:403` — present. Genuine omission in T02. | T25 · exec-C PLAN GAP #5 · discovered via spec/migration cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation fix** | Slot C T25-slice-1 ships Option B: `repo.countByHotelAndName(hotelId, name)` app-layer pre-check + P2002 catch as belt-and-suspenders (dead branch pre-fix, live post-fix). Foundation fix (add `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT` migration mirroring `menu_categories_hotel_name_unique`) rolls to Slot A. **When foundation lands**: no code change needed in Slot C — pre-check remains idempotent-safe; P2002 catch flips dead→live. Race window ~50ms per same-hotel same-name admin write documented in service JSDoc. |
 | Q-T27-#7      | **Foundation port gap**: `src/core/storage/object-storage.port.ts:1-32` exposes `upload` + `delete` only — **no `download` method**. T08 slice-1 comment explicitly says "Slice-1 surface … Signed URL generation deferred to slice-2", implying more slices were expected. T27 slice-1 needs invoice PDF download stream. | T27 · exec-C PLAN GAP #7 · discovered via spec/foundation cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation extension (T-INFRA-06 candidate)** | Slot C T27-slice-1 ships Option A: local `BillingPdfStoragePort` at `src/modules/billing/ports/billing-pdf-storage.port.ts` with `download(key): Promise<Buffer \| null>` + `InMemoryBillingPdfStorageAdapter` for tests + composition-root wiring. Production adapter deferred (DEP-4 or foundation extension). **Foundation fix (T-INFRA-06 candidate)**: extend core `ObjectStoragePort` with `download(key): Promise<Buffer \| null>` + implement on `S3Adapter` (SDK `GetObjectCommand`) + `InMemoryAdapter`. Small extension; matches T08's slice-1 trajectory. Also serves T22/T24 menu-image download + T27 daily-brief when W3 lands. **Migration path when foundation lands**: billing barrel swaps consumer to core port; local port + adapter deleted; billing service constructor untouched (structurally identical). Zero regression risk. |
+| Q-T28-#1      | **Contract Q for PO**: is there a hard tier-cap on `PATCH /api/settings/agents/:id` `is_active:true` that blocks activation beyond `tier.agents_max`? Spec §7 catalog (line 820-835) defines `MIN_AGENTS_VIOLATION` + `TIER_GATE` (resource-access, e.g. analytics) but NO `AGENTS_TIER_CAP` or similar 422 for over-activation. Spec §1.10 tier matrix uses "**3 min**" (Professional) + "**5 include**" (Luxury) wording + `billing_extras.type='extra_agent'` DDL comment at §2.10 line 686 suggests baseline-included counts with billing-time expansion (not hard-caps). Enforcing a hard cap at activation-time would block a hotel from activating agents they paid for via extras. | T28 · PM C independent spec review of exec ASSIGNMENT self-authored tier-cap enforcement · Q escalated to PARENT §3a | **open — PO ratify** (slice-1 ships Min-3 only) | Slot C T28-slice-1 enforces ONLY Min-3 (spec-explicit hard rule). Tier-cap enforcement dropped from scope; `TIER_MATRIX` import from billing NOT needed. If PO ruling introduces a hard cap: needs (a) spec §7 catalog addition (`AGENTS_TIER_CAP`?), (b) clarification on interaction with `billing_extras.extra_agent` (does purchasing an extra raise the cap? By 1 per row? By `qty`?), (c) follow-up ticket (T28-slice-2 or feature-flags T26 tier-gate module). **Slot C ships slice-1 clean today; slice-2 or feature-flags reintroduces tier-cap post-PO-ruling**. |
 
 ---
 
