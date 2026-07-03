@@ -12,11 +12,12 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **9/10 approved** (T26 approved-awaiting-merge; only T30 remaining hard-blocked at DEV)
+- **Day**: H0 (2026-07-03) — Slot C **9/10 approved**; **T30-slice-1 wip** (final task!)
 - **Recent merged**: T21+T22+T23+T24+T25+T27+T28+T29 (PRs #11-18).
-- **Active task**:
-  - **T26 Feature flags (slice-1)** — **APPROVED attempt 1** (2026-07-03 H0). `feat/settings-feature-flags` @ `080d9d9` awaiting PO merge. All 4 PM tightenings held with test coverage. Q-T26-#7 stays open at PARENT §3a (PO contract Q).
-- **Branches**: `feat/settings-feature-flags` (T26, awaiting PO merge)
+- **Active tasks**:
+  - **T26 Feature flags (slice-1)** — APPROVED attempt 1; `feat/settings-feature-flags` @ `080d9d9` awaiting PO merge
+  - **T30 Analytics (slice-1)** — Exec self-claimed under T26 VERDICT green-light. PLAN ACK'd 2026-07-03 H0 with **5 material tightenings** + **3 new PARENT §3a escalations** (Q-T30-#5 salah_kamar_count / Q-T30-#8 TIER_GATE 403 vs 422 inconsistency / Q-T30-#9 Q-CONTRACT-21 ASSUMED shape). Executor C coding on `feat/analytics`.
+- **Branches**: `feat/settings-feature-flags` (T26, awaiting PO merge) · `feat/analytics` (T30, wip)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **My queue (preview)**: 8/10 approved; T22-slice-2 + T23-slice-2 + T24-slice-2 all gated on batched Q-T22-#1 multipart PO ratify; **T26 + T30 hard-blocked at DEV by Opsi C tier-join** (need PARENT §4 Opsi A/multi-schema decision to be implementable).
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
@@ -36,6 +37,7 @@
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
 | T26 | Feature flags (tier-gated, dependency check) (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-feature-flags` @ `080d9d9` — **awaiting PO merge**. 11 files (8 module + 3 tests). `make check` **656/1/657** (+38 net: 26 service + 12 routes); `pnpm test:integration` **183/1/184** (all 12 module suites regression-clean); coverage **98.96% lines** (constants/repo/serializer/service all 100%). **Drift 0/9 + 0 eslint-disable** (6th consecutive Slot C — T28/T29/T22/T24/T23/T26 pattern hold). All 4 tightenings held verbatim with explicit test coverage; **empirical DB-layer proof of `updated_by=null` FK-avoidance** in integration test. Q-T26-#7 stays open at PARENT §3a (3-part PO contract Q — 19-flag list + `FLAG_MIN_TIER` + `campaigns` model). Three-state wire pattern is now a Slot C precedent for Opsi C partial implementations. Zero touch on foundation. |
+| T30 | Analytics 8 endpoints (Luxury-gated + export) (**slice-1 wip**) | wip (PLAN ACK'd with 5 tightenings + 3 escalations) | — | Exec self-claimed final Slot C task under T26 VERDICT green-light. PLAN ACK'd 2026-07-03 H0 with **5 material tightenings**: (1) `alert_threshold_exceeded` uses spec formula `current > prev * 1.10` (10% growth) — NOT exec's invented 0.15 absolute; (2) implement spec-required `recommendation_key` computation (5-state algorithm PM ratified); (3) `salah_kamar_count: null` three-state (NOT invented "general + staff_attitude" proxy); (4) `TIER_GATE` uses spec §7 canonical 422 `BusinessRuleError` (not §1.4 prose 403 — spec inconsistency); (5) escalate Q-CONTRACT-21 ASSUMED shape. **3 new PARENT §3a escalations**: Q-T30-#5 (salah_kamar semantic), Q-T30-#8 (403/422 inconsistency), Q-T30-#9 (Q-CONTRACT-21 ratification). Scope: 3 core endpoints (overview + tickets + high-alert). Slice-2 defers 4 more read endpoints; slice-3 defers export (needs binary-generation dep). Reuses `SKIP_CROSS_DB_CHECKS` env + T26 three-state precedent. Files: 7 module + 3 tests. Zero touch on foundation. Awaiting Executor C SUBMIT. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
@@ -4040,6 +4042,91 @@ Mirror T26 layout (single-entity read-only module with SKIP_CROSS_DB_CHECKS patt
 
 Awaiting PM C ACK.
 
+##### PM C ACK — T30-slice-1 PLAN APPROVED with 5 tightenings + 3 PARENT §3a escalations (proceed to coding, 2026-07-03 H0)
+
+**Ratified**: session-start gate ✓ (independently verified Slot B ticket fields at `prisma/schema.prisma:180-200`); T26 three-state precedent application ✓; 3-slice split (3+4+1 = 8 endpoints) is sensible; files layout mirrors T26 pattern. GAP #1 (three-state tier-gate under Opsi C), #2 (envelope with meta), #3 (dept_head no filter slice-1), #4 (period defaults), #7 (deferred slices) all accept PM leans.
+
+**However, PLAN embeds 2 spec violations + 1 invented semantic + missing spec-required field**. Independent spec cross-check surfaced these — PM tightenings correct against spec text:
+
+**Tightening #1 — `alert_threshold_exceeded` uses spec formula `current > prev * 1.10` (10% growth), NOT hardcoded 0.15**
+
+Verified `docs/spec/02-hotel-core.md:161`:
+> `recommendation_key ∈ '...'`. **Threshold = strict `current > prev * 1.10`**.
+
+Spec explicitly defines the threshold as **10% growth over previous period**, not 15% absolute rate. Exec's GAP #6 invented `HIGH_ALERT_THRESHOLD = 0.15` as a "reasonable industry default" — this is a spec violation. Correction: **remove `HIGH_ALERT_THRESHOLD` constant entirely**; compute `alert_threshold_exceeded` inline as:
+```ts
+const alert_threshold_exceeded = current_period_rate > prev_period_rate * 1.10;
+```
+Prev-period window = same length as current window, immediately preceding. Test: if current_rate=0.15 and prev_rate=0.13, then `0.15 > 0.143` → true. Not `> 0.15` absolute.
+
+**Tightening #2 — implement spec-required `recommendation_key` computation (missing from PLAN)**
+
+Spec §1.4:161 defines the response field as one of 5 enum values: `'all_departments_healthy' | 'single_dept_spike' | 'multi_dept_concern' | 'cross_dept_pattern' | 'systemic_alert'`. Q-CONTRACT-21 example at spec §1.4:150 shows it in the wire. **Exec's PLAN doesn't mention computing this** — the wire would be shipped missing this required field.
+
+PM ruling on algorithm (spec doesn't detail the mapping — reasonable interpretation):
+- **0 depts** with `alert_threshold_exceeded: true` → `'all_departments_healthy'`
+- **1 dept** exceeded → `'single_dept_spike'`
+- **2-3 depts** exceeded (< 50% of active depts) → `'multi_dept_concern'`
+- **4+ depts** exceeded AND < 75% of active depts → `'cross_dept_pattern'`
+- **≥ 75% of active depts** exceeded → `'systemic_alert'`
+
+Include this algorithm in service JSDoc + Q-CONTRACT-21 escalation note. If PO refines the mapping, single-function-body swap.
+
+**Tightening #3 — `salah_kamar_count: null` (three-state) — NOT the "general + staff_attitude" proxy**
+
+Exec's GAP #5 proxies `salah_kamar_count` with `complaint_type IN ('general', 'staff_attitude')` as a "wrong-room stub". Spec is silent on the mapping (there's no `wrong_room` or `salah_kamar` complaint type in T02 CHECK enum). **Inventing a proxy ships misleading data** — same anti-pattern as T26's `is_tier_locked: false` before ACK correction.
+
+Correct per **T26 three-state precedent** (PM-ratified as Slot C durable pattern): ship `salah_kamar_count: null` slice-1. Wire type is `number | null`. FE renders "not-yet-available" state; when PO ratifies the actual complaint-type mapping via Q-T30-#5 escalation, one-line service change, zero wire shape break.
+
+**Tightening #4 — `TIER_GATE` HTTP code: use spec §7 catalog (422) not §1.4 prose (403). Register spec inconsistency as new Q-T30-#8**
+
+Independent spec cross-check surfaced an **inconsistency between spec §1.4:133 and spec §7:830**:
+- Spec §1.4:133 says: "backend **MUST 403** every /api/analytics/* request when hotel.tier !== 'luxury'"
+- Spec §7:830 says: "**422** `TIER_GATE` — Tier-restricted resource access (e.g. analytics for non-Luxury)"
+
+Which wins? PM ruling: **use spec §7 canonical error catalog (422 `BusinessRuleError({rule: 'TIER_GATE'})`)** for slice-1 code path. Rationale: §7 is the authoritative error catalog per module template convention; §1.4 prose predates the catalog cleanup (analogous PM decisions in T27 tightening #1 where uniform envelope wins over invented codes).
+
+Under Opsi C flag=true: gate SKIPPED entirely (three-state meta signals `is_luxury_gate: null`); the throw path is UNREACHABLE slice-1. Slice-2 (post-Opsi-A) actually fires the gate. If PO rules the code should be 403, single-line service change (`BusinessRuleError` → `ForbiddenError` + `details.reason: 'TIER_GATE'`).
+
+**Register Q-T30-#8 (new) → PARENT §3a**: spec §1.4:133 (403) vs §7:830 (422) inconsistency for `TIER_GATE`.
+
+**Tightening #5 — Escalate spec §1.4:129 "ASSUMED" Q-CONTRACT-21 to PARENT §3a**
+
+Spec §1.4:129 explicitly marks the `/high-alert` endpoint as `(Q-CONTRACT-21, ASSUMED)`. The entire response shape at §1.4:138-159 is provisional pending PO confirmation. **Exec's PLAN doesn't call this out** — building against ASSUMED spec without escalation creates rework risk if PO ratifies a different shape.
+
+**Register Q-T30-#9 (new) → PARENT §3a**: Q-CONTRACT-21 formal ratification needed. Slice-1 ships against the ASSUMED shape at spec §1.4:138-159 (with corrections per tightenings #1-#3); if PO ratifies alternate shape, `/high-alert` serializer + service + tests need revision. Non-blocking for slice-1 merge — better to ship the spec-documented ASSUMED shape than nothing.
+
+**GAP responses summary**
+
+- **GAP #1 (tier-gate three-state under Opsi C)** ✓ Accept PM lean A — T26 precedent applies.
+- **GAP #2 (envelope with meta)** ✓ Accept PM lean A — matches T27 billing precedent.
+- **GAP #3 (dept_head no filter slice-1)** ✓ Accept PM lean A — spec ambiguous; slice-1 ships permissive; register in JSDoc for slice-2 refinement post-PO.
+- **GAP #4 (period defaults)** ✓ Accept PM lean A — 30d/today/day.
+- **GAP #5 (`salah_kamar_count`)** → **REJECT PM lean; ship `null` per tightening #3 + escalate Q-T30-#5 to PARENT §3a for PO define**.
+- **GAP #6 (threshold value)** → **REJECT PM lean; use spec formula `current > prev * 1.10` per tightening #1**.
+- **GAP #7 (deferred endpoints)** ✓ Accept PM lean — 3+4+1 = 8 spec endpoints. Slice-2 = 4 more reads, slice-3 = export binary (needs new dep + PO ratify per CLAUDE.md §11 WAJIB — same batched escalation candidate as Q-T22-#1).
+
+**Coding checklist reminders** (things easy to miss)
+
+- **Q-C-02 startup WARN** — mirror `feature-flags.service.ts:35-42` T26 pattern (same `cross_db_check_skip` event key for cross-module grep).
+- **`Prisma._avg` on `Int` column returns `Decimal | null`** — for `avgSatisfaction`, serialize via `.toFixed(2)` if not null (T27 pattern); return `null` if no resolved tickets in range. Wire type is `string | null` (matches T27 `Decimal` serialization convention).
+- **`avgResponseTimeMinutes`** — compute as `EXTRACT(EPOCH FROM (closed_at - created_at)) / 60` in raw SQL for accuracy; Prisma `_avg` on a DateTime diff isn't supported. Wire as `number | null` (minutes with 2-decimal precision for consistency; `null` if no closed tickets).
+- **Prev-period window computation** — for high-alert, compute `prev_from = from - (to - from)` (same-length window ending at `from`). Test: from=2026-07-01, to=2026-07-31 → prev = 2026-06-01 to 2026-06-30 (30 days each). Edge case: if `from - (to - from) < earliest_ticket_created_at`, prev_period_rate should be null or 0 (document in JSDoc).
+- **`trend_7d` shape**: `Array<{date: string, count: number}>` (7 entries — last 7 days from `to`, day-by-day). Reasonable interpretation; if PO refines Q-CONTRACT-21, adjust.
+- **`Prisma.$queryRaw` for date_trunc** — parameterize date bounds with `Prisma.sql` template literal to prevent SQL injection. Do NOT interpolate `from`/`to` strings.
+- **`ForbiddenError` vs `BusinessRuleError`** — service throws `BusinessRuleError({rule: 'TIER_GATE'})` per tightening #4 (unreachable under Opsi C flag=true; live under Opsi A + flag=false).
+- **Baseline math for SUBMIT**: 622/1/623 (post-T26-merge if merged before SUBMIT) or 618/1/619 (pre-T26-merge). State explicitly.
+- **Expected `eslint-disable`**: **0** (7th consecutive Slot C module if held — T28/T29/T22/T24/T23/T26/T30 pattern).
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface — reads from Slot B tickets table (read-only aggregation).
+- **Q-T30-#5** (`salah_kamar_count` semantic) + **Q-T30-#8** (`TIER_GATE` 403 vs 422 inconsistency) + **Q-T30-#9** (Q-CONTRACT-21 formal ratification) all rolled to PARENT §3a — non-blocking for T30-slice-1 merge; Slot C code idempotent to either resolution.
+- No new PARENT §10 nudges.
+
+**Mid-task CHECKPOINT trigger**: if crossing ~4h with the `$queryRaw` aggregation queries or `recommendation_key` algorithm still incomplete, post CHECKPOINT — these are the highest-complexity parts of the module.
+
+Proceed to coding on `feat/analytics`. Awaiting your SUBMIT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -4151,6 +4238,9 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | Q-C-02        | `users.department_id` cross-DB check impossible under Opsi C dev-DB deviation (users lives in Auth DB, not `hotel_core_dev`). Skip in DEV or gate behind env flag? | T21 · exec-C PLAN GAP #2 | **open (PO ratify before staging)** — implementation shipping under safe defaults | `SKIP_CROSS_DB_CHECKS` env flag added to `core/config/env.ts` (`z.coerce.boolean().default(true)`). Service skips `users` count when flag is `true`; tickets check always runs. Startup WARN when flag is `true` + `NODE_ENV === 'production'` prevents silent prod ship. Root fix = PARENT §4 Opsi A / Prisma multi-schema (foundation, PO decision). Will roll up to PARENT §3b at T21 SUBMIT. |
 | Q-C-03        | `escalation_chain.skip_to_l3_categories` — spec §1.5:195 lists `['vvip','urgent','complaint']` as examples; enum-lock or permissive? | T21 · exec-C PLAN GAP #3 | **resolved (provisional, PM C ratified 2026-07-03)** | Permissive with bounds: `z.array(z.string().min(1).max(32)).max(20)`. Spec is illustrative not exhaustive; permissive-with-bounds prevents unbounded payload. Enum-lock deferred to PO-driven ticket if desired. |
 | Q-T25-#5      | **Foundation gap**: spec §2.8:623 defines `wa_templates_hotel_name_unique UNIQUE (hotel_id, name) NULLS NOT DISTINCT` but the actual migrations (`20260701111952_init_hotel_core/migration.sql:209-225` + `20260701112000_add_hc_check_constraints_and_partial_indexes/migration.sql:73-80`) DO NOT add it. Compare `menu_categories_hotel_name_unique` at `20260701111952_init_hotel_core/migration.sql:403` — present. Genuine omission in T02. | T25 · exec-C PLAN GAP #5 · discovered via spec/migration cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation fix** | Slot C T25-slice-1 ships Option B: `repo.countByHotelAndName(hotelId, name)` app-layer pre-check + P2002 catch as belt-and-suspenders (dead branch pre-fix, live post-fix). Foundation fix (add `CREATE UNIQUE INDEX wa_templates_hotel_name_unique ON wa_templates (hotel_id, name) NULLS NOT DISTINCT` migration mirroring `menu_categories_hotel_name_unique`) rolls to Slot A. **When foundation lands**: no code change needed in Slot C — pre-check remains idempotent-safe; P2002 catch flips dead→live. Race window ~50ms per same-hotel same-name admin write documented in service JSDoc. |
+| Q-T30-#5      | **Contract Q for PO — `salah_kamar_count` semantic mapping**. Spec §1.4:148 Q-CONTRACT-21 example shows `salah_kamar_count: 3` in wire but spec doesn't define which complaint_type(s) or dept_type(s) map to "salah_kamar" (wrong-room). No `wrong_room` value in T02 `complaint_type` CHECK enum. | T30 · exec-C PLAN GAP #5 + PM tightening #3 | **open — PO ratify** (T30-slice-1 ships `salah_kamar_count: null` three-state per T26 precedent, non-blocking) | Slot C T30-slice-1 ships `salah_kamar_count: null` slice-1 (T26 three-state precedent — don't invent semantic). Wire type `number \| null`. When PO ratifies: (a) which complaint_type(s) count as "salah_kamar" OR (b) add new complaint_type='wrong_room' to T02 CHECK migration → one-line service change (compute count from `tickets.count({where: {hotelId, complaintType: {in: [...ratified list]}}})`). No wire shape break. |
+| Q-T30-#8      | **Spec inconsistency — `TIER_GATE` HTTP code**. Spec §1.4:133 says "backend **MUST 403** every /api/analytics/* request when hotel.tier !== 'luxury'". Spec §7:830 error catalog says "**422** `TIER_GATE` — Tier-restricted resource access". Same code appears in two spec sections with different HTTP codes. | T30 · PM C independent spec cross-check §1.4:133 vs §7:830 | **open — PO ratify** (T30-slice-1 uses spec §7 canonical 422 `BusinessRuleError`; unreachable under Opsi C flag=true) | Slot C T30-slice-1 uses spec §7 canonical error catalog per module template convention: `BusinessRuleError({rule: 'TIER_GATE'})` (422). Rationale: §7 is the authoritative error catalog + T27 tightening #1 precedent (uniform envelope wins over invented codes). Code path is UNREACHABLE slice-1 (Opsi C flag=true skips tier check entirely). When PO ratifies: if 403 wins → single-line service change (swap `BusinessRuleError` for `ForbiddenError` + `details.reason: 'TIER_GATE'`); if 422 wins → no change. Wire shape identical either way. |
+| Q-T30-#9      | **Contract Q for PO — Q-CONTRACT-21 `/high-alert` response shape ratification**. Spec §1.4:129 explicitly marks the endpoint as `(Q-CONTRACT-21, ASSUMED)`. Full response shape at spec §1.4:138-159 is provisional pending PO confirmation. Includes `salah_kamar_count` (Q-T30-#5 above), `trend_7d` shape, `recommendation_key` algorithm details, and per-dept aggregation shape. | T30 · PM C explicit escalation of spec §1.4:129 ASSUMED marker | **open — PO ratify** (T30-slice-1 ships against ASSUMED shape with PM tightenings applied) | Slot C T30-slice-1 ships against the ASSUMED shape at spec §1.4:138-159 with PM tightenings applied (correct `alert_threshold_exceeded` formula per spec §1.4:161; `salah_kamar_count: null` per Q-T30-#5; `recommendation_key` computed via 5-state algorithm PM ratified in ACK). If PO ratifies alternate shape, `/high-alert` serializer + service + tests need revision (medium refactor). Non-blocking for slice-1 merge — better to ship spec-documented ASSUMED shape than defer entirely. |
 | Q-T26-#7      | **Contract Q for PO — authoritative 19-flag list + per-flag `min_tier` map**. Spec §1.8:259+262 says "**all 19 flags**" but only enumerates 14 (Core 4 + Channels 3 + AI 5 + Verification 2). Spec §646 says `min_tier` is "migration-managed (lookup table or hardcoded const)" — actual mapping not in repo. Spec §4.7 says `depends_on_active_data` should be true for `menu_ordering` when active campaigns exist — but `campaigns` model isn't in T02. | T26 · PM C spec cross-check | **open — PO ratify** (T26-slice-1 ships 14 documented flags with three-state `null` fields; slice-2 fills in when PO ratifies) | Slot C T26-slice-1 ships the 14 known flags with `is_tier_locked: null` + `depends_on_active_data: null` + `min_tier: null` per flag (three-state UX matches T27 Q-T27-#1 precedent). PATCH validates `flag` param against `KNOWN_FLAGS_SET` = 14 documented flags → 400 on unknown. When PO ratifies: (a) 5 missing flag names → extend `KNOWN_FLAGS` constant; (b) per-flag `FLAG_MIN_TIER` map values; (c) `campaigns` model (foundation Slot A) for `depends_on_active_data` computation. Zero code change to wire shape when slice-2 lands — three-state `null` → real boolean/enum flip is transparent to FE. |
 | Q-T29-#1      | **Spec ambiguity contract Q for PO**: MVP §101:81 says `voice_configs` "stub endpoint (**always returns empty + `pbx_type: null`**)". Literal reading = GET is a pure façade ignoring DB state → PUT + persistence table pointless in slice-1. But spec §1.5:181 pairs `GET, PUT /api/settings/voice` as normal verbs + DDL exists with PK+columns → supports GET reflects DB state. Which semantic? | T29 · PM C independent MVP §101 vs spec §1.5 cross-check | **open — PO ratify** (rolls to PARENT §3a) | Slot C T29 ships **Option B**: PUT persists + GET reflects DB with empty-default fallback when no row. Rationale: (a) least-surprising API, (b) MVP §101 literal-A makes PUT+table contradictory, (c) data collected now available to wave 2a without backfill migration, (d) if PO rules literal-A: single-line service change (`get()` returns static empty regardless of DB). Zero regression risk on flip. Non-blocking for merge; matches Q-T28-#1 idempotent-to-either-resolution discipline. |
 | Q-T27-#7      | **Foundation port gap**: `src/core/storage/object-storage.port.ts:1-32` exposes `upload` + `delete` only — **no `download` method**. T08 slice-1 comment explicitly says "Slice-1 surface … Signed URL generation deferred to slice-2", implying more slices were expected. T27 slice-1 needs invoice PDF download stream. | T27 · exec-C PLAN GAP #7 · discovered via spec/foundation cross-check | **open — rolls up to PARENT §3b + §10 for Slot A / foundation extension (T-INFRA-06 candidate)** | Slot C T27-slice-1 ships Option A: local `BillingPdfStoragePort` at `src/modules/billing/ports/billing-pdf-storage.port.ts` with `download(key): Promise<Buffer \| null>` + `InMemoryBillingPdfStorageAdapter` for tests + composition-root wiring. Production adapter deferred (DEP-4 or foundation extension). **Foundation fix (T-INFRA-06 candidate)**: extend core `ObjectStoragePort` with `download(key): Promise<Buffer \| null>` + implement on `S3Adapter` (SDK `GetObjectCommand`) + `InMemoryAdapter`. Small extension; matches T08's slice-1 trajectory. Also serves T22/T24 menu-image download + T27 daily-brief when W3 lands. **Migration path when foundation lands**: billing barrel swaps consumer to core port; local port + adapter deleted; billing service constructor untouched (structurally identical). Zero regression risk. |
