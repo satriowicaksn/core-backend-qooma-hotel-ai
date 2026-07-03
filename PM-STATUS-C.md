@@ -12,10 +12,11 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **6/10 approved**
-- **Active tasks (awaiting PO merge)**:
-  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138`
-  - **T22 Menu CRUD (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4`. 10 files (6 module + 1 barrel + 3 tests). Multipart deferred to T22-slice-2 (Q-T22-#1 at PARENT §3b for PO ratify). Q-T22-#2 dept_head RBAC ambiguity at PARENT §3a.
+- **Day**: H0 (2026-07-03) — Slot C **6/10 approved**; **T24-slice-1 assigned**
+- **Active tasks**:
+  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
+  - **T22 Menu CRUD (slice-1)** — APPROVED attempt 1; `feat/settings-menu` @ `1da9ef4` awaiting PO merge
+  - **T24 Knowledge CRUD + CSV import (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 4 JSON CRUD endpoints (list w/ filters + create + update + delete). CSV import deferred to T24-slice-2 (same multipart dep as T22-slice-2 — reuses Q-T22-#1 escalation).
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -35,6 +36,7 @@
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
+| T24 | Knowledge CRUD + CSV import (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T24-slice-1 issued 2026-07-03 H0. Scope: **4 JSON CRUD endpoints** (list w/ ?is_active/?category/?tag filters + create + update + delete). No UNIQUE + no CHECK on `knowledge_entries` — simplest business rules yet. `tags` array pass-through; permissive `category` + `tags` per-element bounds. **CSV import DEFERRED to T24-slice-2** — same `@fastify/multipart` dep gate as T22-slice-2/T23; reuses existing Q-T22-#1 escalation (no new §3 entry). Dept_head RBAC ambiguity same as Q-T22-#2 (spec §6:807 identical phrasing) — reuses that escalation too. Files: 6 module + 1 barrel + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. 5 GAPs pre-surfaced (T24-#1..#5). Awaiting Executor C PLAN. |
 
 ---
 
@@ -2636,6 +2638,137 @@ Step 8 — Verdict: **APPROVED**
 **§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T22 row → approved · Short roll-up posted to PARENT §2 · Q-T22-#1 stays open PARENT §3b · Q-T22-#2 stays open PARENT §3a.**
 
 **PO merge please**: branch `feat/settings-menu` @ `1da9ef4` ready for main merge. Q-T22-#1 (multipart dep) + Q-T22-#2 (dept_head RBAC) need PO ratification but both non-blocking. Slot C **6/10 approved** (T21+T25+T27+T28 merged + T29+T22 approved-awaiting-merge). Next candidate: **T24 Knowledge CRUD + CSV import** — parallel to T23 (both fully unblocked with T08+T09 merged).
+
+---
+
+### ASSIGNMENT T24 — Knowledge CRUD + CSV import (slice-1, JSON-only, CSV deferred to slice-2) — issued by PM C at 2026-07-03 H0
+
+- **Routed from**: PM C queue selection from T22 VERDICT §0 preview (T24 named alongside T23 as next candidate). Formal §8 queue empty at claim time — PM ASSIGNMENT authoritative.
+- **Branch (to create on claim)**: `feat/settings-knowledge`
+- **Slice ruling**: **slice-1 = 4 JSON CRUD endpoints**. **CSV import deferred to T24-slice-2** — same `@fastify/multipart` dep gate as T22-slice-2 (Q-T22-#1 open at PARENT §3b). Batched multipart ratify from PO covers all three tasks (T22 + T23 + T24) — see PM notes.
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.5 (endpoints lines 174-176) + §2.7 (DDL 581-598) + §6:807 RBAC; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C4 (AC) + §4.6 (dept_head scoping — same ambiguity as Q-T22-#2).
+- **Living reference**: `src/modules/departments/` (T21 — Prisma direct + tenant/loadOwned) · `src/modules/agents/` (T28 — simplest single-entity CRUD, no port/adapter) · `src/modules/voice/` (T29 — thinnest layout).
+
+**Scope — slice-1 (4 JSON endpoints)**
+
+| Method   | Path                              | Purpose                                                          |
+| -------- | --------------------------------- | ---------------------------------------------------------------- |
+| `GET`    | `/api/settings/knowledge`         | List entries for tenant; optional `?is_active` / `?category` / `?tag` filters |
+| `POST`   | `/api/settings/knowledge`         | Create entry (JSON body)                                          |
+| `PATCH`  | `/api/settings/knowledge/:id`     | Update entry                                                      |
+| `DELETE` | `/api/settings/knowledge/:id`     | Delete entry (204)                                                |
+
+**Deferred to T24-slice-2 (CSV import)**
+- `POST /api/settings/knowledge/import` — multipart CSV upload, uses shared `parseCsvWithSchema` from T09 (merged) + `@fastify/multipart` package.
+- **Same prereq as T22-slice-2** — batched PO ratify recommended (Q-T22-#1 already at PARENT §3b covers T22/T23/T24 multipart needs).
+- Slice-1 satisfies spec §1.5 for the 4 CRUD endpoints; import endpoint is a separate MVP §C4 bullet.
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `knowledge_entries` @ spec `docs/spec/02-hotel-core.md:581-598`; Prisma model `KnowledgeEntry` @ `prisma/schema.prisma:325-341`. Fields: `id`, `hotelId`, `title (VARCHAR 255)`, `content (Text)`, `category (VARCHAR 80 nullable)`, `tags (String[] default empty)`, `isActive (default true)`, timestamps. **No UNIQUE constraints** (unlike T21 departments / T22 categories) — knowledge entries can duplicate freely within a hotel. **No CHECK constraints** — permissive throughout.
+- 4 indexes present: `hotel_id`, `(hotel_id, is_active)`, GIN on `tags`, GIN on FTS `to_tsvector(title||content)`.
+
+**RBAC** (spec §6:807 — `/api/settings/knowledge*`):
+- `super_admin`: yes · `gm_admin`: yes · **`dept_head`: SAME AS Q-T22-#2** — spec says "yes (dept-relevant content allowed)" but `knowledge_entries` has no `department_id` FK. MVP §4.6 further specifies dept_head auto-filter `WHERE department_id = session.dept_id` but the schema lacks the join column. **PM lean slice-1: `gm_admin` + `super_admin` only** (dept_head 403); reference existing Q-T22-#2 escalation (do NOT open a new Q — same underlying spec ambiguity affects both menu + knowledge).
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])`.
+
+**Business rules**
+- **List** (`GET`): `where: { hotelId: ctx.hotelId }` (super_admin bypass via `isSuperAdmin`); optional filters:
+  - `?is_active=true|false` → filter `isActive`
+  - `?category=<string>` → filter `category` exact match
+  - `?tag=<string>` → filter `tags: { has: '<string>' }` (Prisma array contains-element)
+- **Create** (`POST`): `hotel_id` server-set from `ctx.hotelId`; zod strict body with `title` + `content` required + `category`/`tags`/`is_active` optional. Return 201 with created row.
+- **Update** (`PATCH`): `loadOwned` (T21 pattern with `assertHotelOwnership`) → Prisma update. 200 with updated row.
+- **Delete** (`DELETE`): `loadOwned` → Prisma delete. 204.
+- **No P2002 handling needed** (no UNIQUE constraints).
+- **No cross-tenant category-reuse guard needed** (single-entity module).
+- **Field allowlist on update**: `hotel_id`, `id`, timestamps immutable (rejected at zod `.strict()`).
+
+**Files to create**
+```
+src/modules/knowledge/
+├── knowledge.types.ts                        (DomainKnowledgeEntry, EntryRow, EntryWire,
+│                                               list filters, response envelopes)
+├── knowledge.schema.ts                       (zod: CreateEntryBodySchema.strict +
+│                                               UpdateEntryBodySchema.strict.refine-non-empty +
+│                                               EntryIdParamSchema + ListEntriesQuerySchema)
+├── knowledge.serializer.ts                   (Prisma row → snake_case wire;
+│                                               `tags: string[]` pass-through)
+├── knowledge.repository.ts                   (Prisma direct — findMany, findById,
+│                                               create, update, delete)
+├── knowledge.service.ts                      (list + create + update + delete;
+│                                               loadOwned helper mirror T21/T28)
+├── knowledge.routes.ts                       (Fastify plugin: 4 handlers; thin;
+│                                               requireTenant → requireRole → parse
+│                                               → service → send)
+├── index.ts                                  (barrel: routes plugin + service class +
+│                                               buildKnowledgeService factory + wire/body types;
+│                                               expected 0 eslint-disable — T28/T29/T22 pattern)
+└── __tests__/
+    ├── knowledge.service.test.ts                     (unit; mock repo; branch coverage:
+    │                                                   list w/ each filter combo; create happy;
+    │                                                   update happy + cross-tenant 404;
+    │                                                   delete happy + cross-tenant 404;
+    │                                                   refine-non-empty; strict field allowlist)
+    ├── knowledge.routes.test.ts                      (unit; supertest-style Fastify inject;
+    │                                                   happy + 401 + 403 dept_head/staff +
+    │                                                   404 cross-tenant + 400 zod validation +
+    │                                                   201/200/204 status codes)
+    └── knowledge.repository.integration.test.ts      (testcontainers real Postgres;
+                                                        seed 2 hotels × 3 entries with varied
+                                                        categories + tags;
+                                                        list filters (is_active/category/tag);
+                                                        tenant isolation;
+                                                        tags array persistence + retrieval;
+                                                        create → update → delete lifecycle)
+```
+
+**Files to modify**
+- **Zero** — `api.ts` untouched (Override #1); `env.ts` untouched (no new env); `prisma/migrations/` untouched; `core/` / `plugins/` / `shared/socket/` untouched. **No new dependencies** in slice-1 (multipart deferred).
+
+**T24-slice-1 DoD**
+- [ ] 4 public endpoints wired.
+- [ ] Zod schemas at boundary: `CreateEntryBodySchema.strict()` (title + content required; category/tags/is_active optional); `UpdateEntryBodySchema.strict().refine(non-empty)` (all fields optional); `EntryIdParamSchema` uuid; `ListEntriesQuerySchema.strict()` with `is_active` boolFlag + `category` string + `tag` string.
+- [ ] Tenant scope: `hotelId` from `ctx.hotelId` on every write; cross-tenant 404 (leak-safe) via `assertHotelOwnership` on update + delete.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on all 4; `dept_head` + `staff` → 403.
+- [ ] `?tag` filter uses Prisma `tags: { has: '<value>' }` (single-element contains).
+- [ ] Response envelope: list `{data: EntryWire[]}` (small N per hotel, no cursor); single `{data: EntryWire}` per Q-B-01 canonical; 201 on POST, 200 on PATCH, 204 on DELETE.
+- [ ] Snake_case wire via serializer; `tags: string[]` pass-through.
+- [ ] Winston logger scoped via `req.log.info({module:'knowledge', action, correlationId})` in each handler.
+- [ ] Unit tests: full branch coverage per DoD.
+- [ ] Integration test: real Postgres via testcontainers; tenant isolation + tag/category/is_active filters + tags array round-trip.
+- [ ] Line coverage ≥ 80% on new files (target ≥ 95% per T21/T25/T27/T28/T29/T22 precedent).
+- [ ] `make check` PASS with baseline **513/1/514** (post-T22-approved) OR **450/1/451** (pre-T22-merge on `main`) — state explicitly.
+- [ ] `pnpm test:integration` PASS; all pre-existing suites regression-clean.
+- [ ] Drift scans clean (T21/T25/T27/T28/T29/T22 pattern).
+- [ ] Named exports only; barrel exposes public API.
+- [ ] Zero touch on foundation surface. **No new dependencies added**.
+- [ ] Expected **0 eslint-disable** (4th consecutive Slot C module if held — T28/T29/T22/T24 pattern).
+
+**PM notes for Executor C**
+
+- **Living reference**: `src/modules/agents/` (T28 approved) is the closest twin — thinnest single-entity CRUD layout, no port/adapter, no state machine, `loadOwned` pattern; `src/modules/departments/` (T21) for tenant/repository conventions; `src/modules/voice/` (T29) for defensive-narrow patterns on JSONB / array fields.
+- **Session-context**: import `SessionUser`, `SessionRole`, `TenantContext` from `@plugins/tenant-guard.js`.
+- **Error hierarchy**: `NotFoundError` (404 leak-safe), `ForbiddenError` (403 RBAC), `ValidationError` (400 auto). No `ConflictError` (no UNIQUE constraints).
+- **`tags` array pass-through**: Prisma returns `string[]` from `String[]` column. Serializer passes through as-is (no defensive narrow needed — array shape guaranteed by DB). Zod validates as `z.array(z.string().min(1).max(40)).max(20)` bounded per element + max 20 total.
+- **`content` field**: Text column, no length limit at DB. Zod bounds recommended: `z.string().min(1).max(10000)` (10KB is generous for a knowledge entry).
+- **No FTS endpoint in slice-1**: GIN index on `to_tsvector(title||content)` exists but the spec §1.5 only lists CRUD verbs — no `?q=` search query. If PO wants FTS search later, small follow-up service method + zod filter. Non-blocking today.
+- **No port + adapter needed in slice-1** — pure DB CRUD, no external RPC. T28/T29/T22 pattern. Barrel has 0 eslint-disable expected.
+- **DEP-4 non-blocking**: build + wire route registration; testcontainers cover integration.
+- **pnpm-store note**: standard `pnpm install --frozen-lockfile` + `pnpm prisma:generate` if types missing.
+- **Fixture strategy**: seed HOTEL_A with 3 entries — one active with tags `['welcome', 'checkin']`, one inactive with category `'faq'`, one active without category — and HOTEL_B with 1 entry for tenant isolation.
+- **Branch + commit**: `feat/settings-knowledge` · `feat(knowledge): T24 slice-1 CRUD JSON`.
+- **PLAN expectations**: session-start gate + files list + approach + GAP responses. Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1/Q-T22-#1..#2 all resolved or open elsewhere — do NOT re-raise.
+- **Estimated size**: ~3-4h (smallest task since T29 — 4 CRUD endpoints, single entity, no state machine, no port/adapter, no transaction). Straight-line to SUBMIT if all tests land clean.
+
+**Expected GAPs — surface in PLAN before coding**
+
+- **T24-#1** — CSV import deferral to slice-2. Reuse **Q-T22-#1** escalation (same `@fastify/multipart` dep). No new §3b entry needed. Slice-1 satisfies MVP §C4 for the 4 CRUD endpoints; import is a separate bullet.
+- **T24-#2** — dept_head RBAC ambiguity. Reuse **Q-T22-#2** escalation (spec §6:807 uses IDENTICAL "yes (dept-relevant content allowed)" phrasing as menu §6:806; MVP §4.6 says `WHERE department_id = session.dept_id` but knowledge_entries has no dept_id FK — same underlying spec-vs-schema gap). PM lean slice-1: gm_admin + super_admin only; dept_head 403. No new §3a entry.
+- **T24-#3** — `tags` validation shape. PM lean: `z.array(z.string().min(1).max(40)).max(20)` bounded per-element + max array length. Matches Q-C-03 / Q-T25-#3 permissive-with-bounds pattern.
+- **T24-#4** — `category` validation. PM lean: permissive `z.string().min(1).max(80).nullable().optional()` matches DDL VARCHAR(80) NULL + Q-T25-#2 permissive-name / Q-T29-#2 permissive-pbx_type discipline.
+- **T24-#5** — FTS search via `?q=` param. **Not in spec §1.5** — GIN index at `to_tsvector` exists but no endpoint spec'd. PM lean: **not in slice-1**. Follow-up ticket if PO/FE wants FTS surface.
+
+Awaiting PM C ACK before coding begins.
 
 <!--
 TEMPLATE — copy untuk task baru:
