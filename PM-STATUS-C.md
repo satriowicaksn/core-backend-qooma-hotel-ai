@@ -12,16 +12,14 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **5/10 approved** (half of Slot C shipped)
-- **Recent activity**:
-  - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
-  - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
-  - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
-  - **T28 Settings/agents (Min-3)** — **MERGED** (PR #14 `0e68a38`) ✓
-  - **T29 Settings/voice groundwork** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` awaiting PO merge. 10 files. **Highest module-wide coverage of any Slot C task** (98.85% lines). 2nd consecutive Slot C module with 0 eslint-disable. Q-T29-#1 stays open PARENT §3a (PO ratify).
-- **Branches**: `feat/settings-voice` (T29, awaiting PO merge)
+- **Day**: H0 (2026-07-03) — Slot C **5/10 approved**; **T22-slice-1 assigned**
+- **Active tasks**:
+  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
+  - **T22 Menu CRUD (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 6 JSON endpoints (Categories CRUD + Items CRUD with pre-signed URL image_url). **Multipart deferred to T22-slice-2** (needs `@fastify/multipart` dep — escalated to PARENT §3b for PO ratify).
+- **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
+- **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25+T27+T28 merged; T29 approved-awaiting-merge; **T22/T23/T24 all fully unblocked** (T08 storage + T09 CSV import merged); T26+T30 hard-blocked at DEV by Opsi C tier-join. Next candidate: **T22 Menu CRUD + multipart image** or **T23 Menu bulk (CSV)** or **T24 Knowledge CRUD + CSV import**.
+- **My queue (preview)**: T21+T25+T27+T28 merged; T29 approved; T22-slice-1 assigned; T23/T24 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C tier-join.
 
 ---
 
@@ -35,7 +33,8 @@
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
-| T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **483/1/484** (+33 net: 20 service + 12 routes + 1 empty-default helper); `pnpm test:integration` **140/1/141** (all 9 suites regression-clean); coverage **98.85% lines** module-wide (**highest of any Slot C task**; service/repo/serializer all 100% lines+branches+funcs). **Drift 0/9 + 0 eslint-disable** (2nd consecutive Slot C module without any — T28 was first). Both tightenings held: (a) `BusinessRuleError` 422 `VOICE_NOT_CONFIGURED` at service.ts:52-55 (not ValidationError); (b) winston observability at BOTH PUT + POST /test with `pbxTypeSet`/`isActiveSet` audit flags on PUT. Q-T29-#1 stays open PARENT §3a (PO ratify MVP §101 vs spec §1.5 semantic). Wave-2a security prereq nudge added to PARENT §10 (config JSONB will carry PBX credentials — encryption at-rest per CLAUDE.md §6 WAJIB). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
+| T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
+| T22 | Menu CRUD + categories + multipart image (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T22-slice-1 issued 2026-07-03 H0. Scope: **6 JSON endpoints** (Categories CRUD + Items CRUD; `image_url` accepted as pre-signed URL string) + `CATEGORY_HAS_ITEMS` 409 + `CATEGORY_NAME_TAKEN` 409 + `Decimal.toFixed(2)` price + TIME `HH:mm` + `available_window` cross-field validation. **Multipart image upload DEFERRED to T22-slice-2** — `@fastify/multipart` NOT installed (verified `package.json`); needs PO ratification per CLAUDE.md §11 WAJIB. Escalating to PARENT §3b. RBAC gm_admin + super_admin only slice-1 (dept_head spec ambiguity Q-T22-#2 → PARENT §3a). Nested list `{data:{categories:[{...items:[...]}]}}` per Q-T22-#3 lean A. Files: 6 module + 1 barrel + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; **no new deps in slice-1**. 6 GAPs pre-surfaced (T22-#1..#6). Awaiting Executor C PLAN. |
 
 ---
 
@@ -2173,6 +2172,157 @@ Step 8 — Verdict: **APPROVED**
 **§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T29 row → approved · Short roll-up posted to PARENT §2 · Q-T29-#1 stays open PARENT §3a · new wave-2a security prereq nudge added to PARENT §10.**
 
 **PO merge please**: branch `feat/settings-voice` @ `416e138` ready for main merge. Q-T29-#1 (MVP §101 vs spec §1.5 GET semantic) needs PO ratification but non-blocking. Slot C **5/10 approved** (T21+T25+T27+T28 merged + T29 approved-awaiting-merge — half of Slot C shipped). Next candidates fully unblocked: **T22 Menu CRUD** + **T23 Menu bulk (CSV)** + **T24 Knowledge CRUD + CSV import** (T08 + T09 foundation dependencies both merged); T26+T30 remain hard-blocked at DEV by Opsi C tier-join.
+
+---
+
+### ASSIGNMENT T22 — Menu CRUD + categories (slice-1, JSON-only, multipart deferred to slice-2) — issued by PM C at 2026-07-03 H0
+
+- **Routed from**: PM C queue selection from T29 VERDICT §0 preview (T22 named as next candidate). Formal §8 queue empty at claim time — PM ASSIGNMENT authoritative.
+- **Branch (to create on claim)**: `feat/settings-menu`
+- **Slice ruling**: **slice-1 = 6 JSON endpoints (Menu items + Categories CRUD)**. **Multipart image upload deferred to T22-slice-2** — see PM notes for rationale.
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.5 (endpoints table lines 168-171) + §2.6 (DDL lines 544-579) + §6:806 RBAC + §7:832 error catalog (`CATEGORY_HAS_ITEMS`); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C2 (AC) + §79 fallback guidance + §97 seed guidance.
+- **Living reference**: `src/modules/departments/` (T21 — Prisma UNIQUE + P2002 catch + tenant/loadOwned pattern) · `src/modules/wa-templates/` (T25 — state-branch guards, `.strict()` zod bodies with `.refine(non-empty)`) · `src/modules/billing/` (T27 — `Decimal.toFixed(2)` pattern for `price_idr`).
+
+**Scope — slice-1 (6 JSON endpoints)**
+
+| Method   | Path                                          | Purpose                                                                    |
+| -------- | --------------------------------------------- | -------------------------------------------------------------------------- |
+| `GET`    | `/api/settings/menu`                          | List categories + items nested (`{data: {categories: [...items: [...]]}}`) |
+| `POST`   | `/api/settings/menu`                          | Create menu item (JSON body, `image_url` accepted as pre-signed URL string in slice-1) |
+| `PATCH`  | `/api/settings/menu/:id`                      | Update menu item (JSON body, `image_url` optional string)                  |
+| `DELETE` | `/api/settings/menu/:id`                      | Delete menu item                                                            |
+| `POST`   | `/api/settings/menu/categories`               | Create category                                                            |
+| `PATCH`  | `/api/settings/menu/categories/:id`           | Update category                                                            |
+| `DELETE` | `/api/settings/menu/categories/:id`           | Delete category → **409 `CATEGORY_HAS_ITEMS`** if items assigned            |
+
+**Deferred to T22-slice-2 (Multipart image upload)**
+- Multipart body parsing on `POST /api/settings/menu` + `PATCH /api/settings/menu/:id` — needs `@fastify/multipart` package (verified **NOT installed** in `package.json` — foundation dep addition per CLAUDE.md §11 requires PO approval via Parent PM).
+- `ObjectStoragePort.upload(...)` integration (T08 merged, `upload`+`delete` methods live in `src/core/storage/`) for image blob → S3/R2 key → `menu_items.image_url = returned URL`.
+- **Why deferred**: `@fastify/multipart` is a new dependency requiring PO ratification per CLAUDE.md §11 WAJIB. Slot C ships JSON-only slice-1 today (accepts `image_url` as pre-signed URL string per MVP §79 spirit — FE renders `<img src={url}>` regardless of source); slice-2 lands after PO approves the dep + issues a new ticket. This mirrors the T25-slice-2 (HMAC plugin) and T27 quota-meter (HMAC + INTEGRATION_SHARED_SECRET) prereq-deferral patterns. Slice-1 satisfies MVP §C2 for the 6 CRUD endpoints (multipart is called out inline but is one behavior on 2 of the 7 endpoints).
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `menu_categories` @ spec `docs/spec/02-hotel-core.md:544-558`; Prisma model `MenuCategory` @ `prisma/schema.prisma:284-299`. Fields: `id`, `hotelId`, `name (VARCHAR 80)`, `sortOrder (Int default 0)`, `isActive (default true)`, timestamps. **UNIQUE(hotel_id, name)** already in migration (T02 shipped this properly, unlike wa_templates — no Q-T25-#5-style gap).
+- `menu_items` @ spec `docs/spec/02-hotel-core.md:559-579`; Prisma model `MenuItem` @ `prisma/schema.prisma:301-326`. Fields: `id`, `hotelId`, `categoryId`, `name (VARCHAR 120)`, `description (Text nullable)`, `priceIdr (Decimal 12,2)`, `imageUrl (VARCHAR 500 nullable)`, `prepMinutes (Int nullable)`, `isAvailable (default true)`, `availableWindowFrom/To (TIME nullable)`, timestamps. CHECKs: `price_idr >= 0` + `prep_minutes IS NULL OR prep_minutes >= 0`. FK `menu_items.category_id → menu_categories.id` **ON DELETE RESTRICT** (DB-level guard for category delete).
+
+**RBAC** (spec §6:806 — `/api/settings/menu*`):
+- `super_admin`: yes · `gm_admin`: yes · **`dept_head`: SEE GAP T22-#2** (spec says "yes (dept-relevant content allowed)" but schema has no dept mapping on menu tables — semantic ambiguous). **PM lean slice-1: `gm_admin` + `super_admin` only** (dept_head 403); register as contract Q for PO.
+- Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])` (T21/T25/T27/T28/T29 verified pattern).
+
+**Business rules (all in service; use existing error hierarchy from T07-slice-1 + T04)**
+- **List** (`GET /api/settings/menu`): fetch `menuCategories.findMany({include: {items: true}, where: {hotelId: ctx.hotelId}, orderBy: [{sortOrder: 'asc'}, {name: 'asc'}]})`. Items nested under each category. Optional `?is_active=true|false` filter on categories (mirror T21).
+- **Create item** (`POST`): `hotel_id` from `ctx.hotelId` (hardcoded server-side); validate `category_id` belongs to same hotel (cross-tenant category-reuse blocked — pre-check `findUnique({where:{id: category_id, hotelId: ctx.hotelId}})` → 404 if not found); zod-validated body; Prisma create; P2002 unlikely on items (no UNIQUE); serialize with `.toFixed(2)` on `price_idr`. **201 Created**.
+- **Update item** (`PATCH`): `loadOwned` mirror T21 with `assertHotelOwnership`; if `category_id` changing, re-validate it belongs to same hotel; Prisma update; serialize with `.toFixed(2)`.
+- **Delete item** (`DELETE`): `loadOwned` + Prisma delete; 204 No Content.
+- **Create category** (`POST /categories`): `hotel_id` from `ctx.hotelId`; zod-validated body; catch P2002 UNIQUE(hotel_id, name) violation → 409 `ConflictError({reason:'CATEGORY_NAME_TAKEN', name})`. 201.
+- **Update category** (`PATCH`): `loadOwned` + Prisma update; P2002 catch on name change.
+- **Delete category** (`DELETE`): `loadOwned` → **pre-check** `menuItems.count({where:{categoryId: id}}) > 0` → if items exist, throw `ConflictError({reason:'CATEGORY_HAS_ITEMS', itemCount})` (409, spec §7:832). Fallback: DB FK Restrict backstop if pre-check races (translate P2003 → same envelope). 204 if empty.
+- **`available_window_from/to` cross-validation**: at zod level, if either is set both must be set + `from < to` (see GAP T22-#4). No wrap-around midnight in slice-1.
+- **Field allowlist on update**: `hotel_id`, timestamps immutable (rejected at zod `.strict()`).
+
+**Files to create**
+```
+src/modules/menu/
+├── menu.types.ts                              (DomainMenuCategory, DomainMenuItem,
+│                                                CategoryWire, ItemWire, MenuListResponse,
+│                                                CategoryResponse, ItemResponse, filters)
+├── menu.schema.ts                             (zod: CreateCategoryBodySchema.strict +
+│                                                UpdateCategoryBodySchema.strict.refine-non-empty +
+│                                                CreateItemBodySchema.strict +
+│                                                UpdateItemBodySchema.strict.refine-non-empty +
+│                                                CategoryIdParamSchema + ItemIdParamSchema +
+│                                                ListMenuQuerySchema + TIME field zod helper +
+│                                                available_window cross-field refine)
+├── menu.serializer.ts                         (Prisma row → snake_case wire;
+│                                                Decimal.toFixed(2) on price_idr;
+│                                                Date → 'HH:mm' string on TIME fields;
+│                                                nested category-with-items shape for list)
+├── menu.repository.ts                         (Prisma direct — ADR-0001;
+│                                                listCategoriesWithItems, findCategoryById,
+│                                                findItemById, createCategory, updateCategory,
+│                                                deleteCategory, countItemsInCategory,
+│                                                createItem, updateItem, deleteItem,
+│                                                ensureCategoryBelongsToHotel)
+├── menu.service.ts                            (all business rules above; consumes repo;
+│                                                loadOwnedCategory/Item helpers mirror T21)
+├── menu.routes.ts                             (Fastify plugin: 7 handlers; thin
+│                                                requireTenant → requireRole → parse
+│                                                → service → send)
+├── index.ts                                   (barrel: menuRoutes plugin + MenuService class +
+│                                                buildMenuService factory + wire/body types)
+└── __tests__/
+    ├── menu.service.test.ts                          (unit; mock repo; branch coverage:
+    │                                                   category CRUD happy + P2002 → CONFLICT +
+    │                                                   cross-tenant 404 + refine-non-empty;
+    │                                                   item CRUD happy + category-scope check +
+    │                                                   cross-tenant category-reuse blocked +
+    │                                                   price/prep validation edges;
+    │                                                   delete-category with items → 409
+    │                                                   CATEGORY_HAS_ITEMS + empty → 204;
+    │                                                   available_window cross-field validation)
+    ├── menu.routes.test.ts                           (unit; supertest-style Fastify inject;
+    │                                                   happy + 401 + 403 dept_head/staff +
+    │                                                   404 cross-tenant + 409 CATEGORY_HAS_ITEMS +
+    │                                                   409 CATEGORY_NAME_TAKEN + 400 zod validation +
+    │                                                   201/200/204 status codes)
+    └── menu.repository.integration.test.ts           (testcontainers real Postgres;
+                                                        seed 2 hotels × 2 categories × 2 items each;
+                                                        UNIQUE(hotel_id, name) proven; price CHECK proven;
+                                                        prep CHECK proven; FK Restrict on category delete
+                                                        with items proven; tenant isolation;
+                                                        nested-list ordering)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1 pattern held; barrel-only wiring; DEP-4 registers). `env.ts` untouched (no new env in slice-1). `prisma/migrations/` untouched. `core/` / `plugins/` / `shared/socket/` untouched. **No new dependencies** in slice-1 (multipart deferred).
+
+**T22-slice-1 DoD**
+- [ ] 7 public endpoints wired: GET list · POST/PATCH/DELETE item · POST/PATCH/DELETE category.
+- [ ] Zod schemas at boundary: all 4 bodies `.strict()`; update bodies `.refine(non-empty)`; `available_window_from/to` cross-field refine (both-or-neither, `from < to`); `price_idr: z.number().nonnegative().max(99999999999.99)` matches DECIMAL(12,2) precision; `prep_minutes: z.number().int().nonnegative().nullable().optional()`.
+- [ ] Tenant scope: `hotel_id` sourced from `ctx.hotelId` on every write; `category_id` cross-tenant reuse blocked (pre-check on create/update item).
+- [ ] Cross-tenant 404 (leak-safe) proven for both category + item paths.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on all 7; `dept_head` + `staff` → 403 (verified via routes test).
+- [ ] `is_active` filter on list query (categories); items always included (all-or-none per category).
+- [ ] `Decimal.toFixed(2)` on `price_idr` serialization (T27 tightening reused — matches DDL DECIMAL(12,2) precision + stable `"25000.00"` wire shape).
+- [ ] TIME fields serialized as `"HH:mm"` string on wire (`available_window_from`/`to`).
+- [ ] `CATEGORY_HAS_ITEMS`: `ConflictError` (409) via app-layer `countItemsInCategory` pre-check + P2003 FK Restrict catch as belt-and-suspenders.
+- [ ] `CATEGORY_NAME_TAKEN`: `ConflictError` (409) via `isPrismaUniqueViolation(err)` P2002 catch (mirror T21/T25 pattern).
+- [ ] Response envelope: list `{data: {categories: CategoryWire[]}}` where each category wire includes `items: ItemWire[]`; single category/item `{data: CategoryWire | ItemWire}` per Q-B-01 canonical.
+- [ ] Winston logger scoped to handler via `req.log.info({module:'menu', action, correlationId})` in each handler.
+- [ ] Unit tests: branch coverage per DoD; mock repo.
+- [ ] Integration test: real Postgres via testcontainers; UNIQUE + price/prep CHECKs + FK Restrict on category delete + tenant isolation + nested-list ordering.
+- [ ] Line coverage ≥ 80% on new files (target ≥ 96% per T21/T25/T27/T28/T29 precedent).
+- [ ] `make check` PASS with baseline **483/1/484** (post-T29-merge) — state delta explicitly in SUBMIT.
+- [ ] `pnpm test:integration` PASS; all pre-existing suites regression-clean (departments/wa-templates/billing/agents/voice/tickets/notifications/visits/guests).
+- [ ] Drift scans clean (T21/T25/T27/T28/T29 pattern).
+- [ ] Named exports only; barrel exposes public API (routes plugin + service class + factory + wire/body types + `CategoryWire`/`ItemWire` types); NO repository/serializer/schema-parser internal leak.
+- [ ] Zero touch on `src/entrypoints/api.ts` + `src/core/config/env.ts` + `prisma/migrations/` + `src/core/` + `src/plugins/` + `src/shared/socket/`. **No new dependencies added**.
+
+**PM notes for Executor C**
+
+- **Living reference**: `src/modules/departments/` (T21 approved) for `loadOwned` + `isPrismaUniqueViolation` + tenant-scoped repository queries; `src/modules/wa-templates/` (T25 approved) for `.strict()` + `.refine(non-empty)` + P2002 catch pattern; `src/modules/billing/` (T27 approved) for `Decimal.toFixed(2)` serializer pattern on `price_idr`.
+- **Session-context**: import `SessionUser`, `SessionRole`, `TenantContext` from `@plugins/tenant-guard.js` (Slot-A authoritative, Q-B-02 resolved).
+- **Error hierarchy**: `ConflictError` (409 UNIQUE + CATEGORY_HAS_ITEMS), `NotFoundError` (404 leak-safe), `ForbiddenError` (403 RBAC), `ValidationError` (400 auto). No `BusinessRuleError` needed in slice-1 (available_window is zod-level validation, not domain-rule 422).
+- **`Decimal` serialization**: Prisma returns `Decimal` object for `priceIdr` — MUST convert to string in serializer (`row.priceIdr.toFixed(2)`). Same as T27 tightening #2.
+- **TIME field handling**: Prisma maps `@db.Time` to `DateTime` — actual wire value is `HH:mm:ss.sssZ` unless normalized. Serializer should extract `HH:mm` slice for FE consumption (spec §2.6:569 example `'06:00'`). Zod PUT parser should accept `HH:mm` string + convert to Prisma-compatible `Date` at `1970-01-01T${hhmm}:00.000Z`.
+- **Cross-tenant category reuse guard**: on create/update item, verify `category_id` belongs to `ctx.hotelId` via `repo.ensureCategoryBelongsToHotel(categoryId, hotelId)` returning boolean — if false, throw `NotFoundError('MenuCategory', categoryId)` (leak-safe, don't reveal cross-tenant existence).
+- **No port + adapter needed in slice-1** — pure DB CRUD, no external RPC. T28/T29 pattern. Barrel has 0 eslint-disable expected.
+- **DEP-4 non-blocking**: build + wire route registration; testcontainers cover integration. Slot B + T21/T25/T27/T28/T29 shipped this way.
+- **pnpm-store note**: `pnpm install --frozen-lockfile` fresh; if `@prisma/client` missing types, run `pnpm prisma:generate`. Do NOT `pnpm rebuild @prisma/client`.
+- **Fixture strategy**: seed both `HOTEL_A` (2 categories `Beverages`+`Mains`, 2 items per category) and `HOTEL_B` (1 category `Beverages` — same name proves per-hotel UNIQUE allowance) for tenant isolation + UNIQUE proof.
+- **Branch + commit**: `feat/settings-menu` · `feat(menu): T22 slice-1 categories + items JSON CRUD`.
+- **PLAN expectations**: session-start gate + files list + approach + GAP responses. Q-B-01/Q-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1 all resolved or open elsewhere — do NOT re-raise.
+- **Estimated size**: ~6-8h (biggest task tied with T27 — 7 endpoints × 2 entities + nested-list serializer + cross-field validation + FK-Restrict handling). **CHECKPOINT WAJIB** if crossing ~4h with >4 files still incomplete.
+
+**Expected GAPs — surface in PLAN before coding**
+
+- **T22-#1** — **Multipart deferral to slice-2**. `@fastify/multipart` not installed. Slice-1 accepts `image_url` as pre-signed URL string in JSON body per MVP §79 fallback spirit. Confirm slicing approach + acknowledge that FE won't be able to upload from Settings page until slice-2 lands (workaround: manual pre-upload to storage bucket + paste URL — acceptable for MVP admin flow). Escalate `@fastify/multipart` dep to PARENT §3b for PO ratify.
+- **T22-#2** — **dept_head RBAC ambiguity** (spec §6:806 "yes (dept-relevant content allowed)"). Menu tables have no `dept_id` FK. **PM lean: gm_admin + super_admin only in slice-1**, dept_head 403 same as T21/T25/T27/T28/T29. Register as contract Q for PO — if PO wants dept_head access, needs (a) spec clarification on dept-filter semantic, (b) schema decision (add `dept_id` on category? item? both?), (c) follow-up ticket. Non-blocking for slice-1.
+- **T22-#3** — **List response shape**. Options: (A) nested `{data: {categories: [{...category, items: [...]}]}}` — natural rendering shape; (B) flat `{data: {categories: [...], items: [...]}}` — normalized; (C) items-only `{data: {items: [...items with category embedded]}}`. **PM lean: A** — matches spec "List (categories + items)" wording + natural FE render; less normalization overhead.
+- **T22-#4** — **`available_window_from/to` cross-field validation**. Options: (A) both-or-neither + `from < to` (no wrap-around; late-night items would need slice-2 revisit); (B) allow wrap-around (e.g. 22:00 → 06:00); (C) permissive independent (either can be set alone, meaning defaults). **PM lean: A** — spec is silent on wrap-around; strict-first + easier to relax later than tighten. Zod `.refine()` at schema level.
+- **T22-#5** — **`image_url` in slice-1 JSON body**. Options: (A) accept as pre-signed URL string (`z.string().url().max(500).nullable().optional()`); (B) reject entirely (405 or 400 with helpful error); (C) accept but ignore. **PM lean: A** — permissive-URL matches DDL VARCHAR(500) nullable + supports admin manual pre-upload workflow for MVP. Slice-2 replaces this with multipart adapter + still accepts pre-signed URL as fallback.
+- **T22-#6** — **`is_active` filter scope on list**. Options: (A) filter categories only (`?is_active=true` returns only active categories with all their items); (B) filter both cats + items independently (`?category_active=&item_available=`); (C) no filter in slice-1. **PM lean: A** — simplest; FE filter items via `is_available` field client-side if needed.
+
+Awaiting PM C ACK before coding begins.
 
 <!--
 TEMPLATE — copy untuk task baru:
