@@ -3198,6 +3198,55 @@ Step 8 — Verdict: **APPROVED**
 
 Awaiting PM C ACK before coding begins.
 
+#### PLAN T23-slice-1 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+1 endpoint (`POST /api/settings/menu/bulk-availability`) added to the existing `src/modules/menu/` module (T22 merged). Additive changes to 5 existing files (schema/types/repository/service/routes/index) + 2 new test files + 1 extended integration test. Reuses T22's `refineAvailableWindow` + `hhmmToTime` codec + strict-body pattern. Bulk-updates `isAvailable` / `availableWindowFrom` / `availableWindowTo` on N items in one `updateMany` after pre-fetching matching IDs; cross-tenant + nonexistent items reported in `skipped[]` array with single `NOT_FOUND` reason (leak-safe per Q-T23-#4). Response envelope `{data: {updated: number, skipped: [{item_id, reason: 'NOT_FOUND'}]}}` with 200 always (never 404 per Q-T23-#6). T22's 78 tests must stay green.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.5 line 173 (bulk endpoint) + §6:806 RBAC (menu family, same as T22) ✓ ; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C3 (AC — 2 endpoints, gm_admin) ✓
+- Parent docs spot-read: `src/modules/menu/menu.schema.ts` (T22 — `refineAvailableWindow` helper at L64-85 verified reusable + strict + refine-non-empty pattern), `src/modules/menu/menu.serializer.ts` (T22 — `hhmmToTime`/`timeToHHmm` codec pair at L14-26 for TIME field write), `src/modules/menu/menu.repository.ts` (T22 — Prisma direct pattern; will add 2 methods), `src/modules/menu/menu.service.ts` (T22 — `isPrismaUniqueViolation` + no `loadOwned` needed for bulk), `src/modules/menu/menu.routes.ts` (T22 — 7 handlers, will append 8th), `src/modules/menu/menu.types.ts` (T22 — types added), `src/modules/menu/index.ts` (T22 — barrel with re-export additions), `src/plugins/rbac.ts` + `src/plugins/tenant-guard.ts` (unchanged from T22 usage), `src/core/errors/app-errors.ts` (`ValidationError` L27 auto via zod; no `NotFoundError` needed) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ · T21/T25/T27/T28/T29/T22/T24 ✓ (T22 living reference; T24 approved-awaiting-merge; menu module merged as of PR #15 `2d41120`) — all approved
+- `make typecheck` clean ✓ · `make lint` clean ✓ · `make test-unit` **513/1/514** on `main` (T24 approved-awaiting-merge; T29 approved-awaiting-merge; menu module from T22 merged) ✓
+- Scaffolder risk: **none** — no `pnpm create`; **no new dependency** (CSV multipart deferred per Q-T23-#1 which reuses Q-T22-#1); no schema.prisma edit; no env change; no migration touch
+
+**GAP responses** — accept all 7 PM leans; **no new PARENT §3 entries**
+
+- **Q-T23-#1 (CSV deferral)** → **Accepting PM lean**: slice-1 JSON-only; reuses **Q-T22-#1** open at PARENT §3b (batched multipart ratify covers T22/T23/T24 CSV surfaces).
+- **Q-T23-#2 (dept_head RBAC)** → **Accepting PM lean**: `requireRole([gm_admin])` only; dept_head 403; reuses **Q-T22-#2** open at PARENT §3a.
+- **Q-T23-#3 (`item_ids` max bound)** → **Accepting PM lean 100**: `z.array(z.string().uuid()).min(1).max(100)`. Reasonable admin batch size + prevents pathological memory-heavy requests. Bulk-availability is a settings-page action, not an API pipeline — 100 items covers realistic hotel menu counts (per spec §2.6 menu items are dept-food not general SKUs).
+- **Q-T23-#4 (skipped reason granularity)** → **Accepting PM lean**: single `'NOT_FOUND'` code — leak-safe (no `CROSS_TENANT` enum leak). Matches T21/T22/T24 cross-tenant 404 pattern.
+- **Q-T23-#5 (empty-delta rejection)** → **Accepting PM lean**: zod `.refine(at-least-one-of-3-fields)` rejects with 400. Zero-delta bulk request has no valid use case.
+- **Q-T23-#6 (all-skipped status code)** → **Accepting PM lean**: 200 with `updated: 0 + skipped: [...]`. Never 404. Summary endpoint semantic — 4xx would misrepresent valid-request-with-zero-matches.
+- **Q-T23-#7 (`data.skipped` ordering)** → **Accepting PM lean**: preserve input order via `input.item_ids.filter(id => !matchingSet.has(id))`. Simpler for FE reconciliation against request order.
+
+Q-B-01/-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7/Q-T28-#1/Q-T29-#1/Q-T22-#1..#2/Q-T24-#1..#5 all resolved or open elsewhere — not re-raising.
+
+**Files to modify** (extends existing menu module — additive only)
+- `src/modules/menu/menu.schema.ts` — ADD `BulkAvailabilityBodySchema.strict()` + `.refine(at-least-one-delta-field)` composed with `refineAvailableWindow`; ADD `parseBulkAvailabilityBody` parser.
+- `src/modules/menu/menu.repository.ts` — ADD `findMatchingItemIds(itemIds: string[], hotelId: string): Promise<string[]>` (uses `findMany({where: {id: {in}, hotelId}, select: {id: true}})`); ADD `bulkUpdateAvailability(itemIds: string[], hotelId: string, delta: {isAvailable?, availableWindowFrom?, availableWindowTo?}): Promise<number>` (uses `updateMany`, returns `.count`).
+- `src/modules/menu/menu.service.ts` — ADD `bulkAvailability(ctx, input): Promise<BulkAvailabilityResponse>` method (pre-fetch matching IDs → compute skipped preserving input order → conditional bulkUpdate when matching > 0 → return summary).
+- `src/modules/menu/menu.routes.ts` — ADD `POST /settings/menu/bulk-availability` handler at bottom (mirror existing 7-handler discipline).
+- `src/modules/menu/menu.types.ts` — ADD `BulkAvailabilityDelta` (camelCase repo shape), `BulkAvailabilitySkippedItem`, `BulkAvailabilityResult`, `BulkAvailabilityResponse` types.
+- `src/modules/menu/index.ts` — re-export `BulkAvailabilityBody`, `BulkAvailabilityResponse` public types.
+
+**Files to create** (new tests only — no new module files)
+- `src/modules/menu/__tests__/menu.bulk.service.test.ts` — separate file for bulk service tests (keep existing `menu.service.test.ts` untouched for T22 review isolation).
+- `src/modules/menu/__tests__/menu.bulk.routes.test.ts` — separate file for bulk route tests.
+- `src/modules/menu/__tests__/menu.repository.integration.test.ts` — **extend** with a new `describe('bulk-availability', ...)` block (T22 existing tests untouched).
+
+**Files NOT modified**
+- `src/entrypoints/api.ts`, `src/core/config/env.ts`, `prisma/migrations/`, `src/core/`, `src/plugins/`, `src/shared/socket/`. **No new dependencies added**.
+
+**Approach**
+Extend existing T22 menu module — no new module. Schema: `BulkAvailabilityBodySchema` = `.object({item_ids, is_available?, available_window_from?, available_window_to?}).strict()` + `.refine((v) => v.is_available !== undefined || v.available_window_from !== undefined || v.available_window_to !== undefined, 'at least one of is_available/available_window_from/available_window_to required')` + reuse `refineAvailableWindow` composable helper for both-or-neither + `from < to`. Repository: `findMatchingItemIds` returns `string[]` from `findMany({where: {id: {in: itemIds}, hotelId}, select: {id: true}})`; `bulkUpdateAvailability` calls `updateMany({where: {id: {in: matchingIds}, hotelId}, data: delta})` and returns `.count`. Service: `bulkAvailability(ctx, input)` calls `repo.findMatchingItemIds(input.item_ids, ctx.hotelId)` → build `matchingSet = new Set(matchingIds)` → compute `skipped = input.item_ids.filter(id => !matchingSet.has(id)).map(item_id => ({item_id, reason: 'NOT_FOUND' as const}))` preserving input order (Q-T23-#7) → if `matchingIds.length > 0` call `repo.bulkUpdateAvailability(matchingIds, ctx.hotelId, buildBulkDelta(input))` returning `updated: count` (Prisma-authoritative count per PM ACK note, not `matchingIds.length`); else `updated: 0`. `buildBulkDelta` converts snake_case body → camelCase Prisma delta + uses `hhmmToTime` for TIME fields (null passes through). Routes: append handler at `menu.routes.ts` bottom — `requireTenant → requireRole([gm_admin]) → parseBulkAvailabilityBody → service.bulkAvailability(ctx, body) → reply.code(200).send(result)`. Winston log with `itemCount: body.item_ids.length` for audit trail. **No `loadOwned` pattern** (bulk uses filter-based approach; tenant scope via `updateMany where`). **No `NotFoundError`** — this endpoint never 404s. Test isolation: `menu.bulk.*.test.ts` files are separate from T22's `menu.service/routes.test.ts` for review clarity; integration test extends the shared testcontainer file with a new `describe('bulk-availability', ...)` block that manages its own seed within `beforeEach` (T22 setup already handles teardown).
+
+**Est.**: ~2-3h (smallest task since T29/T24 — 1 endpoint added to existing module, reuses T22 helpers, no port/adapter, no transaction). Straight-line to SUBMIT.
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
