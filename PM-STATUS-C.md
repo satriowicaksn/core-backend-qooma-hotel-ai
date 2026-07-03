@@ -1627,6 +1627,123 @@ Same-state toggle (`is_active: true` on already-active row) or empty-body-effect
 
 Proceed to coding on `feat/settings-agents`. Awaiting your SUBMIT.
 
+#### SUBMIT T28 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Settings/agents config (list + patch with Min-3)
+Branch: `feat/settings-agents` @ `02a296d` (pushed to origin)
+Files changed: 10 new (0 modified — `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/` all untouched per DoD)
+  - `src/modules/agents/agents.types.ts` (new)
+  - `src/modules/agents/agents.schema.ts` (new)
+  - `src/modules/agents/agents.serializer.ts` (new)
+  - `src/modules/agents/agents.repository.ts` (new)
+  - `src/modules/agents/agents.service.ts` (new)
+  - `src/modules/agents/agents.routes.ts` (new)
+  - `src/modules/agents/index.ts` (new — barrel + `buildAgentsService` factory)
+  - `src/modules/agents/__tests__/agents.service.test.ts` (new — 30 tests)
+  - `src/modules/agents/__tests__/agents.routes.test.ts` (new — 9 tests)
+  - `src/modules/agents/__tests__/agents.repository.integration.test.ts` (new — 13 tests)
+
+**DoD self-check** (from ASSIGNMENT T28)
+- [x] 2 endpoints wired: `GET /api/settings/agents` list + `PATCH /api/settings/agents/:id` — `agents.routes.ts:42,58`.
+- [x] Zod schemas at boundary: `UpdateAgentBodySchema.strict().refine(non-empty)` allowing only `is_active`/`capacity`(1-100)/`config` — `agents.schema.ts:16-27`. `AgentIdParamSchema` uuid + `ListAgentsQuerySchema.strict()` with `is_active` boolFlag.
+- [x] Tenant scope: `hotelId` from `ctx.hotelId` on every query; cross-tenant 404 via `loadOwned → assertHotelOwnership` — 2 unit tests + 1 integration test cover cross-tenant leak-safety.
+- [x] RBAC: `requireRole(ctx, ['gm_admin'])` on both handlers; `dept_head`/`staff` both 403; `super_admin` implicit — routes tests cover all matrix cells.
+- [x] Min-3 rule enforced via **callback-form** `db.$transaction(async tx => ...)` with `isolationLevel: 'Serializable'` (PM ACK tightening #2 held) + `withSerializableRetry` helper on P2034/40001 with 0-20ms jitter (tightening #3 held). Concurrent-race integration test proves exactly-one-succeeds under Serializable.
+- [x] Tier-cap dropped from slice-1 (PM ACK tightening #1) — service constructor is `(repo, db)` only; no `skipCrossDbChecks`/`nodeEnv`/`tierResolver`/`TIER_MATRIX`/WARN. Q-T28-#1 rolls to PARENT §3a for PO.
+- [x] `MIN_AGENTS_VIOLATION` → `BusinessRuleError` (422) with `details: {rule:'MIN_AGENTS_VIOLATION', activeAfter, minRequired: 3}` — verified by service test asserting exact details + route test asserting envelope 422 + `code:'BUSINESS_RULE'`.
+- [x] No-op idempotency (PM ACK tightening #4): same-state toggle (`is_active:true` on already-active) returns current row with 200; capacity/config-only patches use plain `repo.update` outside transaction. 3 unit tests + 1 integration test cover no-op branches.
+- [x] Response envelope: list `{data: AgentWire[]}` · single `{data: AgentWire}` (Q-B-01 canonical).
+- [x] Snake_case wire via serializer; `config` JSONB pass-through (defensive narrow to `{}` on non-object row, T28 conservative-serializer pattern).
+- [x] Winston logger scoped via `req.log.info({module:'agents', action, correlationId})` in each handler (T21 pattern).
+- [x] Unit tests: 39 total (30 service + 9 routes) — zod parsers + `buildAgentWhere` + `serializeAgent` + list happy path + Min-3 block/allow + toggle-on no-cap + no-op idempotency (3 cases) + capacity+config-only via plain update + retry-on-P2034 (succeed / bubble / no-retry-on-other) + cross-tenant/not-found 404 + all route status matrix.
+- [x] Integration test: 13 tests via real Postgres testcontainer — UNIQUE(hotel_id, agent_type) + tenant isolation + list filters + Min-3 at floor (HOTEL_B blocks toggle-off) + Min-3 at 4→3 allowed (HOTEL_A) + toggle-on reactivate + **concurrent-toggle race** via `Promise.allSettled` proving exactly-one-succeeds + capacity/config updates + no-op + cross-tenant 404.
+- [x] Line coverage: **97.65% lines / 97.08% stmts** across `src/modules/agents/**` (repo 100 · serializer 100 · service 98.21 · routes 96.55 · schema 96.55 · index 100).
+- [x] `make check` PASS baseline **411/1/412** (post-T27 merge PR #13 `af02167`); SUBMIT delta = **+39 unit** (450/1/451) + **+13 integration** (129/1/130).
+- [x] `pnpm test:integration` PASS; all pre-existing suites regression-clean (departments/wa-templates/billing/tickets/notifications/visits/guests).
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel exposes `agentsRoutes` plugin + `AgentsService` + `buildAgentsService` factory + wire/DTO types.
+- [x] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`.
+
+**4 PM tightenings — all held**
+- **#1 tier-cap dropped** — service constructor simplified to `(repo, db)` (no `skipCrossDbChecks`, no `nodeEnv`, no `tierResolver`, no WARN). No `TIER_MATRIX` import. No `TIER_CAP_VIOLATION` code path. Q-T28-#1 rolls to PARENT §3a for PO decision.
+- **#2 callback-form `$transaction`** — `db.$transaction(async (tx) => { ... }, { isolationLevel: 'Serializable' })` at `agents.service.ts:103-121`. Inside: `tx.aiAgentConfig.count` → conditional `throw BusinessRuleError` → `tx.aiAgentConfig.update`. Atomic read-then-conditional-write.
+- **#3 GAP #1+#2 acceptance + retry helper** — `withSerializableRetry` at `agents.service.ts:39-49`. `isSerializationFailure` at `agents.service.ts:29-37` checks both `err.code === 'P2034'` and `err.meta.code === '40001'`. Single retry with `Math.random() * 20` ms jitter. 3 unit tests prove: succeed-on-second-attempt, bubble-on-double-fail (calls=2), no-retry-on-non-serialization error.
+- **#4 no-op PATCH idempotency + response shape** — `agents.service.ts:86-97`: reads current row, computes `isActiveChange`/`capacityChange`/`configChange` deltas, returns current row with 200 when all deltas resolve to no-op. Empty-body still rejected at zod. 3 unit + 1 integration test.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings — 0 eslint-disable in barrel; simplest module yet with no port/adapter)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 450 passed, 1 skipped, 451 total (baseline 411/1/412 + **+39**)
+- `pnpm test:integration`: **PASS** — 129 passed, 1 skipped, 130 total (baseline 116/1/117 + **+13**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/agents/`)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route (excl tests where used as jest assertion helpers): **0** (test-file hits are `throw new Error('expected throw')` and `throw new Error('seed missing')` — allowed jest/assertion pattern)
+- Forbidden imports (`express`/`typeorm`/`sequelize`/`moment`/`node-fetch`): **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `eslint-disable` in module: **0** (no port+adapter → no barrel-vs-service restriction to bypass)
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no webhook).
+- Token encryption via `shared/utils/crypto`: **N/A** (no token storage).
+- PII masking in log: **N/A** (agent config is operational — `agentId`/`hotelId`/`agentType` — no guest PII).
+- `hotel_id` NEVER from body — sourced from `ctx.hotelId` via `assertHotelOwnership` on `loadOwned`. `agent_type`/`name` immutable (zod strict rejects).
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 39 new tests (30 service + 9 routes)
+- Integration: 13 new tests via testcontainer real Postgres
+- Race-scenario proof (integration): `should race-safe: two concurrent toggle-offs on HOTEL_A (4 active) result in exactly one violation` — asserts 1 fulfilled + 1 `BusinessRuleError({rule:'MIN_AGENTS_VIOLATION'})` + final `activeCount === 3` (Min-3 floor preserved).
+- Coverage:
+  ```
+  All files            | 97.08 stmts | 79.59 branch | 93.54 funcs | 97.65 lines
+   agents.repository.ts | 100         | 100          | 100         | 100
+   agents.routes.ts     | 96.66       | 50           | 100         | 96.55
+   agents.schema.ts     | 96.66       | 63.63        | 100         | 96.55
+   agents.serializer.ts | 100         | 100          | 100         | 100
+   agents.service.ts    | 96.72       | 86.2         | 100         | 98.21
+   index.ts             | 100         | 100          | 33.33       | 100
+  ```
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+GET /settings/agents
+< 200 OK
+< {"data":[{"id":"...","hotel_id":"...","agent_type":"concierge","name":"Concierge",
+   "is_active":true,"capacity":3,"config":{},"created_at":"...","updated_at":"..."}, ...]}
+
+PATCH /settings/agents/:id   body {"is_active":false}   (HOTEL_A: 4 active → 3 after)
+< 200 OK
+< {"data":{..., "is_active": false}}
+
+PATCH /settings/agents/:id   body {"is_active":false}   (HOTEL_B: 3 active → 2 after)
+< 422 Unprocessable Entity
+< {"code":"BUSINESS_RULE","message":"Minimum 3 active agents required",
+   "details":{"rule":"MIN_AGENTS_VIOLATION","activeAfter":2,"minRequired":3}}
+
+PATCH /settings/agents/:id   body {"is_active":true}   (already active row)
+< 200 OK
+< {"data":{..., "is_active": true}}   # no-op idempotent, current row returned
+
+PATCH /settings/agents/:id   body {"agent_type":"butler"}
+< 400 Bad Request  (zod strict — immutable field)
+```
+
+**Notes / questions for PM C**
+
+1. **Q-T28-#1 stays open at PARENT §3a for PO** — Tier-cap semantics: hard 422 gate on activation, or is `billing_extras.extra_agent` the mechanism? Once PO decides, slice-2 either adds `TIER_CAP_VIOLATION` (with fresh spec §7 catalog entry) or the file stays at Min-3 only. Slot C code is idempotent to either resolution (no dead code today).
+2. **`serializer.ts:9-11` defensive config narrowing** — `AiAgentConfig.config` is Prisma `Json`, i.e. `Prisma.JsonValue`. Non-object shapes (string, array, primitive) are theoretically possible via raw INSERT. Serializer narrows to `{}` in those cases. Alternative: let `Prisma.JsonValue` widen the wire type to `unknown`. Chose defensive narrow to keep FE `config: Record<string, unknown>` contract stable. Coverage cost: 1 branch line (60%). Non-blocking.
+3. **`fakeDb` typing in unit tests** — the `PrismaClient` stub uses `as unknown as PrismaClient` cast. Same pattern as T21/T25/T27 mock repo casts. If PM wants stricter typing (e.g. via `jest.mocked` on a full Prisma type), it's a rewrite of the test harness — flagging as a testing-convention discussion, not a T28 concern.
+4. **Retry-once policy in production traffic** — under sustained contention (10+ concurrent PATCHes to the same hotel), the retry-once policy still surfaces 5xx to the losing tx after two failures. This is acceptable UX for a settings surface per PM ACK GAP #2 lean A. If PO wants richer retry (e.g. N=3 with exponential backoff), the helper is a 3-line change — flagging as a potential slice-2 concern.
+5. **No CHECK constraint on `agent_type` at the DB** — spec §2.11 declares `agent_type VARCHAR(40)` with no enum lock. Slice-1 accepts any string. If PO wants an enum lock (e.g. `concierge`/`reception`/`housekeeping`/`fnb`/`wellness`), that's a foundation migration + zod schema tightening — not this task.
+6. **`config` shape validation** — slice-1 permissive per Q-C-01 pattern. If PO wants per-`agent_type` config schemas (e.g. concierge has `{tone, language}`, reception has `{shift_hours}`), that's a follow-up spec/coordination task with AI service consumers.
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
