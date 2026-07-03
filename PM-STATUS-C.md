@@ -12,15 +12,15 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **3/10 approved+merged**; **T28 wip**
+- **Day**: H0 (2026-07-03) — Slot C **4/10 approved** (T21+T25+T27 merged; T28 approved-awaiting-merge)
 - **Recent activity**:
   - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
   - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
   - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
-  - **T28 Settings/agents (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 4 tightenings. Exec self-claimed from §0 preview + I ratified. **Scope tightened: Min-3 only** (tier-cap dropped pending PO Q-T28-#1). Executor C coding on `feat/settings-agents`.
-- **Branches**: `feat/settings-agents` (T28, wip)
+  - **T28 Settings/agents (Min-3)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-agents` @ `02a296d` awaiting PO merge. 10 files (6 module + 1 barrel + 3 tests). First Slot C module with **0 eslint-disable** (no port+adapter). Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics).
+- **Branches**: `feat/settings-agents` (T28, awaiting PO merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25+T27 merged; T28 wip; T22/T23/T24 merge-gated on T09 PO merge; T29 fully unblocked; T26+T30 hard-blocked at DEV by Opsi C.
+- **My queue (preview)**: T21+T25+T27 merged; T28 approved; T22/T23/T24 merge-gated on T09 PO merge; T29 fully unblocked (last fully-unblocked task); T26+T30 hard-blocked at DEV by Opsi C.
 
 ---
 
@@ -33,7 +33,7 @@
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
-| T28 | Settings/agents config (Min-3 enforcement) (**wip**) | wip (PLAN ACK'd with 4 tightenings) | — | Exec self-claimed from §0 preview + PM ratified. PLAN ACK'd 2026-07-03 H0. **Scope tightened**: slice-1 enforces **ONLY Min-3** (spec-explicit); tier-cap enforcement dropped pending PO Q-T28-#1 (contract question rolled to PARENT §3a). GAP responses #1+#2 accepted (Serializable isolation + retry-on-40001); GAP #3/#4/#5 all N/A after tightening #1. Callback-form `$transaction` mandated (exec's array-form won't work for read-then-conditional-write). No-op idempotency: same-state toggle returns current row 200. 2 endpoints: `GET /api/settings/agents` list + `PATCH /:id` update. No port/adapter (pure DB read/write per CLAUDE.md §4). Files: 7 module + 3 tests. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. Awaiting Executor C SUBMIT. |
+| T28 | Settings/agents config (Min-3 enforcement) (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-agents` @ `02a296d` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **450/1/451** (+39 net: 30 service + 9 routes); `pnpm test:integration` **129/1/130** (all 8 suites regression-clean); coverage **97.65% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (first Slot C module without any — no port/adapter). All 4 tightenings held (tier-cap dropped; callback-form `$transaction` + Serializable isolation; `withSerializableRetry` on P2034/40001 with 0-20ms jitter; no-op idempotency returns current row 200). **Race-scenario integration test proves Serializable isolation** — exactly-one-succeeds under concurrent toggle-off with Min-3 floor preserved. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
 
 ---
 
@@ -1744,6 +1744,66 @@ PATCH /settings/agents/:id   body {"agent_type":"butler"}
 
 Requesting PM C VERDICT.
 
+##### VERDICT T28 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 18 DoD boxes verified, independent PM validation on `feat/settings-agents` @ `02a296d`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints (4 tightenings + Q-T28-#1 scope reduction + coding checklist reminders) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0 (even in tests — mock casts use `as unknown as PrismaClient` pattern)
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes, excl tests)  : 0
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 0 ← FIRST Slot C module with zero eslint-disable (no port+adapter = no barrel-vs-service restriction)
+```
+
+Step 3 — File inventory: **10 files created** (`git show --name-only 02a296d` — 6 module + 1 barrel + 3 tests). **SUBMIT header claim of "10 new" is accurate — first Slot C SUBMIT with exact count** (T25/T27 had off-by-2 typos in headers). Simplest module structure Slot C has shipped yet: no ports, no adapters, no barrel factory imports. Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` / `src/core/` / `src/plugins/` / `src/shared/socket/` — Override #1 held + all foundation surface untouched.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 450/1/451** (baseline 411/1/412 post-T27-merge + **+39 net**: 30 service + 9 routes); Docker-free (T-INFRA-03 held); 1.611s
+- `pnpm test:integration` **PASS 129/1/130** — all 8 module suites green (departments/wa-templates/tickets/notifications/guests/visits/billing + agents 13 new). T21+T25+T27 + Slot B regression clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `agents.service.ts` (152 LOC): all 4 tightenings held verbatim — **#1**: constructor `(repo, db)` only — no `skipCrossDbChecks`/`nodeEnv`/`tierResolver`/`TIER_MATRIX`/WARN (L63-66); **#2**: callback-form `db.$transaction(async (tx) => {...}, { isolationLevel: 'Serializable' })` at L104-121 with imperative read (`tx.aiAgentConfig.count`) → conditional throw (L110-116) → write (`tx.aiAgentConfig.update`); **#3**: `withSerializableRetry` at L39-49 (single retry with 0-20ms jitter); `isSerializationFailure` at L29-37 (P2034 + 40001 belt-and-suspenders); **#4**: no-op idempotency at L94-97 (returns current row when all deltas resolve to no-op). Constants `MIN_ACTIVE_AGENTS = 3` module-level (grep-able). Toggle-on plain `repo.update` outside transaction at L128 (no race per tightening #1's dropped tier-cap). `loadOwned` mirrors T21/T25/T27 pattern with cross-tenant 404 leak-safe via `assertHotelOwnership`. JSDoc invariant at L73-85 documents Min-3 rule + idempotency semantic. Comments cross-ref MVP §4.3 + spec §7. ✓
+- `agents.routes.ts` (69 LOC): thin handlers per T21/T25/T27 convention (`requireTenant → requireRole → parse → service → send`); correlationId propagated via helper L27-33; 200 on both endpoints (no 201/204 — pure list/update, no create/delete in slice-1); `requireRole(ctx, ['gm_admin'])` super_admin bypass verified at `rbac.ts:46`. ✓
+- `agents.schema.ts` (73 LOC): `UpdateAgentBodySchema.strict().refine(non-empty)` at L16-25 with `is_active`/`capacity`/`config` allowlist — server-set fields (`agent_type`/`name`/`hotel_id`/timestamps) implicitly rejected by strict; `capacityField: z.number().int().min(1).max(100)` matches PM ACK reminder; permissive `configField: z.record(z.string(), z.unknown())` per Q-C-01 pattern; `.strict()` on list query too. ✓
+- Bonus `agents.repository.ts`: Prisma direct (ADR-0001 compliant); simple CRUD surface (no `count` methods since Min-3 count runs inside the callback-form transaction where `tx.aiAgentConfig.count` is used directly on the transaction client). ✓
+- Bonus `index.ts` barrel: **first Slot C module with 0 eslint-disable** — no port+adapter → no adapter imports to disable. Factory `buildAgentsService(db)` simplest yet. ✓
+- Bonus tests: **race-scenario integration test** at `agents.repository.integration.test.ts` proves Serializable isolation with `Promise.allSettled` on 2 concurrent toggle-off calls where HOTEL_A starts at 4 active → exactly-one-succeeds pattern: 1 fulfilled + 1 `BusinessRuleError({rule:'MIN_AGENTS_VIOLATION'})` + final `activeCount === 3` (Min-3 floor preserved). Empirically proves the guard works under concurrent traffic. ✓
+
+Step 6 — Security floor: no webhook (HMAC N/A); no token storage (crypto N/A); no PII (`agentId`/`hotelId`/`agentType` operational, not guest data); `hotel_id` sourced from `ctx.hotelId` via `assertHotelOwnership` in `loadOwned`; immutable fields (`agent_type`/`name`/`hotel_id`/timestamps) rejected at zod boundary + never read in service; no secret hardcoded ✓
+
+Step 7 — Test coverage: line **97.65%** across `agents/**` (exceeds ≥ 80% DoD; repo/serializer/index all 100%; service 98.21; routes 96.55; schema 96.55). Branch 79.59% — uncovered branches are Prisma-JsonValue-shape defensive narrows in serializer + retry-with-mock-null-error edge cases + zod-parse-null-body defensive paths. All coverage misses justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (Q-T28-#1 stays open at PARENT §3a for PO)** ✓ verified. Registered at ACK time (`83e1b44`) — status unchanged: **open, PO ratify**. Slot C code idempotent to either resolution (no dead code today) — matches T21 Q-C-02 discipline pattern.
+- **Note #2 (defensive `config` narrowing in serializer)** — accepted as-is. Trade-off (1 uncovered branch line for stable FE `config: Record<string, unknown>` contract) is defensible.
+- **Note #3 (`fakeDb` typing in tests via `as unknown as PrismaClient`)** — accepted as-is. Same pattern as T21/T25/T27 mock repo casts. Testing-convention discussion (not module-specific).
+- **Note #4 (retry-once policy under sustained contention)** — accepted as-is per PM ACK GAP #2 lean A. Settings surface UX tolerance. Flag for follow-up if traffic profile changes.
+- **Note #5 (no `agent_type` DB CHECK / enum lock)** — noted. Consistent with T25 Q-T25-#2 permissive-name pattern + spec §2.11's permissive VARCHAR(40). Foundation-scope migration if PO wants enum lock; not blocking today.
+- **Note #6 (`config` shape per-agent_type schemas)** — future coordination task with AI service consumers. Non-blocking.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (env.ts + core/ + plugins/ + shared/socket/ + api.ts + migrations all untouched).
+- **First Slot C module with zero eslint-disable** — foundation ESLint nudge (from T25 VERDICT) still open at PARENT §10 for future port+adapter modules (T22/T23/T24 menu tasks may hit it).
+- Q-T28-#1 stays open PARENT §3a (**PO decision needed**) — non-blocking for T28 merge; T28-slice-1 ships Min-3 only.
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T28 row → approved · Short roll-up posted to PARENT §2 · Q-T28-#1 stays open PARENT §3a.**
+
+**PO merge please**: branch `feat/settings-agents` @ `02a296d` ready for main merge. Q-T28-#1 (tier-cap semantics) needs PO ratification but non-blocking — code is idempotent to either resolution. Slot C **4/10 approved** (T21 merged + T25 merged + T27 merged + T28 approved-awaiting-merge). Next candidate: **T29 Voice groundwork stub** (last fully-unblocked task).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -1868,6 +1928,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | 2026-07-03 T21 SUBMIT | src/modules/departments/** (10) + src/core/config/env.ts (+7 lines additive) | 0 | 0 | 0 (env.ts:91 pre-existing boilerplate `5ce7f867`, not this task) | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T25-slice-1 SUBMIT | src/modules/wa-templates/** (13) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 | 2026-07-03 T27-slice-1 SUBMIT | src/modules/billing/** (16) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
+| 2026-07-03 T28 SUBMIT | src/modules/agents/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
