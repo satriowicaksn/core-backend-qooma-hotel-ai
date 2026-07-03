@@ -12,11 +12,11 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **8/10 merged**; **T26-slice-1 wip**
-- **Recent merged**: T21+T22+T23+T24+T25+T27+T28+T29 (PRs #11-18). All approved-awaiting-merge landed on `main`.
+- **Day**: H0 (2026-07-03) — Slot C **9/10 approved** (T26 approved-awaiting-merge; only T30 remaining hard-blocked at DEV)
+- **Recent merged**: T21+T22+T23+T24+T25+T27+T28+T29 (PRs #11-18).
 - **Active task**:
-  - **T26 Feature flags (slice-1)** — Exec self-claimed under T23 VERDICT green-light for Opsi C partial. PLAN ACK'd 2026-07-03 H0 with **4 material tightenings** (`updated_by=null` under Opsi C to avoid FK failure; three-state `is_tier_locked`/`depends_on_active_data`/`min_tier` = `null` per T27 precedent, NOT `false`/`'lite'` defaults) + **Q-T26-#7 escalated to PARENT §3a** (contract Q — authoritative 19-flag list + per-flag min_tier map). Executor C coding on `feat/settings-feature-flags`.
-- **Branches**: `feat/settings-feature-flags` (T26, wip)
+  - **T26 Feature flags (slice-1)** — **APPROVED attempt 1** (2026-07-03 H0). `feat/settings-feature-flags` @ `080d9d9` awaiting PO merge. All 4 PM tightenings held with test coverage. Q-T26-#7 stays open at PARENT §3a (PO contract Q).
+- **Branches**: `feat/settings-feature-flags` (T26, awaiting PO merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
 - **My queue (preview)**: 8/10 approved; T22-slice-2 + T23-slice-2 + T24-slice-2 all gated on batched Q-T22-#1 multipart PO ratify; **T26 + T30 hard-blocked at DEV by Opsi C tier-join** (need PARENT §4 Opsi A/multi-schema decision to be implementable).
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
@@ -35,7 +35,7 @@
 | T21 | Departments CRUD (escalation tree + operating hours) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #11 `bbf4bd7`)**. 11 files (10 module + `env.ts` additive `SKIP_CROSS_DB_CHECKS`). `make check` **312/1/313** (+34 net); coverage **96.07%**. Q-C-02 open at PARENT §3b (PO ratify pre-staging). |
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
-| T26 | Feature flags (tier-gated, dependency check) (**slice-1 wip**) | wip (PLAN ACK'd with 4 tightenings) | — | Exec self-claimed under T23 VERDICT green-light for Opsi C partial. PLAN ACK'd 2026-07-03 H0 with **4 material tightenings**: (1) `updated_by = null` under Opsi C (avoid FK failure — verified FK exists at migration L535 to Auth users table); (2) `is_tier_locked: null` three-state (NOT `false` — T27 Q-T27-#1 precedent); (3) `depends_on_active_data: null` three-state (no campaigns model); (4) `min_tier: null` per flag (spec silent, don't invent values). **Q-T26-#7 escalated to PARENT §3a** — contract Q for PO on authoritative 19-flag list + per-flag min_tier map (spec §1.8:259 says "all 19 flags" but only enumerates 14). Slice-1 ships 14 documented flags with three-state `null` fields — slice-2 fills in when PO ratifies. Zero code change to wire shape at slice-2 (null → real value flip is transparent to FE). Files: 8 module + 3 tests. Reuses `SKIP_CROSS_DB_CHECKS` env. Zero touch on foundation. Awaiting Executor C SUBMIT. |
+| T26 | Feature flags (tier-gated, dependency check) (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-feature-flags` @ `080d9d9` — **awaiting PO merge**. 11 files (8 module + 3 tests). `make check` **656/1/657** (+38 net: 26 service + 12 routes); `pnpm test:integration` **183/1/184** (all 12 module suites regression-clean); coverage **98.96% lines** (constants/repo/serializer/service all 100%). **Drift 0/9 + 0 eslint-disable** (6th consecutive Slot C — T28/T29/T22/T24/T23/T26 pattern hold). All 4 tightenings held verbatim with explicit test coverage; **empirical DB-layer proof of `updated_by=null` FK-avoidance** in integration test. Q-T26-#7 stays open at PARENT §3a (3-part PO contract Q — 19-flag list + `FLAG_MIN_TIER` + `campaigns` model). Three-state wire pattern is now a Slot C precedent for Opsi C partial implementations. Zero touch on foundation. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
@@ -3840,6 +3840,77 @@ PATCH /feature-flags/multi_language   body {"hotel_id": "attacker"}
 
 Requesting PM C VERDICT.
 
+##### VERDICT T26-slice-1 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 4 PM tightenings held + Q-T26-#7 escalation registered. Independent PM validation on `feat/settings-feature-flags` @ `080d9d9`.
+
+**Best turnaround under heavy tightening package**: 4 material tightenings from PM ACK (including 1 runtime-blocking bug fix) → SUBMIT held all 4 with explicit test coverage. Exec-C proved out the highest-severity tightening (`updated_by = null` FK-avoidance) empirically at DB layer via testcontainer proof.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK 4 tightenings + Q-T26-#7 escalation ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes, excl tests)  : 0
+default export outside entrypoints/config           : 0
+forbidden imports                                    : 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap                 : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 0 ← 6TH consecutive Slot C module (T28 → T29 → T22 → T24 → T23 → T26 pattern hold)
+```
+
+Step 3 — File inventory: **11 files created** (8 module + 3 tests). Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` / `src/core/` / `src/plugins/` / `src/shared/socket/` — Override #1 held. **Reuses existing `SKIP_CROSS_DB_CHECKS` env** (introduced by T21) — no new env additions.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 656/1/657** (post-T29+T24+T23-merged baseline 618/1/619 + **+38 net**: 26 service + 12 routes tests); Docker-free; 2.89s
+- `pnpm test:integration` **PASS 183/1/184** — all 12 module suites green (departments/wa-templates/tickets/notifications/guests/visits/billing/agents/menu/voice/knowledge + feature-flags 5 new).
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check critical files:
+- **`feature-flags.service.ts` L70 — Tightening #1 verbatim**: `const updatedBy = this.skipCrossDbChecks ? null : ctx.userId;` (highest-severity FK-avoidance held); JSDoc L50-64 documents all deferred Opsi-C-vs-Opsi-A code paths (excellent forward-plan documentation); Q-C-02 startup WARN L35-42 mirrors `departments.service.ts:55-64` + `billing.service.ts:49-58` exactly (same `cross_db_check_skip` event key for cross-module grep); simplest slot-C service (82 LOC).
+- **`feature-flags.serializer.ts` — Tightenings #2/#3/#4 verbatim**: `is_tier_locked: null` (L23,39); `depends_on_active_data: null` (L24,40); `min_tier: FLAG_MIN_TIER[flag]` (L22,38 — with FLAG_MIN_TIER all-null map per tightening #4); `composeFlagList` L47-59 elegant left-join of KNOWN_FLAGS × DB rows via `Map<flag, row>` for O(1) lookup + `KNOWN_FLAGS.map` preserves flag order; defensive `config` narrowing (T28/T29 pattern reused).
+- **`feature-flags.constants.ts` — Tightening #4 verbatim**: `KNOWN_FLAGS` = 14 flags as `as const` tuple (ordered per spec §1.8 groups); `KnownFlag` type derived from tuple; `KNOWN_FLAGS_SET` for O(1) validation; `FLAG_MIN_TIER` structural placeholder with **all 14 values `null`** (verbatim tightening #4); excellent comment L1-9 documents spec §1.8:262 "19 flags total" vs 14 enumerated + Q-T26-#7 escalation rationale.
+- **Integration test empirical FK-avoidance proof** at `feature-flags.repository.integration.test.ts:94-95` — `describe('FeatureFlagsService.patch — tightening #1 (updated_by=null under Opsi C)')` with test `should upsert a new row without hitting the users FK`. Empirically proves the runtime-blocking bug from PM ACK #1 is fixed at DB layer via testcontainer.
+
+Step 6 — Security floor: no webhook (HMAC N/A); no token storage (crypto N/A); no PII; `hotel_id` NEVER from body — zod strict rejects + upsert compound key sinks from `ctx.hotelId`; `flag` param validated against `KNOWN_FLAGS_SET` (400 on unknown); no secret hardcoded ✓
+
+Step 7 — Test coverage: **98.96% lines / 99.04% stmts** module-wide — `constants/repo/serializer/service` all 100% lines+branches+funcs; routes 96.55/50/100/96.55; schema 100/66.66/100/100; index 100/100/50/100. Uncovered branches are defensive fallbacks (schema `?? undefined` field path when zod issues have no path — same T24 pattern). All justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on all 4 tightenings + Q-T26-#7**
+
+- **Tightening #1 (`updated_by = null` FK-avoidance)** ✓ — verbatim at `service.ts:70`. **Empirical DB-layer proof** in `feature-flags.repository.integration.test.ts:94-95`. This was the highest-severity fix — without it, the integration test would have failed on first PATCH with `feature_flags_updated_by_fkey` violation. Exec-C's forward-plan JSDoc at L50-64 also documents the flag=false code path for slice-2 (post-Opsi-A) so future reader knows the migration path.
+- **Tightening #2 (`is_tier_locked: null` three-state)** ✓ — verbatim in serializer L23,39.
+- **Tightening #3 (`depends_on_active_data: null` three-state)** ✓ — verbatim in serializer L24,40.
+- **Tightening #4 (`min_tier: null` per flag)** ✓ — verbatim in constants L39-54 with excellent comment documenting rationale.
+- **Q-T26-#7 escalation** ✓ — registered at PM-STATUS-C §3 + PARENT §3a at ACK time (`70160c3`); status unchanged (open, PO ratify pending). Non-blocking for T26 merge.
+
+**PM annotations on exec Notes**
+
+- **Note #1 (all 4 tightenings held with explicit test coverage)** ✓ verified. Exec's test discipline mapping tightenings → tests is exemplary.
+- **Note #2 (Q-T26-#7 stays open at PARENT §3a)** ✓ — 3-part PO contract Q registered. Slot C code idempotent to resolution (all 3 fields flip from `null` → real value without wire shape change).
+- **Note #3 (slice-2 handoff notes)** ✓ documented forward-plan. Zero code change to wire shape when slice-2 lands.
+- **Note #4 (Slot C now 9/10)** ✓ verified.
+- **Note #5 (config JSONB round-trip)** ✓ — same defensive narrowing pattern from T28/T29 reused; integration test proves round-trip.
+- **Note #6 (three-state wire pattern is Slot C precedent)** — PM ratifies as an architectural pattern for Opsi C partial implementations. **Applies to T30 Analytics** which faces the same Luxury-tier gate — response wire should ship `is_luxury_gate: boolean | null` + `tier: TierName | null` three-state fields under Opsi C, not misleading `false` defaults. This is a durable pattern for the remaining task.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface. Reuses `SKIP_CROSS_DB_CHECKS` (T21) + `TierName` type imported from billing barrel (T27) — cross-module reuse without cross-slot encroachment.
+- **6th consecutive Slot C module with 0 eslint-disable** — foundation ESLint nudge (from T25 VERDICT) still open at PARENT §10.
+- Q-T26-#7 stays open PARENT §3a (**PO decision needed** — 3-part contract Q) — non-blocking for T26 merge.
+- No new PARENT §10 nudges. Standard patterns throughout.
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T26 row → approved · Short roll-up posted to PARENT §2 · Q-T26-#7 stays open PARENT §3a.**
+
+**PO merge please**: branch `feat/settings-feature-flags` @ `080d9d9` ready for main merge. Q-T26-#7 (19-flag list + `FLAG_MIN_TIER` + `campaigns` model) needs PO ratification but non-blocking for slice-1 merge. Slot C **9/10 approved** (T21+T22+T23+T24+T25+T27+T28+T29 merged + T26 approved-awaiting-merge).
+
+**Final remaining Slot C task**: **T30 Analytics (Luxury-gated)** — 8 endpoints, same Opsi C hard-block as T26. Three-state wire precedent from T26 applies (`is_luxury_gate: boolean | null` + `tier: TierName | null` instead of misleading `false` defaults). Ready to assign when you're ready.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -3971,6 +4042,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | 2026-07-03 T22-slice-1 SUBMIT | src/modules/menu/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T24-slice-1 SUBMIT | src/modules/knowledge/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T23-slice-1 SUBMIT | src/modules/menu/** (9 — 6 modified additively + 3 new/extended tests) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
+| 2026-07-03 T26-slice-1 SUBMIT | src/modules/feature-flags/** (11) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
