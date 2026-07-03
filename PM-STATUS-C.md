@@ -1390,6 +1390,156 @@ Step 8 — Verdict: **APPROVED**
 
 **PO merge please**: branch `feat/settings-billing` @ `97f1615` ready for main merge. Deferred slices (T25-slice-2 Meta-callback + T27 quota-meter + T27 W3/W5 workers) blocked on foundation prereqs (HMAC plugin, INTEGRATION_SHARED_SECRET env; T10 workers-harness now merged so W3 unblocked at foundation infra layer but daily-brief PDF generation is a whole worker task) — not this task. Slot C **3/10 approved** (T21 merged + T25 merged + T27-slice-1 approved-awaiting-merge).
 
+### ASSIGNMENT T28 — Settings/agents config (list + patch with min-3 + tier-cap) — claimed by exec-C (Satrio) at 2026-07-03 H0
+
+- **Routed from**: PM C verbal direction ("continue to the next T") + §0 preview line 22 candidates T28/T29; PM listed T28 first. Formal §8 queue empty at claim time — self-select per EXECUTOR-PROTOCOL §0.3 route (B) honouring verbal direction. If PM prefers T29 instead, reject this ASSIGNMENT and I'll swap.
+- **Branch (to create on PLAN ACK)**: `feat/settings-agents`
+- **Spec source of truth**: `docs/spec/02-hotel-core.md` §1.5 (endpoints + `PATCH` constraints Min-3 + tier caps), §2.11 (`ai_agent_configs` DDL), §6 RBAC row `/api/settings/agents*`, §7 error catalog (`MIN_AGENTS_VIOLATION`); `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C8 (AC) + §4.3 (Min-3 rule with SELECT FOR UPDATE guidance) + §101 (seed 3 default agents per hotel).
+- **Living reference**: `src/modules/wa-templates/` (T25 approved — port+adapter subdirs not needed here; T28 is pure DB read/write, no external RPC) · `src/modules/departments/` (T21 approved — schema.strict + Q-C-02 SKIP_CROSS_DB_CHECKS pattern for tier cap under Opsi C) · `src/modules/billing/` (T27 approved — `TIER_MATRIX` in serializer can be reused for tier-cap lookup).
+
+**Scope (2 endpoints)**
+
+| Method  | Path                        | Purpose                                                                              |
+| ------- | --------------------------- | ------------------------------------------------------------------------------------ |
+| `GET`   | `/api/settings/agents`      | List AI agents for `req.tenant.hotelId`                                              |
+| `PATCH` | `/api/settings/agents/:id`  | Update `is_active` / `capacity` / `config`. Enforce Min-3 active + tier-cap on activate |
+
+**Data model** (already migrated via T02 — do NOT touch schema)
+- `ai_agent_configs` @ spec `docs/spec/02-hotel-core.md:697-712` — verified `prisma/schema.prisma:437-454`. Key fields: `id`, `hotelId`, `agentType (VARCHAR 40)`, `name (VARCHAR 80)`, `isActive (default true)`, `capacity (Int default 1)`, `config (JSONB default {})`, timestamps. UNIQUE(hotel_id, agent_type) already in migration.
+- No status CHECK; no `agent_type` enum lock at DB — permissive VARCHAR(40) per T21 Q-#3 pattern.
+
+**RBAC** (spec §6:812 — `/api/settings/agents*`):
+- `super_admin`: yes · `gm_admin`: yes · `dept_head`: **NO** · staff: **NO**. Wire via `@plugins/rbac.js` `requireRole(ctx, ['gm_admin'])` (T21/T25/T27 verified pattern).
+
+**Business rules**
+- **List** (`GET /api/settings/agents`): return all agents for the tenant, ordered by `agentType asc`. Optional `?is_active=true|false` filter (mirror T21 departments pattern).
+- **Patch** (`PATCH /api/settings/agents/:id`): allowed fields `is_active` | `capacity` | `config`. `agent_type`, `name`, `hotel_id`, timestamps are immutable — zod strict rejects.
+  - **Min-3 rule** (MVP §4.3): if PATCH sets `is_active: false` on an agent currently active AND the post-update active count would drop below 3, → `422 BUSINESS_RULE` with `rule: 'MIN_AGENTS_VIOLATION'` + `details: {activeAfter, minRequired: 3}`. **SELECT FOR UPDATE transaction** to serialize concurrent toggles.
+  - **Tier-cap rule** (spec §1.5 + §1.10): if PATCH sets `is_active: true` on an agent currently inactive AND the post-update active count would exceed `tier.agents_max`, → `422 BUSINESS_RULE` with `rule: 'TIER_CAP_VIOLATION'` + `details: {tier, activeAfter, capacity}`. **Under Opsi C `SKIP_CROSS_DB_CHECKS=true`**: tier is null → tier-cap check is SKIPPED (only Min-3 enforced); WARN at construction (mirror T21/T27 pattern).
+  - `capacity` value validation: `z.number().int().min(1).max(100)` bounded (T25 Q-T25-#3 permissive-with-bounds pattern).
+  - `config` validation: permissive `z.record(z.string(), z.unknown())` — no enum lock (Q-C-01 permissive JSON pattern from T21).
+
+**Files to create**
+```
+src/modules/agents/
+├── agents.types.ts                                (DomainAgent, AgentRow, AgentWire, list filter,
+│                                                    response envelopes)
+├── agents.schema.ts                               (zod: UpdateAgentBodySchema.strict.refine-non-empty
+│                                                    + AgentIdParamSchema + ListAgentsQuerySchema
+│                                                    (is_active filter))
+├── agents.serializer.ts                           (Prisma row → snake_case wire)
+├── agents.repository.ts                           (Prisma direct — findMany, findById,
+│                                                    update, countActive, countActiveForUpdate
+│                                                    within a transaction)
+├── agents.service.ts                              (loadOwned + Min-3 + tier-cap guards;
+│                                                    SELECT FOR UPDATE transaction pattern;
+│                                                    reuse TIER_MATRIX from billing.serializer
+│                                                    or inline snapshot)
+├── agents.routes.ts                               (Fastify plugin: 2 handlers; thin;
+│                                                    requireTenant → requireRole → parse →
+│                                                    service → send)
+├── index.ts                                       (barrel — routes plugin + service + factory
+│                                                    + public types only)
+└── __tests__/
+    ├── agents.service.test.ts                            (unit; mock repo;
+    │                                                      branch cases: Min-3 blocks toggle-off
+    │                                                      dropping below 3; Min-3 allows toggle-off
+    │                                                      when 4 remain; tier-cap blocks toggle-on
+    │                                                      exceeding cap; tier-cap skipped under
+    │                                                      flag=true; cross-tenant 404; update no-op
+    │                                                      allowed; capacity + config-only PATCH)
+    ├── agents.routes.test.ts                             (unit; Fastify inject; happy + 401 +
+    │                                                      403 dept_head/staff + 404 cross-tenant +
+    │                                                      422 min-3 + 422 tier-cap + 400 strict)
+    └── agents.repository.integration.test.ts             (testcontainers real Postgres; seed
+                                                            HOTEL_A with 5 agents (3 active, 2 inactive) +
+                                                            HOTEL_B with 3 agents (all active) for
+                                                            isolation; UNIQUE(hotel_id, agent_type)
+                                                            proven; countActive filter; SELECT FOR
+                                                            UPDATE race isolation proven via
+                                                            concurrent-transaction test)
+```
+
+**Files to modify**
+- **Zero** — `src/entrypoints/api.ts` untouched (T21 Override #1 pattern held; barrel-only wiring). `env.ts` reuses existing `SKIP_CROSS_DB_CHECKS` (no new env). Schema + migrations untouched. Zero touch on `core/` / `plugins/` / `shared/socket/` / other modules.
+
+**T28 DoD**
+- [ ] 2 endpoints wired: `GET /api/settings/agents` list + `PATCH /api/settings/agents/:id` update.
+- [ ] Zod schemas at boundary: `UpdateAgentBodySchema.strict().refine(non-empty)` accepting `is_active`, `capacity` (1-100), `config` (record); `AgentIdParamSchema` uuid; `ListAgentsQuerySchema.strict()` with `is_active` boolFlag.
+- [ ] Tenant scope: `hotelId` from `ctx.hotelId` on every query; cross-tenant 404 (leak-safe) via `assertHotelOwnership` mirroring T21/T27 pattern.
+- [ ] RBAC: `requireRole(ctx, ['gm_admin'])` on both; `dept_head` + `staff` → 403.
+- [ ] Min-3 rule enforced via `SELECT FOR UPDATE` transaction (Prisma `$transaction` + `queryRaw` for the row-lock OR use serializable isolation — see PLAN GAPs).
+- [ ] Tier-cap rule: when `SKIP_CROSS_DB_CHECKS=true`, skip tier-cap enforcement + emit startup WARN on prod+flag=true (T21 Q-C-02 pattern). When flag=false (future), read tier + cap-check on activation.
+- [ ] `MIN_AGENTS_VIOLATION` + `TIER_CAP_VIOLATION` → `BusinessRuleError` (422) with `rule` + observability details.
+- [ ] Response envelope: list `{data: AgentWire[]}` · single `{data: AgentWire}` per Q-B-01 canonical.
+- [ ] Snake_case wire via serializer (T21/T25/T27 pattern).
+- [ ] Winston logger scoped via `req.log.info({module:'agents', ...})` in each handler.
+- [ ] Unit tests: branch coverage for Min-3 + tier-cap + cross-tenant 404 + strict update.
+- [ ] Integration test: real Postgres via testcontainers; seed 2 hotels; verify tenant isolation + UNIQUE(hotel_id, agent_type) + Min-3 race scenario (SELECT FOR UPDATE) or serializable isolation guaranteeing no-race.
+- [ ] Line coverage ≥ 80% new files (T21/T25/T27 shipped ≥96%).
+- [ ] `make check` PASS baseline **411/1/412** (T27-merged); delta stated in SUBMIT.
+- [ ] `pnpm test:integration` PASS all suites regression-clean.
+- [ ] Drift scans clean (T21/T25/T27 pattern).
+- [ ] Named exports only; barrel exposes public API (routes plugin + service + factory + wire/DTO types).
+- [ ] Zero touch on `api.ts` / `env.ts` / `prisma/migrations/` / `core/` / `plugins/` / `shared/socket/` / other modules.
+
+#### PLAN T28 — exec-C (Satrio) at 2026-07-03 H0
+
+**Scope recap**
+2 endpoints: `GET /api/settings/agents` (list, optional `?is_active` filter) + `PATCH /api/settings/agents/:id` (update `is_active`/`capacity`/`config`). Business rules: Min-3 active-agents enforced via `$transaction` + row-lock (`SELECT FOR UPDATE`) to avoid race, throwing `422 MIN_AGENTS_VIOLATION` on toggle-off below 3; tier-cap enforced on toggle-on when flag=false (deferred code path today under Opsi C — Q-C-02 pattern) throwing `422 TIER_CAP_VIOLATION`. Prisma direct (ADR-0001). No external ports; no adapters. Tenant scope via `assertHotelOwnership`; cross-tenant 404 leak-safe. RBAC `requireRole([gm_admin])`. Zero touches on `api.ts`/env/schema/migrations/core/plugins/shared.
+
+**Session-start gate** (EXECUTOR-PROTOCOL §2)
+- Identity confirmed: Executor, Slot C (Satrio) ✓
+- CLAUDE.md loaded ✓
+- Task spec read: `docs/spec/02-hotel-core.md` §1.5 endpoints + §2.11 DDL + §6 RBAC row + §7 error catalog `MIN_AGENTS_VIOLATION` (line 830) ✓; `docs/spec/MVP-HOTEL-CORE-FIRST.md` §C8 + §4.3 Min-3 SELECT FOR UPDATE + §101 seed guidance ✓
+- Parent docs spot-read: `src/modules/departments/` (T21 SKIP_CROSS_DB_CHECKS + startup WARN + `loadOwned` pattern), `src/modules/wa-templates/` (T25 `assertNotLocked` guard shape for reuse as `assertMin3` / `assertTierCap`), `src/modules/billing/` (T27 `TIER_MATRIX` at `billing.serializer.ts:25-44` — can import + reuse for tier-cap lookup, avoids duplication), `src/plugins/tenant-guard.ts` + `rbac.ts`, `src/core/errors/app-errors.ts` `BusinessRuleError` (L104), `src/core/config/env.ts` `SKIP_CROSS_DB_CHECKS` (T21 Q-C-02, T27 reuse), `prisma/schema.prisma:437-454` (AiAgentConfig) ✓
+- Dependencies: T02 ✓ · T03 ✓ · T04 ✓ · T05 ✓ · T07-slice-1 ✓ (`BusinessRuleError`) · T21 ✓ (Q-C-02 pattern) · T25 ✓ (state-machine guard pattern) · T27 ✓ (`TIER_MATRIX` reuse candidate) — all approved and merged
+- `make typecheck` clean ✓ (post-T27 merge) · `make lint` clean ✓ · `make test-unit` **411/1/412** ✓
+- Scaffolder risk: **none**
+
+**Files to create** (as per ASSIGNMENT §Files to create above)
+
+**Files to modify**
+- **Zero** per ASSIGNMENT DoD.
+
+**Approach**
+Mirror T21 layout (no port/adapter this time — no external RPC): `types → schema → serializer → repository → service → routes → barrel`. Service constructor `(repo, opts = {skipCrossDbChecks, nodeEnv, logger, tierResolver?})`. Tier snapshot resolution: default `tierResolver = () => null` under Opsi C flag=true (matches billing's fetchTierSnapshot pattern); flag=false path takes an injectable `TierResolver` interface with method `(hotelId) → TierName | null` — dead branch today, TODO(Opsi A) comment inlined. Startup WARN once on prod+flag=true (same `event: 'cross_db_check_skip'` shape for cross-module grep). **List** returns all `AiAgentConfig` rows for the tenant, sorted by `agentType`. **Patch** flow:
+1. `loadOwned(ctx, id)` → row + tenant check + super_admin bypass.
+2. Compute delta: no-op → return current row (idempotent-safe).
+3. If body includes `is_active` transition, wrap in `db.$transaction([...], { isolationLevel: 'Serializable' })` — the whole read-then-write becomes atomic per row batch. Inside the transaction:
+   - Toggle-off (active → inactive): compute `activeAfter = countActive - 1`; if `activeAfter < 3` throw `BusinessRuleError({rule:'MIN_AGENTS_VIOLATION', activeAfter, minRequired: 3, currentStatus:'active'})`.
+   - Toggle-on (inactive → active): if `skipCrossDbChecks=true` → skip cap check (dev/Opsi C). Otherwise fetch tier via `tierResolver(hotelId)`; look up `agents_max` from `TIER_MATRIX` (import from billing serializer); compute `activeAfter = countActive + 1`; if `activeAfter > agents_max` throw `BusinessRuleError({rule:'TIER_CAP_VIOLATION', tier, activeAfter, capacity: agents_max})`.
+   - Same-state toggle (`is_active: true` on active row, or `false` on inactive): no-op on `is_active` change — passthrough for capacity/config-only updates.
+   - Persist `repo.update(id, delta)` still inside transaction.
+4. Non-toggle patches (capacity/config only): plain `repo.update` outside transaction (no race concern).
+5. Serialize response → `{data: AgentWire}`.
+
+**Design choice: Serializable isolation vs SELECT FOR UPDATE raw** — spec §4.3 says "Compute in a transaction (SELECT FOR UPDATE) to avoid race". Prisma doesn't natively support row-level `FOR UPDATE` via the fluent API. Two options: (A) `db.$transaction([...], { isolationLevel: 'Serializable' })` — Prisma-idiomatic, serializable snapshot conflicts abort the losing transaction (Postgres 40001) → we can retry once OR let it bubble as 5xx (rare race). (B) `db.$queryRaw` for `SELECT ... FOR UPDATE` on the count query. (A) is preferred: idiomatic + integration-testable via concurrent transactions; retry-on-40001 is a small helper. See GAP #1.
+
+**GAPs / questions**
+
+- **GAP T28-#1** — SELECT FOR UPDATE vs Serializable isolation. Options: (A) Prisma `$transaction` with `isolationLevel: 'Serializable'` + retry-on-40001 (Postgres serialization_failure). Clean, no raw SQL, integration-testable. (B) `db.$queryRawUnsafe('SELECT ... FOR UPDATE')` inside `$transaction` — matches spec §4.3 wording literally. Adds raw SQL to the module. (C) Advisory lock via `pg_advisory_xact_lock(hash(hotelId))` — serializes all agent PATCHes per hotel; simpler than serializable, avoids retry.
+  - **My intent**: **A** — Prisma-idiomatic, no raw SQL, retry-on-40001 is a 5-line helper. Integration test proves race isolation via `Promise.all` on two concurrent toggle-off calls where only one succeeds (matches expected behaviour under serializable isolation). C is attractive but pg-specific + harder to test cleanly. B works but breaks the "no raw SQL" convention shown across T21/T25/T27.
+
+- **GAP T28-#2** — Retry-on-40001 policy. Options: (A) retry once with small jitter, then bubble as 5xx. (B) no retry — bubble immediately, FE re-submits on user retry. (C) retry N times with backoff.
+  - **My intent**: **A** — single retry catches the common case (2 concurrent toggles) without adding meaningful latency; N-retry is over-engineering for a settings surface. FE would still see 5xx on genuine sustained contention (rare).
+
+- **GAP T28-#3** — Tier-cap check under `SKIP_CROSS_DB_CHECKS=true`. Options: (A) Skip cap check entirely (only Min-3 enforced) — matches T27 tier=null approach. (B) Use hardcoded default `professional` tier (`agents_max=3`) for cap check under flag=true — always cap at 3. (C) Refuse toggle-on entirely under flag=true (safe-strict).
+  - **My intent**: **A** — matches T27 precedent (tier=null → tier-related checks skipped). WARN at construction covers observability. B introduces a fake tier that could surprise post-Opsi-A operators. C is over-strict for dev/staging UX.
+
+- **GAP T28-#4** — Tier-cap details wire shape. When `TIER_CAP_VIOLATION` fires, what fields in `details`? Proposal: `{tier: TierName, activeAfter: number, capacity: number}`. `capacity` is the tier's `agents_max`; naming avoids conflict with the agent row's `capacity` field.
+  - **My intent**: Ship as proposed.
+
+- **GAP T28-#5** — `TIER_MATRIX` reuse from `billing.serializer.ts`. It's exported from that module. Options: (A) import from `@modules/billing` barrel — clean cross-module public API consumption (barrel exports `TierName` type but not `TIER_MATRIX` value). (B) Duplicate `TIER_MATRIX` inline in agents.service (~10 lines). (C) Extract to a shared location like `@shared/constants/tier-matrix.ts`.
+  - **Barrel check**: verified `src/modules/billing/index.ts` exports `TierName`, `TierSnapshotWire`, but **NOT `TIER_MATRIX`** — it's an internal implementation detail of the serializer. Options: (A') extend billing barrel to export `TIER_MATRIX` (cross-module API expansion); (B) duplicate; (C) extract to `@shared/`.
+  - **My intent**: **B** — small duplication (~10 lines constant) is cheaper than cross-module API surface expansion (A') OR foundation-scope shared-constants file (C). The tier matrix is small; when Opsi A restores and both modules read from Auth's `tiers` table, both local copies get deleted. Alternative: I can propose extending the billing barrel to export `TIER_MATRIX` if PM prefers single-source-of-truth — 1-line change, no code duplication.
+
+Q-B-01/Q-B-02/Q-C-01..-03/Q-T25-#1..#5/Q-T27-#1..#7 all resolved — not re-raising.
+
+**Est.**: ~4-5h (2 endpoints + Min-3/tier-cap guard + transaction pattern + testcontainer race test). Smaller than T27 (no port/adapter, no streaming, no multiple ports).
+
+Awaiting PM C ACK.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
