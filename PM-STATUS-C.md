@@ -12,16 +12,16 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **4/10 approved+merged**; **T29 wip**
+- **Day**: H0 (2026-07-03) — Slot C **5/10 approved** (half of Slot C shipped)
 - **Recent activity**:
   - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
   - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
   - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
   - **T28 Settings/agents (Min-3)** — **MERGED** (PR #14 `0e68a38`) ✓
-  - **T29 Settings/voice groundwork** — PLAN ACK'd 2026-07-03 H0 with 2 tightenings + Q-T29-#1 spec-ambiguity escalation. Exec self-claimed from T28 VERDICT §0 preview. Executor C coding on `feat/settings-voice`.
-- **Branches**: `feat/settings-voice` (T29, wip)
+  - **T29 Settings/voice groundwork** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` awaiting PO merge. 10 files. **Highest module-wide coverage of any Slot C task** (98.85% lines). 2nd consecutive Slot C module with 0 eslint-disable. Q-T29-#1 stays open PARENT §3a (PO ratify).
+- **Branches**: `feat/settings-voice` (T29, awaiting PO merge)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
-- **My queue (preview)**: T21+T25+T27+T28 merged; T29 wip; T22/T23/T24 now fully unblocked (T09 CSV import merged + T08 storage merged); T26+T30 hard-blocked at DEV by Opsi C.
+- **My queue (preview)**: T21+T25+T27+T28 merged; T29 approved-awaiting-merge; **T22/T23/T24 all fully unblocked** (T08 storage + T09 CSV import merged); T26+T30 hard-blocked at DEV by Opsi C tier-join. Next candidate: **T22 Menu CRUD + multipart image** or **T23 Menu bulk (CSV)** or **T24 Knowledge CRUD + CSV import**.
 
 ---
 
@@ -35,7 +35,7 @@
 | T25 | WA templates lifecycle + Meta-callback ingest (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #12 `437bb3a`)**. 13 files (6 module + 1 port + 1 adapter + 1 barrel + 4 tests). `make check` **363/1/364** (+51 net: 34 service + 12 routes + 5 adapter); `pnpm test:integration` **104/1/105** (all 6 suites regression-clean); coverage **96.68% lines** module-wide. Drift 0/9 clean (2 eslint-disable in barrel with justification — accepted; foundation config nudge for Slot A at PARENT §10). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`. All 3 tightenings held (variables:string[], language bounded, adapter log payload). All 4 GAP resolutions delivered. **Q-T25-#5 stays open** at PARENT §3b (foundation UNIQUE constraint missing from T02 — Slot A T-INFRA-05 candidate; Slot C code idempotent-safe post-fix). **Slice-2 (Meta-callback ingest) blocked** on foundation HMAC plugin + INTEGRATION_SHARED_SECRET env — separate ticket. |
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
-| T29 | Settings/voice groundwork stub (**wip**) | wip (PLAN ACK'd with 2 tightenings) | — | Exec self-claimed from T28 VERDICT §0 preview + PM ratified. PLAN ACK'd 2026-07-03 H0. Scope: 3 endpoints (`GET /api/settings/voice` empty-default fallback + `PUT` upsert + `POST /test` stub with soft guard). No port/adapter (stub /test not external RPC; wave 2a task adds real SIP/Twilio adapter). 2 tightenings held: (a) POST /test guard uses `BusinessRuleError` 422 `VOICE_NOT_CONFIGURED` (not ValidationError 400 — precondition rule matches T25/T28 pattern); (b) winston observability at BOTH PUT + POST /test routes. **Q-T29-#1 spec-ambiguity escalated to PARENT §3a** (MVP §101 "always returns empty" vs spec §1.5 GET/PUT paired verbs — Slot C ships option B, PUT persists + GET reflects; idempotent to either PO resolution). GAP #2/#4/#5 all accept exec leans. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. Awaiting Executor C SUBMIT. |
+| T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **483/1/484** (+33 net: 20 service + 12 routes + 1 empty-default helper); `pnpm test:integration` **140/1/141** (all 9 suites regression-clean); coverage **98.85% lines** module-wide (**highest of any Slot C task**; service/repo/serializer all 100% lines+branches+funcs). **Drift 0/9 + 0 eslint-disable** (2nd consecutive Slot C module without any — T28 was first). Both tightenings held: (a) `BusinessRuleError` 422 `VOICE_NOT_CONFIGURED` at service.ts:52-55 (not ValidationError); (b) winston observability at BOTH PUT + POST /test with `pbxTypeSet`/`isActiveSet` audit flags on PUT. Q-T29-#1 stays open PARENT §3a (PO ratify MVP §101 vs spec §1.5 semantic). Wave-2a security prereq nudge added to PARENT §10 (config JSONB will carry PBX credentials — encryption at-rest per CLAUDE.md §6 WAJIB). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
 
 ---
 
@@ -2114,6 +2114,65 @@ POST /settings/voice/test   (pbx_type set)
 
 Requesting PM C VERDICT.
 
+##### VERDICT T29 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 12 DoD boxes verified, independent PM validation on `feat/settings-voice` @ `416e138`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints (2 tightenings + Q-T29-#1 spec-ambiguity ship-option-B + all 6 PM ACK coding checklist reminders) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes)              : 0
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 0 ← 2nd consecutive Slot C module with zero eslint-disable (T28 was first)
+```
+
+Step 3 — File inventory: **10 files created** (`git show --name-only 416e138` — 6 module + 1 barrel + 3 tests). SUBMIT header claim of "10 new" is accurate — **2nd consecutive Slot C SUBMIT with exact count** (T28 was first; T25/T27 had off-by-2 typos). Simplest structure yet — tied with T28 for thinnest layout; no ports, no adapters, no barrel factory imports. Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` / `src/core/` / `src/plugins/` / `src/shared/socket/` — Override #1 held + all foundation surface untouched.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 483/1/484** (baseline 450/1/451 post-T28-merge + **+33 net**: 20 service + 12 routes + 1 empty-default helper test); Docker-free (T-INFRA-03 held); 1.315s
+- `pnpm test:integration` **PASS 140/1/141** — all 9 module suites green (departments/wa-templates/tickets/notifications/guests/visits/billing/agents + voice 11 new). T21+T25+T27+T28 + Slot B regression clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `voice.service.ts` (64 LOC): all 2 tightenings held verbatim — **#1** `BusinessRuleError(422)` at L52-55 with `rule:'VOICE_NOT_CONFIGURED'` (not `ValidationError`); **#2** N/A here (route layer). Q-T29-#1 option B implemented at L26-28 (GET returns `emptyVoiceConfig(ctx.hotelId)` fallback when no row + spec ref to MVP §101 in comment L4). Partial-update contract at L35-41 (only sets keys the body includes; omitted keys preserved via Prisma upsert semantics). No `assertHotelOwnership` needed — PK is `hotelId`, so `findByHotel(ctx.hotelId)` inherently tenant-scopes (elegant simplification for this schema shape). Const `TEST_STUB_NOTE = 'stub — PBX integration is wave 2a per ADD-23.7'` module-level with spec anchor. JSDoc comments explain wave 2a defer. Smallest service Slot C has shipped. ✓
+- `voice.routes.ts` (79 LOC): all 3 handlers log with `{module:'voice', action, correlationId}` per T21 pattern; **PM tightening #2 held** — PUT log at L53-62 includes `pbxTypeSet` + `isActiveSet` observability flags (settings-audit posture); POST /test log at L70-73. Thin handler chain (`requireTenant → requireRole → parse → service → send`). ✓
+- `voice.serializer.ts` (30 LOC): defensive `config` narrow at L7-10 (non-object JSONB → `{}` per PM ACK reminder — protects against raw INSERT drift); `emptyVoiceConfig(hotelId)` at L22-30 returns `{hotel_id: caller's, pbx_type: null, config: {}, is_active: false, updated_at: null}` per Q-T29-#5 shape uniformity + PM ACK "carries caller's hotelId not null"; comment L20-21 anchors MVP §101 rationale. ✓
+- Bonus `voice.repository.ts` (34 LOC): Prisma direct (ADR-0001 compliant); `VoiceUpsertDelta` type declares the partial-update contract; upsert uses PK `hotelId` (natural target); NO manual `updatedAt` — Prisma `@updatedAt` decorator handles it (PM ACK reminder honored). ✓
+- Bonus `voice.schema.ts` (43 LOC): permissive `pbxTypeField = z.string().min(1).max(40).nullable()` per Q-T29-#2 (matches DDL VARCHAR(40) NULL); `.strict()` + `.refine(non-empty)` per T21/T25/T27/T28 pattern. ✓
+
+Step 6 — Security floor: no webhook (HMAC N/A); no token storage in slice-1 (crypto N/A — but see exec Note #4 for wave 2a security-review flag); no PII (voice config operational — pbx_type/is_active settings values); `hotel_id` NEVER from body — sourced from `ctx.hotelId` via PK on all 3 endpoints; zod `.strict()` rejects `hotel_id` in body (belt-and-suspenders with test assertion); no secret hardcoded ✓
+
+Step 7 — Test coverage: line **98.85%** across `voice/**` — **highest module-wide coverage of any Slot C task yet** (T21=96.07, T25=96.68, T27=96.68, T28=97.65, T29=98.85). Repo/service/serializer all 100% lines+branches+funcs; routes 96.96/66.66/100; schema 100/60/100; index 100/100/33. Branch 87.50% — uncovered branches are defensive `config` narrow guards (typeof/isArray defensive paths) that are unreachable via zod-guarded ingest but valuable for raw-INSERT protection. All coverage misses justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (Q-T29-#1 stays open at PARENT §3a for PO)** ✓ verified. Registered at ACK time (`619df66`) — status unchanged: **open, PO ratify**. Slot C code idempotent to either resolution (single-line service change if PO rules option A).
+- **Note #2 (Slot C 5/10 status)** ✓ verified — Slot C is 5/10 approved with T29 APPROVED-awaiting-merge. Half of Slot C done.
+- **Note #3 (wave 2a PBX integration migration pattern)** — accepted as documented forward-plan. Matches T25→T25-slice-2 + T27→wave-2a-worker precedent. `VoicePbxPort` interface + adapters at `src/modules/voice/ports/` + `adapters/`, `service.test()` swap from stub note to `pbxAdapter.test(...)`, 1-line composition-root wiring. Clean migration path.
+- **Note #4 (config JSONB may carry PBX credentials wave 2a — security-review flag)** ✓ **PM ratifies + logs at PARENT §10 as wave-2a security prereq**. Per CLAUDE.md §6 WAJIB #1 "Token sensitif WAJIB enkripsi at-rest", credential-shaped `config` values in wave 2a will need `shared/utils/crypto.ts` (AES-256-GCM) at-rest encryption. Slice-1 is safe (no credential-shaped ingest surface today — permissive JSONB but no credential fields defined). Adding this to PARENT §10 as **wave-2a security prereq nudge** so the pattern lands alongside the PBX adapter. Excellent forward-thinking by exec.
+- **Note #5 (empty-default GET stable across sessions)** ✓ verified via integration test sequence exec described. Confirms no side-effect between calls.
+- **Note #6 (emptyVoiceConfig internal export scope)** — accepted as-is. Internal impl detail for GET fallback; not part of module's public API surface. Test imports directly is fine (T25/T27/T28 internal-helper test-consumption pattern).
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (env.ts + core/ + plugins/ + shared/socket/ + api.ts + migrations all untouched).
+- 2nd consecutive Slot C module with **zero eslint-disable** (T28 was first) — foundation ESLint nudge (from T25 VERDICT) still open at PARENT §10 for future port+adapter modules (T22 menu multipart, T23 CSV producer, T24 knowledge — those will likely re-introduce port/adapter pattern).
+- Q-T29-#1 stays open PARENT §3a (**PO decision needed** on MVP §101 vs spec §1.5 semantic) — non-blocking for T29 merge.
+- New PARENT §10 row added: wave-2a PBX credential encryption prereq (exec Note #4 forward-thinking).
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T29 row → approved · Short roll-up posted to PARENT §2 · Q-T29-#1 stays open PARENT §3a · new wave-2a security prereq nudge added to PARENT §10.**
+
+**PO merge please**: branch `feat/settings-voice` @ `416e138` ready for main merge. Q-T29-#1 (MVP §101 vs spec §1.5 GET semantic) needs PO ratification but non-blocking. Slot C **5/10 approved** (T21+T25+T27+T28 merged + T29 approved-awaiting-merge — half of Slot C shipped). Next candidates fully unblocked: **T22 Menu CRUD** + **T23 Menu bulk (CSV)** + **T24 Knowledge CRUD + CSV import** (T08 + T09 foundation dependencies both merged); T26+T30 remain hard-blocked at DEV by Opsi C tier-join.
 
 <!--
 TEMPLATE — copy untuk task baru:
@@ -2241,6 +2300,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | 2026-07-03 T25-slice-1 SUBMIT | src/modules/wa-templates/** (13) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 | 2026-07-03 T27-slice-1 SUBMIT | src/modules/billing/** (16) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 | 2026-07-03 T28 SUBMIT | src/modules/agents/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
+| 2026-07-03 T29 SUBMIT | src/modules/voice/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
