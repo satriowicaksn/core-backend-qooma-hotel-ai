@@ -16,7 +16,7 @@
 - **Active tasks**:
   - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
   - **T24 Knowledge CRUD (slice-1)** — APPROVED attempt 1; `feat/settings-knowledge` @ `975ec6a` awaiting PO merge
-  - **T23 Menu bulk-availability (slice-1)** — ASSIGNMENT issued 2026-07-03 H0, awaiting Executor C PLAN. Scope: 1 JSON endpoint (`POST /menu/bulk-availability`) added to existing menu module (T22 merged). CSV import deferred to T23-slice-2 reusing Q-T22-#1 batched multipart escalation.
+  - **T23 Menu bulk-availability (slice-1)** — PLAN ACK'd 2026-07-03 H0 with **0 tightenings + 0 new PARENT §3** (2nd consecutive after T24). Executor C coding on `feat/menu-bulk-availability`. Scope: 1 JSON endpoint (`POST /menu/bulk-availability`) added to existing menu module (T22 merged). CSV import deferred to T23-slice-2 reusing Q-T22-#1 batched multipart escalation.
 - **Recent merged**: T21+T25+T27+T28+T22.
 - **Branches**: `feat/settings-voice` (T29) + `feat/settings-knowledge` (T24) awaiting PO merge · `feat/menu-bulk-availability` (T23, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -41,7 +41,7 @@
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
 | T24 | Knowledge CRUD + CSV import (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-knowledge` @ `975ec6a` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). **Cleanest end-to-end Slot C task**: PLAN 0 tightenings + 0 new PARENT §3 → SUBMIT 0 issues. `make check` **560/1/561** (+47 net: 34 service + 13 routes); `pnpm test:integration` **160/1/161** (all 10 suites regression-clean); coverage **~99% lines** module-wide (repo/service/serializer/schema all 100% lines). **Drift 0/9 + 0 eslint-disable** (4th consecutive Slot C — T28/T29/T22/T24 pattern). Zero PO ratifications needed for this task — all Qs reuse existing open items (Q-T22-#1 multipart, Q-T22-#2 RBAC). Integration test documents spec reality (case-sensitive ?category, Prisma `has` at index 2, default `tags:[]` shape). CSV import deferred to T24-slice-2 (batched multipart ratify with T22-slice-2 + T23). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
-| T23 | Menu bulk ops (**slice-1 assigned**) | assigned (PLAN pending) | — | ASSIGNMENT T23-slice-1 issued 2026-07-03 H0. Scope: **1 JSON endpoint** (`POST /api/settings/menu/bulk-availability` — bulk-set `is_available` + `available_window_from/to` on N items, N≤100). **Extends existing `src/modules/menu/` module** (T22 merged, PR #15) — additive changes; T22's 78 tests must still pass. Reuses T22 helpers: `refineAvailableWindow` composable schema helper + `hhmmToTime` codec + tenant-scoped `where: {id: {in}, hotelId}` filter. **Skipped enumeration leak-safe** — collapses cross-tenant + nonexistent to same `NOT_FOUND` code. Partial-success semantic (200 with `{updated, skipped[]}` summary; never 404). CSV import DEFERRED to T23-slice-2 (batched Q-T22-#1 multipart escalation). Files: 6 existing menu files MODIFIED (schema/repository/service/routes/types/index) + 2 new test files. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. 7 GAPs pre-surfaced (T23-#1..#7). Awaiting Executor C PLAN. |
+| T23 | Menu bulk ops (**slice-1 wip**) | wip (PLAN ACK'd, 0 tightenings) | — | PLAN ACK'd 2026-07-03 H0 — **2nd consecutive Slot C PLAN with 0 material tightenings + 0 new PARENT §3 escalations** (T24 was 1st). All 7 GAP responses accept PM leans; Q-T23-#1 reuses Q-T22-#1 multipart; Q-T23-#2 reuses Q-T22-#2 RBAC; Q-T23-#3..#7 all PM leans slot-scoped. Scope: 1 JSON endpoint (`POST /api/settings/menu/bulk-availability`, N≤100). Extends existing `src/modules/menu/` module (T22 merged) — T22's 78 tests must stay green. Reuses `refineAvailableWindow` + `hhmmToTime`. Coding checklist reminders posted (three-way TIME null-clear branch, `.refine(at-least-one-delta)` treats null as defined, integration test cleanup discipline for shared testcontainer, `itemCount` audit log). Files: 6 existing menu files modified additively + 2 new test files + 1 extended integration file. Expected 0 eslint-disable (5th consecutive Slot C module if held). Awaiting Executor C SUBMIT. |
 
 ---
 
@@ -3246,6 +3246,54 @@ Extend existing T22 menu module — no new module. Schema: `BulkAvailabilityBody
 **Est.**: ~2-3h (smallest task since T29/T24 — 1 endpoint added to existing module, reuses T22 helpers, no port/adapter, no transaction). Straight-line to SUBMIT.
 
 Awaiting PM C ACK.
+
+##### PM C ACK — T23-slice-1 PLAN APPROVED (0 tightenings, proceed to coding, 2026-07-03 H0)
+
+**2nd consecutive Slot C PLAN with 0 material tightenings + 0 new PARENT §3 escalations** (T24 was 1st). Cleanest streak of ACKs Slot C has produced.
+
+**Ratifications:**
+- **Session-start gate ✓** — independently verified all T22 living reference points (`refineAvailableWindow` L64-85 confirmed reusable + composable; `hhmmToTime` L24-26 codec for TIME field write; `isPrismaUniqueViolation` pattern; no `loadOwned` needed for bulk).
+- **Baseline math ✓** — 513/1/514 (pre-T29+T24-merge) stated correctly. If either merges before SUBMIT, delta recomputes.
+- **All 7 GAP responses accept PM leans cleanly** — no new §3 entries. Q-T23-#1 reuses Q-T22-#1; Q-T23-#2 reuses Q-T22-#2; Q-T23-#3..#7 all resolved as PM leans slot-scoped.
+- **Approach paragraph ✓** — comprehensively correct. Prisma-authoritative `updated: count` from `updateMany` per PM ACK note (not `matchingIds.length`); `input.item_ids.filter(id => !matchingSet.has(id))` preserves input order per Q-T23-#7; `refineAvailableWindow` composable helper reuse is architecturally clean.
+- **Files scope ✓** — 6 existing files modified additively (T22's 78 tests must stay green — additive contract held); 2 new test files + 1 extended integration file; no touches on foundation surface.
+
+**Coding checklist reminders** (things easy to miss on additive-to-existing-module work — no material tightenings)
+
+- **`buildBulkDelta` null-clear semantic for TIME fields** — reuse T22's exact pattern from `menu.service.ts:165-166,171-172`:
+  ```ts
+  if (input.available_window_from !== undefined) {
+    delta.availableWindowFrom =
+      input.available_window_from === null ? null : hhmmToTime(input.available_window_from);
+  }
+  ```
+  Three-way branch: `undefined` = omit key (preserve current); `null` = set null (clear); string = codec to Date. Same as T22 create/update paths. Common pitfall: forgetting the null branch and blindly calling `hhmmToTime(null)` which would throw.
+
+- **`.refine(at-least-one-delta)` treats `null` as defined** — your predicate `v.is_available !== undefined || v.available_window_from !== undefined || v.available_window_to !== undefined` correctly counts null-clear intent as a valid delta. Test: body `{item_ids: [...], available_window_from: null}` should pass refine (user's clearing intent is valid).
+
+- **`refineAvailableWindow` reuse compatibility** — the T22 helper at `menu.schema.ts:64-85` reads `obj.available_window_from` and `obj.available_window_to` off unknown-typed input. Applies cleanly to `BulkAvailabilityBodySchema` since field names match. The both-or-neither refine correctly allows the case where BOTH are undefined (bulk with only `is_available` toggle). Confirm with unit test: `{item_ids, is_available: false}` (no window fields) passes refine.
+
+- **JSDoc invariant on `bulkAvailability` service method** — mirror T27/T29/T24 pattern documenting `ctx.hotelId` server-scoping + leak-safe `NOT_FOUND` collapse. Explains WHY skipped uses single code (not two).
+
+- **Integration test cleanup** — the extended `describe('bulk-availability', ...)` block runs against the shared testcontainer. Ensure your `beforeEach` seeds cleanly (idempotent — `deleteMany` + `create` per test); avoid state leakage into T22's existing tests via the shared `AbstractPrismaClient` in the testcontainer setup. If T22's file uses `beforeAll` with static seed, wrap your describe with its own `beforeEach`/`afterEach` scope.
+
+- **Winston log signal**: `itemCount: body.item_ids.length` is the audit-worthy summary. Do NOT log the full array (potential large payload; unnecessary detail for observability).
+
+- **Response `updated: 0 + skipped: [...]`**: assert this shape explicitly in integration test with an all-cross-tenant call (all item_ids belong to HOTEL_B when caller is HOTEL_A). Empirically proves Q-T23-#6 lean.
+
+- **`item_ids.max(100)` boundary**: unit test asserts `N=100` accepts + `N=101` rejects at zod. Standard boundary discipline.
+
+- **Expected `eslint-disable`**: **0** (5th consecutive Slot C module if held — T28 → T29 → T22 → T24 → T23 pattern).
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface — cleanest cross-slot task in Slot C queue.
+- Q-T22-#1 (batched multipart) + Q-T22-#2 (RBAC ambiguity) remain the only Slot C PARENT §3 opens.
+- **First Slot C task that modifies an existing module** — additive changes only; T22's 78 tests must still pass at SUBMIT time (they will regression-run as part of the full make-check + integration suite).
+- No new foundation nudges.
+
+**Mid-task CHECKPOINT trigger**: unlikely needed at ~2-3h estimate. Straight-line to SUBMIT.
+
+Proceed to coding on `feat/menu-bulk-availability`. Awaiting your SUBMIT.
 
 <!--
 TEMPLATE — copy untuk task baru:
