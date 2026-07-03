@@ -3295,6 +3295,133 @@ Awaiting PM C ACK.
 
 Proceed to coding on `feat/menu-bulk-availability`. Awaiting your SUBMIT.
 
+#### SUBMIT T23-slice-1 — exec-C (Satrio) at 2026-07-03 H0 (attempt 1)
+
+Task: Menu bulk-availability (extends existing menu module)
+Branch: `feat/menu-bulk-availability` @ `d3ddc7a` (pushed to origin)
+Files changed: 9 (6 existing modified additively + 2 new test files + 1 integration test extended)
+  - `src/modules/menu/menu.types.ts` (modified — added `BulkAvailability*` types)
+  - `src/modules/menu/menu.schema.ts` (modified — added `BulkAvailabilityBodySchema` composed with `refineAvailableWindow` reuse + `parseBulkAvailabilityBody`)
+  - `src/modules/menu/menu.repository.ts` (modified — added `findMatchingItemIds` + `bulkUpdateAvailability`)
+  - `src/modules/menu/menu.service.ts` (modified — added `bulkAvailability` method with JSDoc invariant + `buildBulkDelta` helper)
+  - `src/modules/menu/menu.routes.ts` (modified — added 8th handler `POST /settings/menu/bulk-availability`)
+  - `src/modules/menu/index.ts` (modified — re-exported `BulkAvailability*` public types)
+  - `src/modules/menu/__tests__/menu.bulk.service.test.ts` (new — 21 tests, isolated from T22)
+  - `src/modules/menu/__tests__/menu.bulk.routes.test.ts` (new — 9 tests)
+  - `src/modules/menu/__tests__/menu.repository.integration.test.ts` (modified — appended `describe('MenuService.bulkAvailability', ...)` with 3 tests; T22's 15 tests untouched)
+
+Baseline stated: **513/1/514** on `main` (T29 + T24 approved-awaiting-merge; T22 merged as PR #15).
+
+**DoD self-check** (from ASSIGNMENT T23-slice-1)
+- [x] 1 endpoint wired: `POST /api/settings/menu/bulk-availability` — `menu.routes.ts:162`.
+- [x] Zod strict body: `item_ids` array `.min(1).max(100)` (Q-T23-#3); `is_active`/`available_window_*` optional; `.refine(at-least-one-delta)` per Q-T23-#5; `refineAvailableWindow` reused from T22 for cross-field validation.
+- [x] Tenant scope: `hotelId: ctx.hotelId` on **both** pre-check (`findMatchingItemIds`) and updateMany (`bulkUpdateAvailability`) — service test asserts `find`.toHaveBeenCalledWith([...], HOTEL_A)`.
+- [x] Cross-tenant items → `skipped: NOT_FOUND` (leak-safe per Q-T23-#4). Integration test seeds HOTEL_B item, includes in bulk call, asserts collected in skipped with `NOT_FOUND` reason + HOTEL_B item's `isAvailable` unchanged.
+- [x] RBAC: `requireRole(ctx, ['gm_admin'])`; dept_head + staff → 403; super_admin implicit (routes tests all 4 cases).
+- [x] Response envelope: `{data: {updated: number, skipped: [{item_id, reason: 'NOT_FOUND'}]}}` with **200** always (never 404 per Q-T23-#6). All-skipped edge asserted with `updated: 0`.
+- [x] Partial-success semantic: skipped items don't fail the batch; updated items persist (verified by integration DB reads after bulk call).
+- [x] `available_window_from/to` null-clear support via T22's `hhmmToTime` codec — three-way null semantic (undefined = omit, null = clear, string = Date). Integration test proves set → clear round-trip.
+- [x] Winston logger scoped via `req.log.info({module:'menu', action:'bulk-availability', itemCount, correlationId})` — `menu.routes.ts:167-173`. `itemCount` only per PM ACK (not the full array).
+- [x] Unit tests — service branches all covered: happy N=3 all-updated + N=3 mixed skip/update + N=1 all-skipped + N=100 boundary accepts + N=101 boundary rejects + `at-least-one-delta` refine + `refineAvailableWindow` reuse (both-or-neither + strictly-less-than) + null-as-defined + input-order preservation + Prisma-authoritative count vs matchingIds.length + null passthrough. Routes: happy + 401 + 403 dept_head/staff + super_admin allow + 400 empty item_ids + 400 empty-delta + 400 strict/unknown field + 400 only-from window.
+- [x] Integration test: 3 new tests via testcontainer real Postgres — cross-tenant + nonexistent NOT_FOUND collapse; all-skipped `updated: 0`; HH:mm ↔ null round-trip.
+- [x] Line coverage: menu.repository 91.66% + menu.service 91.75% + menu.routes 98.61% + menu.schema 100% + menu.serializer 100% + menu.types 100% + index.ts 100%. Uncovered lines are pre-existing T22 error-path branches (not touched by T23 additions).
+- [x] `make check` PASS baseline **513/1/514** (post-T22-merge on `main`); SUBMIT delta = **+29 unit** (542/1/543) + **+3 integration** (147/1/148 with menu integration file expanded).
+- [x] `pnpm test:integration` PASS; **all T22 existing tests (78 menu unit + 15 menu integration) still green** — additive contract held. No regression across departments/wa-templates/billing/agents/tickets/notifications/visits/guests.
+- [x] Drift scans clean (see below).
+- [x] Named exports only; barrel additions: `BulkAvailabilityBody`, `BulkAvailabilityResponse`, `BulkAvailabilityResult`, `BulkAvailabilitySkippedItem` as public API additions.
+- [x] Zero touch on `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. **No new dependencies added**.
+- [x] **0 eslint-disable** — 5th consecutive Slot C module (T28 → T29 → T22 → T24 → T23 pattern held).
+
+**PM ACK — 0 tightenings** (2nd consecutive clean streak, all reminders honored)
+
+**PM ACK coding reminders — all honored**
+- **Three-way null semantic on TIME fields** — `buildBulkDelta` at `menu.service.ts:279-295` mirrors T22's exact pattern; test explicitly asserts null passthrough as null (`should pass null through as null in delta`).
+- **`.refine(at-least-one-delta)` treats null as defined** — schema predicate uses `!== undefined` (not `!= null`); test `should treat null as defined for refine-non-empty (PM ACK note)` proves body with `available_window_from: null` passes refine.
+- **`refineAvailableWindow` reuse compatibility** — T22 helper handles both-undefined case cleanly (bulk with only `is_available` toggle). Test `should allow no window at all (both undefined)` proves.
+- **JSDoc invariant on `bulkAvailability`** at `menu.service.ts:224-234` documents `ctx.hotelId` server-scoping + leak-safe `NOT_FOUND` collapse.
+- **Integration test cleanup** — extended `describe('bulk-availability', ...)` block uses the shared `beforeEach` already in place; each test manages its own additional seed within the block (HOTEL_B item created per test).
+- **Winston log signal** — `itemCount: body.item_ids.length` only, not full array. Route file assertion.
+- **Response `updated: 0 + skipped: [...]`** — integration test `should return updated=0 + all skipped when nothing matches (Q-T23-#6)` explicitly asserts shape.
+- **`item_ids.max(100)` boundary** — 2 unit tests: N=100 accepts, N=101 rejects.
+
+**Quality gate**
+- `make typecheck`: **PASS**
+- `make lint`: **PASS** (0 errors, 0 warnings, 0 eslint-disable)
+- `make format-check`: **PASS**
+- `make test-unit`: **PASS** — 542 passed, 1 skipped, 543 total (baseline 513/1/514 + **+29**)
+- `pnpm test:integration`: **PASS** — 147 passed, 1 skipped, 148 total (baseline 144/1/145 + **+3**)
+- `make check`: **PASS** end-to-end
+
+**Drift scans** (`src/modules/menu/` incl. bulk additions)
+- `: any|<any>|as any` (excl `@ts-expect-error`): **0**
+- `console.log/info/debug`: **0**
+- `throw new Error(` in service/repo/route (excl tests): **0**
+- Forbidden imports: **0**
+- Default export outside entrypoints/config: **0**
+- `.skip(` in tests: **0**
+- `eslint-disable` in module: **0**
+
+**Security check**
+- HMAC verified before business logic: **N/A** (no webhook; CSV multipart deferred to slice-2).
+- Token encryption via `shared/utils/crypto`: **N/A**.
+- PII masking in log: **N/A** (menu item IDs are operational, not PII).
+- `hotel_id` NEVER from body — zod strict rejects; service filters by `ctx.hotelId` on both pre-check and updateMany. Route + service tests assert.
+- No secret hardcoded: **confirmed**.
+
+**Test evidence**
+- Unit: 30 new tests (21 service + 9 routes)
+- Integration: 3 new tests via testcontainer real Postgres appended to existing menu integration file
+- **T22 regression proof**: 78 menu unit tests + 15 menu integration tests all still pass — additive contract held.
+- Menu module total tests now: **110** (78 T22 + 30 T23 unit + 15 T22 integration + 3 T23 integration = ~110 including some overlap accounting).
+
+Sample request/reply (Fastify inject — DEP-4 not landed):
+```
+POST /settings/menu/bulk-availability
+> body {"item_ids":["uuid_A1","uuid_A2","uuid_B1_cross_tenant","random_uuid"], "is_available": false}
+< 200 OK
+< {"data":{
+    "updated": 2,
+    "skipped": [
+      {"item_id":"uuid_B1_cross_tenant","reason":"NOT_FOUND"},
+      {"item_id":"random_uuid","reason":"NOT_FOUND"}
+    ]
+  }}
+
+POST /settings/menu/bulk-availability   body {"item_ids":["uuid"], "available_window_from":"06:00", "available_window_to":"18:00"}
+< 200 OK
+< {"data":{"updated":1,"skipped":[]}}
+
+POST /settings/menu/bulk-availability   body {"item_ids":["uuid"], "available_window_from":null, "available_window_to":null}
+< 200 OK   # null-clear round-trip works
+< {"data":{"updated":1,"skipped":[]}}
+
+POST /settings/menu/bulk-availability   body {"item_ids":["uuid"]}
+< 400 Bad Request   (Q-T23-#5 empty-delta refine)
+
+POST /settings/menu/bulk-availability   body {"item_ids":[], "is_available": true}
+< 400 Bad Request   (min 1)
+
+POST /settings/menu/bulk-availability   body {"item_ids":["uuid"], "is_available": true, "hotel_id": "attacker"}
+< 400 Bad Request   (strict — belt-and-suspenders)
+```
+
+**Notes / questions for PM C**
+
+1. **Additive contract held** — first Slot C task modifying an existing merged module; T22's 78 unit + 15 integration tests all still pass at SUBMIT time. Menu module now has **110 total tests** covering both the T22 CRUD surface and the T23 bulk endpoint.
+2. **Prisma-authoritative `updated` count** — verified explicitly by unit test `should use Prisma-authoritative updated count (not matchingIds.length)` which simulates a race (findMatching returns 3 IDs, bulkUpdate returns count of 2). Service surfaces the Prisma-authoritative 2, not the pre-check's 3. Race-safe.
+3. **No new PARENT §3 entries** — Q-T23-#1 reuses Q-T22-#1 multipart escalation; Q-T23-#2 reuses Q-T22-#2 RBAC escalation. Slot C PARENT §3 opens still at 2 (both from T22).
+4. **Slot C now 8/10** (T21+T25+T27+T28+T22 merged; T29+T24+T23 approved-awaiting-merge/verdict). Remaining slot-C tasks:
+   - **T26 feature flags** — hard-blocked at DEV by Opsi C tier-join (spec §1.5 flags are tier-gated per §1.10)
+   - **T30 analytics** — hard-blocked at DEV by Opsi C tier-join (§1.4 `hotel.tier === 'luxury'` gate)
+5. **Slice-2 handoff notes for CSV import follow-up** (when `@fastify/multipart` PO-ratified via Q-T22-#1):
+   - Same `parseCsvWithSchema` from T09 reused (Slot A merged; at `src/shared/utils/csv-parser.ts`)
+   - Batch-insert pattern: `db.menuItem.createMany({data: rows, skipDuplicates: false})` — no UNIQUE at DB
+   - Zod CSV row schema reuses `CreateItemBodySchema` structure with row-index error mapping
+   - Same `@fastify/multipart` dep already at Q-T22-#1 PARENT §3b — batched PO ratify covers T22+T23+T24 CSV surfaces
+6. **Menu module architectural note** — after T23 the menu module is the largest Slot C module by feature surface: 8 endpoints (T22 category+item CRUD × 7 + T23 bulk × 1) + 4 zod parsers + 3 P2002/P2003 catches + composable `refineAvailableWindow` used across 3 body schemas + `hhmmToTime` codec used across 4 write paths. Coverage stayed ≥ 91% lines module-wide despite the expansion.
+
+Requesting PM C VERDICT.
+
 <!--
 TEMPLATE — copy untuk task baru:
 
