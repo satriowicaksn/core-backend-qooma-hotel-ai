@@ -12,10 +12,10 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **5/10 approved**; **T22-slice-1 wip**
-- **Active tasks**:
-  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
-  - **T22 Menu CRUD (slice-1)** — PLAN ACK'd 2026-07-03 H0 with 1 tightening (`price_idr` zod max = 9999999999.99 per DECIMAL(12,2), not 99999999999.99). All 6 GAP responses accepted PM leans. Executor C coding on `feat/settings-menu`. Multipart deferred to T22-slice-2 (Q-T22-#1 open at PARENT §3b for PO ratify).
+- **Day**: H0 (2026-07-03) — Slot C **6/10 approved**
+- **Active tasks (awaiting PO merge)**:
+  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138`
+  - **T22 Menu CRUD (slice-1)** — APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4`. 10 files (6 module + 1 barrel + 3 tests). Multipart deferred to T22-slice-2 (Q-T22-#1 at PARENT §3b for PO ratify). Q-T22-#2 dept_head RBAC ambiguity at PARENT §3a.
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -34,7 +34,7 @@
 | T27 | Billing (overview + upgrade + invoice + daily brief) (**slice-1 approved+merged**) | **approved+merged** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #13 `af02167`)**. 16 files. `make check` **411/1/412** (+40 net); coverage **96.68%**. Q-T27-#7 stays open at PARENT §3b (Slot A T-INFRA-06 candidate). Deferred slices blocked on foundation prereqs. |
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
-| T22 | Menu CRUD + categories + multipart image (**slice-1 wip**) | wip (PLAN ACK'd with 1 tightening) | — | PLAN ACK'd 2026-07-03 H0. Scope: **7 JSON endpoints** (Categories CRUD + Items CRUD, corrected from ASSIGNMENT header 6). All 6 GAP responses accepted PM leans. **1 tightening**: `price_idr` zod max = `9999999999.99` (DECIMAL(12,2) = 10 digits before decimal) — exec plan had `99999999999.99` (13 digits, one order too high). Multipart deferred to T22-slice-2 (Q-T22-#1 open at PARENT §3b). RBAC gm_admin + super_admin only slice-1 (Q-T22-#2 → PARENT §3a). App-layer `countItemsInCategory` + P2003 FK Restrict backstop for delete-category race. TIME `HH:mm` round-trip with integration test proof. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`; no new deps. Awaiting Executor C SUBMIT. |
+| T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
 
 ---
 
@@ -2576,6 +2576,67 @@ PATCH /settings/menu/<id>   body {"image_url":null}
 
 Requesting PM C VERDICT.
 
+##### VERDICT T22-slice-1 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 21 DoD boxes verified, independent PM validation on `feat/settings-menu` @ `1da9ef4`.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK constraints (1 tightening + all 6 GAP resolutions + coding checklist reminders) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes, excl tests)  : 0
+default export outside entrypoints/config           : 0
+forbidden imports (express|typeorm|moment|node-fetch): 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap of Prisma       : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 0 ← 3rd consecutive Slot C module with zero eslint-disable (T28 + T29 + T22)
+```
+
+Step 3 — File inventory: **10 files created** (`git show --name-only 1da9ef4` — 6 module + 1 barrel + 3 tests). **SUBMIT header claim of "10 new" accurate** — 3rd consecutive Slot C SUBMIT with exact count (T28/T29 previous; T25/T27 had off-by-2). Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` / `src/core/` / `src/plugins/` / `src/shared/socket/` — Override #1 held. **No new dependencies added** (multipart deferred to slice-2 per Q-T22-#1).
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 513/1/514** (baseline 450/1/451 pre-T29-merge + **+63 net**: 43 service + 20 routes); Docker-free (T-INFRA-03 held); 2.548s
+- `pnpm test:integration` **PASS 144/1/145** — all 9 module suites green (departments/wa-templates/tickets/notifications/guests/visits/billing/agents + menu 15 new). T21+T25+T27+T28 + Slot B regression clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `menu.service.ts` (237 LOC): `isPrismaUniqueViolation` (L32-34) + `isPrismaForeignKeyRestrict` (L36-40) helpers side-by-side — Q-T22 belt-and-suspenders pattern; `loadOwnedCategory` (L220-227) + `loadOwnedItem` (L229-236) with distinct resource names for wire discrimination (T27 tightening #1 pattern extended); cross-tenant category-reuse guard on `createItem` L149-152 + `updateItem` L188-193 (only when `category_id` changes) — matches PM ACK reminder; **P2003 backstop with re-count** at L133-141 gives FE accurate `itemCount` on race — clever refinement of PM's original backstop suggestion (over-delivers on the coding note); JSDoc invariants on `createCategory` (L61-65) + `removeCategory` (L116-120) document server-set fields + delete rules; TIME null-clear support at L165-166,171-172,204-209; belt-and-suspenders body-field allowlist reads only known keys ✓
+- `menu.schema.ts` (~150 LOC): **PM tightening #1 held** — `priceIdrField = z.number().nonnegative().max(9999999999.99)` at L16 with inline comment "DECIMAL(12,2)"; `refineAvailableWindow` composable helper at L64-85 applies both refines (both-or-neither + strictly-less-than) to any schema — reused for CreateItem L87 + UpdateItem L89-106; `hhmmField` regex `/^\d{2}:\d{2}$/` with human-friendly error message; `parseHHmmToMinutes` exported for reuse; `.strict()` + `.refine(non-empty)` on both update bodies; `hhmmField.nullable().optional()` supports null-clear + omit-preserve semantics ✓
+- `menu.serializer.ts` (68 LOC): `timeToHHmm` at L15-20 uses `getUTCHours/getUTCMinutes` (PM ACK reminder honored — avoids local timezone drift); `hhmmToTime` reverse codec at L24-26 constructs `new Date('1970-01-01T${hhmm}:00.000Z')` for Prisma write; **`Decimal.toFixed(2)` at L35** (T27 pattern reused); `serializeMenuCategoryHeader` DRY factoring at L46-56 shared between empty-items + with-items shapes; snake_case wire throughout ✓
+- Bonus `menu.repository.ts` (67 LOC): Prisma direct (ADR-0001); **`countItemsInCategory` at L41-43 + `ensureCategoryBelongsToHotel` at L45-50 both use `.count()`** matching PM ACK reminder — cheaper than `.findFirst`; `listCategoriesWithItems` nested include with correct ordering `[sortOrder ASC, name ASC]` for categories + `[name ASC]` for items ✓
+- Bonus `index.ts` barrel: 0 eslint-disable; factory `buildMenuService(db)` simplest yet (no options struct needed — no port/adapter/env); `MenuRepository` NOT re-exported (internal) ✓
+
+Step 6 — Security floor: no webhook (HMAC N/A); no token storage (crypto N/A); no PII (menu operational); `hotel_id` from `ctx.hotelId` on all writes — zod strict + service belt-and-suspenders; `image_url` validated via `z.string().url()` — no arbitrary strings accepted; immutable fields (`hotel_id`/`id`/timestamps) rejected at boundary; no secret hardcoded ✓
+
+Step 7 — Test coverage: line **95.54%** across `menu/**` (exceeds ≥ 80% DoD; serializer/index 100%; schema 100 lines; routes 98.46; service 89.87; repo 85.71). Branch 64.19% — uncovered branches are P2003 backstop re-count (mocked at unit level but repo lines are Prisma-thin wrappers) + P2002 catch on update-category rare path + JSONB defensive branches. Coverage step-down from T29 (98.85%) is proportionate to module size (T22 is biggest by far — 63 tests + 15 integration = 78 total, vs T29's 32+11=43). All uncovered lines justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (baseline stated 450/1/451 pre-T29-merge)** ✓ verified via `git log main` — voice module NOT on `main` at SUBMIT time. Delta +63 unit stated correctly.
+- **Note #2 (Q-T22-#1 multipart stays open at PARENT §3b)** ✓ — no change; still open, foundation candidate. Also affects T23/T24 CSV imports (batched PO decision recommended in the §3b row).
+- **Note #3 (Q-T22-#2 dept_head RBAC stays open at PARENT §3a)** ✓ — spec-ambiguity Q, slice-1 ships strict `gm_admin + super_admin`.
+- **Note #4 (Coverage step-down explanation)** — accepted; proportionate to module size + P2003 mock coverage limitation is a standard testing constraint (jest cannot faithfully mock Postgres FK errors at unit level; integration test covers the real-DB path).
+- **Note #5 (Multipart slice-2 architecture sketch)** ✓ documented forward-plan matches T25→slice-2 + T27 quota-meter deferral discipline.
+- **Note #6 (`ObjectStoragePort.upload` slice-2 via T27 barrel pattern)** ✓ clean migration path.
+- **Note #7 (Slot C 6/10 status)** ✓ — Slot C is now 6/10 approved.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface (env.ts + core/ + plugins/ + shared/socket/ + api.ts + migrations all untouched).
+- **3rd consecutive Slot C module with zero eslint-disable** (T28 → T29 → T22 pattern hold) — foundation ESLint nudge (from T25 VERDICT) still open at PARENT §10 for future port+adapter modules.
+- Q-T22-#1 stays open PARENT §3b (**batched multipart dep ratify for T22/T23/T24 recommended**) — non-blocking for T22-slice-1 merge.
+- Q-T22-#2 stays open PARENT §3a (dept_head RBAC ambiguity, PO Q).
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T22 row → approved · Short roll-up posted to PARENT §2 · Q-T22-#1 stays open PARENT §3b · Q-T22-#2 stays open PARENT §3a.**
+
+**PO merge please**: branch `feat/settings-menu` @ `1da9ef4` ready for main merge. Q-T22-#1 (multipart dep) + Q-T22-#2 (dept_head RBAC) need PO ratification but both non-blocking. Slot C **6/10 approved** (T21+T25+T27+T28 merged + T29+T22 approved-awaiting-merge). Next candidate: **T24 Knowledge CRUD + CSV import** — parallel to T23 (both fully unblocked with T08+T09 merged).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -2703,6 +2764,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | 2026-07-03 T27-slice-1 SUBMIT | src/modules/billing/** (16) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A slice-1 no callback) | 0 |
 | 2026-07-03 T28 SUBMIT | src/modules/agents/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T29 SUBMIT | src/modules/voice/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
+| 2026-07-03 T22-slice-1 SUBMIT | src/modules/menu/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
