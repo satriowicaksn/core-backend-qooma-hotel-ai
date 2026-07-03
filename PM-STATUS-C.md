@@ -12,11 +12,18 @@
 
 ## 0. Current focus (slot C)
 
-- **Day**: H0 (2026-07-03) — Slot C **6/10 approved+merged**; **T24-slice-1 wip**
-- **Active tasks**:
-  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
+- **Day**: H0 (2026-07-03) — Slot C **7/10 approved**
+- **Recent activity**:
+  - **T21 Departments CRUD** — **MERGED** (PR #11 `bbf4bd7`) ✓
+  - **T25 WA templates lifecycle (slice-1)** — **MERGED** (PR #12 `437bb3a`) ✓
+  - **T27 Billing (slice-1)** — **MERGED** (PR #13 `af02167`) ✓
+  - **T28 Settings/agents (Min-3)** — **MERGED** (PR #14 `0e68a38`) ✓
   - **T22 Menu CRUD (slice-1)** — **MERGED** (PR #15 `2d41120`) ✓
-  - **T24 Knowledge CRUD + CSV import (slice-1)** — PLAN ACK'd 2026-07-03 H0 with **0 tightenings + 0 new PARENT §3 escalations** (cleanest ACK Slot C has issued). Executor C coding on `feat/settings-knowledge`.
+  - **T29 Settings/voice groundwork** — APPROVED attempt 1; `feat/settings-voice` @ `416e138` awaiting PO merge
+  - **T24 Knowledge CRUD (slice-1)** — **APPROVED attempt 1** (2026-07-03 H0). `feat/settings-knowledge` @ `975ec6a` awaiting PO merge. **Cleanest end-to-end task in Slot C** (0 tightenings + 0 new §3 + ~99% coverage). Zero PO ratifications needed.
+- **Branches**: `feat/settings-voice` (T29) + `feat/settings-knowledge` (T24), both awaiting PO merge
+- **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
+- **My queue (preview)**: T21+T25+T27+T28+T22 merged; T29+T24 approved; **T23 fully unblocked (slice-1 = bulk-availability JSON; CSV multipart deferred to T23-slice-2 reusing Q-T22-#1)**; T22-slice-2 + T24-slice-2 gated on batched Q-T22-#1 PO ratify; T26+T30 hard-blocked at DEV by Opsi C tier-join.
 - **Recent activity (merged)**: T21 (PR #11) + T25 (PR #12) + T27 (PR #13) + T28 (PR #14) all merged.
 - **Branches**: `feat/settings-voice` (T29, awaiting PO merge) · `feat/settings-menu` (T22, executor to create on claim)
 - **Next gate (global)**: G1 — lihat `PM-STATUS-PARENT.md §5`
@@ -36,7 +43,7 @@
 | T28 | Settings/agents config (Min-3 enforcement) (**approved+merged**) | **approved+merged** | PM C (Satrio) | ✅ APPROVED attempt 1 + **MERGED to main 2026-07-03 (PR #14 `0e68a38`)**. 10 files. `make check` **450/1/451** (+39 net); coverage **97.65%**. First Slot C module with 0 eslint-disable. Q-T28-#1 stays open PARENT §3a (PO ratify tier-cap semantics). |
 | T29 | Settings/voice groundwork stub (**approved**) | **approved** | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-voice` @ `416e138` — **awaiting PO merge**. 10 files. `make check` **483/1/484** (+33 net); coverage **98.85% lines** (highest of Slot C). 0 eslint-disable (2nd consecutive). Q-T29-#1 stays open PARENT §3a. Wave-2a security prereq nudge added to PARENT §10. |
 | T22 | Menu CRUD + categories (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-menu` @ `1da9ef4` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). `make check` **513/1/514** (+63 net: 43 service + 20 routes); `pnpm test:integration` **144/1/145** (all 9 suites regression-clean); coverage **95.54% lines** module-wide. **Drift 0/9 + 0 eslint-disable** (3rd consecutive Slot C module — T28/T29/T22). PM tightening #1 held (`price_idr` max `9999999999.99` per DECIMAL(12,2)). All 6 GAP resolutions delivered. **P2003 backstop with re-count** (over-delivers on PM coding note — gives FE accurate itemCount on race). **Q-T22-#1 stays open** at PARENT §3b (multipart dep — batched ratify for T22/T23/T24 recommended). **Q-T22-#2 stays open** at PARENT §3a (dept_head RBAC ambiguity). Multipart deferred to T22-slice-2. Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. No new deps. |
-| T24 | Knowledge CRUD + CSV import (**slice-1 wip**) | wip (PLAN ACK'd, 0 tightenings) | — | PLAN ACK'd 2026-07-03 H0 — **cleanest ACK Slot C has issued**: 0 material tightenings, 0 new PARENT §3 escalations. All 5 GAP responses accept PM leans; Q-T24-#1 reuses Q-T22-#1 multipart escalation; Q-T24-#2 reuses Q-T22-#2 RBAC escalation; Q-T24-#3/#4/#5 all PM leans confirmed. Simplest business rules yet (no UNIQUE + no CHECK + no cross-entity guards + no state machine). Coding checklist reminders posted (category case-sensitivity default, tags array `has` operator empirical proof with 3+ tags, empty-array shape assertion, content bound rationale). Files: 6 module + 1 barrel + 3 tests. Expected 0 eslint-disable (4th consecutive Slot C module if held). Awaiting Executor C SUBMIT. |
+| T24 | Knowledge CRUD + CSV import (**slice-1 approved**) | **approved** (slice-1) | PM C (Satrio) | ✅ APPROVED attempt 1 (2026-07-03 H0). `feat/settings-knowledge` @ `975ec6a` — **awaiting PO merge**. 10 files (6 module + 1 barrel + 3 tests). **Cleanest end-to-end Slot C task**: PLAN 0 tightenings + 0 new PARENT §3 → SUBMIT 0 issues. `make check` **560/1/561** (+47 net: 34 service + 13 routes); `pnpm test:integration` **160/1/161** (all 10 suites regression-clean); coverage **~99% lines** module-wide (repo/service/serializer/schema all 100% lines). **Drift 0/9 + 0 eslint-disable** (4th consecutive Slot C — T28/T29/T22/T24 pattern). Zero PO ratifications needed for this task — all Qs reuse existing open items (Q-T22-#1 multipart, Q-T22-#2 RBAC). Integration test documents spec reality (case-sensitive ?category, Prisma `has` at index 2, default `tags:[]` shape). CSV import deferred to T24-slice-2 (batched multipart ratify with T22-slice-2 + T23). Zero touch `api.ts`/`env.ts`/`prisma/migrations/`/`core/`/`plugins/`/`shared/socket/`. |
 
 ---
 
@@ -2995,6 +3002,73 @@ PATCH /settings/knowledge/<cross-tenant-id>   body {"title":"x"}
 
 Requesting PM C VERDICT.
 
+##### VERDICT T24-slice-1 — APPROVED (attempt 1, 2026-07-03 H0) by PM C
+
+✅ **APPROVED**. All 17 DoD boxes verified, independent PM validation on `feat/settings-knowledge` @ `975ec6a`.
+
+**Cleanest end-to-end task in Slot C**: PLAN 0 tightenings + 0 new PARENT §3 escalations → SUBMIT 0 issues + ~99% coverage + 0 eslint-disable. First (and to date only) Slot C module with 100% coverage on repo/service/serializer/schema.
+
+**PM independent validation** (per PM-AGENT §3)
+
+Step 1 — Task match: DoD 1:1 map to ASSIGNMENT + PM ACK coding reminders (no tightenings issued at ACK; all reminders honored) ✓
+Step 2 — Drift-detection scans (rerun by PM on branch):
+```
+: any|<any>|as any (excl @ts-expect-error)         : 0
+console.log|info|debug                              : 0
+throw new Error( (service/repo/routes, excl tests)  : 0
+default export outside entrypoints/config           : 0
+forbidden imports                                    : 0
+.skip( in tests                                     : 0
+IRepository / ICache interface wrap                 : 0
+hardcoded URL / secret                              : 0
+setTimeout(..., >=1000ms) for job delay             : 0
+eslint-disable                                      : 0 ← 4TH consecutive Slot C module (T28 → T29 → T22 → T24 pattern hold)
+```
+
+Step 3 — File inventory: **10 files created** (`git show --name-only 975ec6a` — 6 module + 1 barrel + 3 tests). SUBMIT header claim "10 new" accurate — 4th consecutive Slot C SUBMIT with exact count (T28/T29/T22 precedents; T25/T27 had off-by-2). Zero touch on `src/entrypoints/api.ts` / `src/core/config/env.ts` / `prisma/migrations/` / `src/core/` / `src/plugins/` / `src/shared/socket/` — Override #1 held. **No new dependencies added**.
+
+Step 4 — Quality gate (independent rerun by PM):
+- `make check` **PASS 560/1/561** (baseline 513/1/514 post-T22-merge + **+47 net**: 34 service + 13 routes); Docker-free (T-INFRA-03 held); 2.769s
+- `pnpm test:integration` **PASS 160/1/161** — all 10 module suites green (departments/wa-templates/tickets/notifications/guests/visits/billing/agents/menu + knowledge 16 new). All prior modules regression-clean.
+- `make typecheck` + `make lint` + `make format-check` all PASS
+
+Step 5 — Spot-check 3 random files:
+- `knowledge.service.ts` (95 LOC — smallest service Slot C has shipped): `buildKnowledgeWhere` pure function at L21-38 with filter composition + super_admin bypass + `tags: { has: filters.tag }` (Prisma array-contains); comment at L33-34 documents case-sensitive Prisma default per PM ACK coding note; `loadOwned` (L87-94) with distinct resource name `KnowledgeEntry` per T27 tightening #1 wire-discrimination pattern; JSDoc invariant on `create()` L48-52 documenting server-set fields (T27/T29 pattern); simplest constructor Slot C has shipped `(repo)` only; no P2002/P2003 catches (correct — no UNIQUE + no CHECK); explicit comment L1-2 anchors "no P2002/P2003 needed" spec-reality ✓
+- `knowledge.schema.ts`: all 4 Q-T24 GAP responses held verbatim — `titleField = z.string().min(1).max(255)` matches DDL VARCHAR(255); `contentField = z.string().min(1).max(10000)` matches PM notes 10KB bound; `categoryField = z.string().min(1).max(80).nullable()` Q-T24-#4; `tagsField = z.array(z.string().min(1).max(40)).max(20)` Q-T24-#3 bounded per-element + max 20; `.strict()` on all bodies + `.refine(non-empty)` on update; `ListEntriesQuerySchema.strict()` filters bounded ✓
+- `knowledge.serializer.ts` (spot-checked): pass-through `tags: string[]` (Prisma guarantees array shape); snake_case wire; `hotel_id` included per T21/T25 convention ✓
+- Bonus `knowledge.repository.ts`: Prisma direct (ADR-0001); simplest CRUD surface (findMany/findById/create/update/delete only — no counts, no ensures) ✓
+- Bonus `index.ts` barrel: 0 eslint-disable; factory `buildKnowledgeService(db)` simplest signature (no options struct needed) ✓
+- Bonus tests: **3 integration tests documenting spec reality** — case-sensitive `?category` boundary (`'FAQ'` returns 0 vs `'faq'` returns 1); Prisma `tags: { has }` operator empirical proof at index 2 of a 3-tag array; default `tags: []` shape assertion. Excellent test-as-spec discipline ✓
+
+Step 6 — Security floor: no webhook (HMAC N/A); no token storage (crypto N/A); no PII (knowledge is operational content); `hotel_id` NEVER from body — zod strict rejects with route test coverage; immutable fields rejected at boundary; no secret hardcoded ✓
+
+Step 7 — Test coverage: line **~99%** across `knowledge/**` — **repo/serializer/service/schema all 100% lines**; routes 97.67; index 100. Highest module-wide coverage tied with T29. Uncovered branches (schema 81.25%) are `toValidationError` fallback field-path branches per exec Note #6 — defensive `undefined` fallback that never actually fires because zod issues always have path arrays even for root-level refine. Justified ✓
+
+Step 8 — Verdict: **APPROVED**
+
+**PM annotations on exec Notes**
+
+- **Note #1 (baseline 513/1/514 post-T22-merge)** ✓ verified via `git log main`.
+- **Note #2 (0 tightenings held)** ✓ — first Slot C submission where ACK issued no material tightenings; delivered clean.
+- **Note #3 (0 new PARENT §3 escalations)** ✓ — Q-T24-#1 reuses Q-T22-#1; Q-T24-#2 reuses Q-T22-#2; Q-T24-#3/#4/#5 all resolved as PM leans slot-scoped.
+- **Note #4 (Slot C now 7/10 pending merge)** ✓ verified.
+- **Note #5 (T24-slice-2 CSV import spec sketch)** ✓ clean forward-plan; batched PO ratify on Q-T22-#1 unblocks T22-slice-2 + T23 + T24-slice-2 simultaneously.
+- **Note #6 (schema coverage 81.25% branch)** — accepted as justified; defensive fallback that zod's actual API never triggers.
+
+**Slot A / Slot B awareness**
+- Zero touch on Slot B files, Slot A owned surface — cleanest cross-slot touch of any Slot C task.
+- **4th consecutive Slot C module with 0 eslint-disable** (T28 → T29 → T22 → T24) — foundation ESLint nudge (from T25 VERDICT) still open at PARENT §10 for the T22-slice-2 / T23 / T24-slice-2 multipart-adapter modules when they land.
+- No new §3 escalations, no new §10 nudges. Standard patterns throughout.
+
+**§1 task tracker updated · §0 focus updated · §4 drift baseline updated · PARENT §1 T24 row → approved · Short roll-up posted to PARENT §2 · No new §3 entries · No new §10 nudges.**
+
+**PO merge please**: branch `feat/settings-knowledge` @ `975ec6a` ready for main merge. **Zero PO ratifications needed for this task** — all Qs reuse existing open items. Slot C **7/10 approved** (T21+T22+T25+T27+T28 merged + T29+T24 approved-awaiting-merge).
+
+**Slot C queue status update**:
+- **Fully unblocked remaining**: **T23 Menu bulk ops** (`POST /menu/bulk-availability` JSON + `POST /menu/import-csv` multipart-deferred to T23-slice-2 reusing Q-T22-#1); **T22-slice-2 + T23-slice-2 + T24-slice-2** all gated on Q-T22-#1 `@fastify/multipart` PO ratify (batched).
+- **Hard-blocked at DEV** by Opsi C tier-join: T26 feature flags + T30 analytics.
+- **Next candidate**: T23-slice-1 (bulk-availability JSON endpoint — smallest remaining task; 1 endpoint + no port/adapter).
+
 <!--
 TEMPLATE — copy untuk task baru:
 
@@ -3123,6 +3197,7 @@ Re-run `make check` after fix, confirm pass, resubmit (attempt N+1).
 | 2026-07-03 T28 SUBMIT | src/modules/agents/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T29 SUBMIT | src/modules/voice/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 | 2026-07-03 T22-slice-1 SUBMIT | src/modules/menu/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
+| 2026-07-03 T24-slice-1 SUBMIT | src/modules/knowledge/** (10) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 (N/A no webhook) | 0 |
 
 > PM C jalankan drift scan per `PM-AGENT.md §3 Step 2` setiap SUBMIT + end-of-day full scan untuk slot C's touched files.
 
