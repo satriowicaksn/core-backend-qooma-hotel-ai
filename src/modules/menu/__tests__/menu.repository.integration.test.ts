@@ -323,3 +323,85 @@ describe('MenuService item CRUD + DB constraints (integration)', () => {
     await expect(service.removeItem(gmA, bItem.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+// T23-slice-1 extension. beforeEach in the enclosing scope already reseeds
+// HOTEL_A + HOTEL_B menu state per test.
+describe('MenuService.bulkAvailability (integration)', () => {
+  it('should update matching items and skip cross-tenant + nonexistent items', async () => {
+    // HOTEL_A seed: 4 items across 2 categories.
+    // Seed HOTEL_B item for cross-tenant coverage.
+    const catB = await db.menuCategory.findFirst({ where: { hotelId: HOTEL_B } });
+    if (!catB) throw new Error('seed missing');
+    const bItem = await db.menuItem.create({
+      data: {
+        id: '30000000-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        hotelId: HOTEL_B,
+        categoryId: catB.id,
+        name: 'B bulk',
+        priceIdr: new Prisma.Decimal('10000.00'),
+      },
+    });
+    const aItems = await db.menuItem.findMany({
+      where: { hotelId: HOTEL_A },
+      orderBy: { name: 'asc' },
+      take: 2,
+    });
+    const idA1 = aItems[0]?.id ?? '';
+    const idA2 = aItems[1]?.id ?? '';
+    const random1 = '99999999-9999-4999-8999-999999999991';
+    const random2 = '99999999-9999-4999-8999-999999999992';
+
+    const res = await service.bulkAvailability(gmA, {
+      item_ids: [idA1, idA2, bItem.id, random1, random2],
+      is_available: false,
+    });
+    expect(res.data.updated).toBe(2);
+    // Q-T23-#4: NOT_FOUND collapses cross-tenant + nonexistent.
+    expect(res.data.skipped).toEqual([
+      { item_id: bItem.id, reason: 'NOT_FOUND' },
+      { item_id: random1, reason: 'NOT_FOUND' },
+      { item_id: random2, reason: 'NOT_FOUND' },
+    ]);
+    // HOTEL_A items must be updated.
+    const a1After = await db.menuItem.findUnique({ where: { id: idA1 } });
+    expect(a1After?.isAvailable).toBe(false);
+    // HOTEL_B item must NOT be touched (leak-safe).
+    const bAfter = await db.menuItem.findUnique({ where: { id: bItem.id } });
+    expect(bAfter?.isAvailable).toBe(true); // Prisma default from creation
+  });
+
+  it('should return updated=0 + all skipped when nothing matches (Q-T23-#6)', async () => {
+    const random = '99999999-9999-4999-8999-999999999999';
+    const res = await service.bulkAvailability(gmA, {
+      item_ids: [random],
+      is_available: true,
+    });
+    expect(res.data.updated).toBe(0);
+    expect(res.data.skipped).toEqual([{ item_id: random, reason: 'NOT_FOUND' }]);
+  });
+
+  it('should set + clear available_window via HH:mm ↔ null round-trip', async () => {
+    const aItem = await db.menuItem.findFirst({ where: { hotelId: HOTEL_A } });
+    if (!aItem) throw new Error('seed missing');
+    // Set the window.
+    const setRes = await service.bulkAvailability(gmA, {
+      item_ids: [aItem.id],
+      available_window_from: '06:00',
+      available_window_to: '10:30',
+    });
+    expect(setRes.data.updated).toBe(1);
+    const withWindow = await db.menuItem.findUnique({ where: { id: aItem.id } });
+    expect(withWindow?.availableWindowFrom?.toISOString()).toBe('1970-01-01T06:00:00.000Z');
+    expect(withWindow?.availableWindowTo?.toISOString()).toBe('1970-01-01T10:30:00.000Z');
+    // Clear via null-null.
+    const clearRes = await service.bulkAvailability(gmA, {
+      item_ids: [aItem.id],
+      available_window_from: null,
+      available_window_to: null,
+    });
+    expect(clearRes.data.updated).toBe(1);
+    const cleared = await db.menuItem.findUnique({ where: { id: aItem.id } });
+    expect(cleared?.availableWindowFrom).toBeNull();
+    expect(cleared?.availableWindowTo).toBeNull();
+  });
+});
