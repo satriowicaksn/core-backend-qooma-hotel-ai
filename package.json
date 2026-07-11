@@ -1,6 +1,6 @@
 {
   "name": "@qooma/core-backend",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Hotel Core (CRM) backend service for Qooma — tickets, guests, visits, settings, billing, notifications, analytics. Spec: docs/spec/02-hotel-core.md.",
   "license": "UNLICENSED",
