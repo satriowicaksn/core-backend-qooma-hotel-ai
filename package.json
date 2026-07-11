@@ -25,7 +25,7 @@
     "test:unit": "jest --testPathPattern=__tests__/.*\\.test\\.ts --testPathIgnorePatterns='\\.integration\\.test\\.ts$'",
     "test:integration": "jest --testPathPattern=__tests__/.*\\.integration\\.test\\.ts --runInBand",
     "test:coverage": "jest --coverage",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "prisma generate && rm -rf node_modules/.pnpm/@prisma+client*/node_modules/.prisma",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:reset": "prisma migrate reset",
