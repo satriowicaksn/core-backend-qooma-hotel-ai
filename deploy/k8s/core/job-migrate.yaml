@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: core-migrate
+  namespace: core-staging
+spec:
+  # Preserve completed pod logs for 24 h.
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: core-migrate
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: migrate
+          image: ghcr.io/satriowicaksn/core-backend-api:latest
+          imagePullPolicy: Always
+          # `prisma` now shipped as a runtime dependency (Dockerfile pitfall 6.2).
+          # `prisma migrate deploy` is production-safe (no --dev prompts).
+          command: ['node', 'node_modules/prisma/build/index.js']
+          args: ['migrate', 'deploy']
+          envFrom:
+            - configMapRef:
+                name: core-config
+            - secretRef:
+                name: core-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 384Mi
