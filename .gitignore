@@ -53,6 +53,8 @@ Thumbs.db
 *.key
 *.crt
 secrets/
+deploy/k8s/**/secret.staging.yaml
+deploy/k8s/**/secret.production.yaml
 
 # --- Prisma generated client (re-generated saat install) ---
 src/core/prisma/generated/

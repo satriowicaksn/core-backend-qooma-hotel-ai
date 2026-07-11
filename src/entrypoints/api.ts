@@ -1,41 +1,40 @@
 /**
  * Entrypoint: HTTP API server (Fastify).
  *
- * Tanggung jawab:
- * - Register Fastify plugins (auth, hmac-validator, rate-limit, cors, error-handler)
- * - Wire up adapter → port → service (manual DI)
- * - Register module routes
- * - Graceful shutdown
+ * Minimal boot — only `/healthz` is wired here so the pod passes k8s
+ * readiness/liveness while modules land incrementally. Feature routes
+ * will be registered here as they graduate to the wiring boundary
+ * (see CLAUDE.md §4).
  */
 
-export {}; // ESM module marker — prevents global scope collision with worker.ts
+import Fastify from 'fastify';
 
-// TODO(boilerplate): implementasi setelah dependencies install + core modules siap.
-//
-// import Fastify from 'fastify';
-// import { loadConfig } from '@core/config/env.js';
-// import { createLogger } from '@core/logger/logger.js';
-// ... wire up
+import { loadConfig } from '@core/config/env.js';
 
 async function main(): Promise<void> {
-  // const config = loadConfig();
-  // const logger = createLogger({ service: 'api', level: config.LOG_LEVEL });
-  // const fastify = Fastify({ logger });
-  //
-  // await fastify.register(corsPlugin);
-  // await fastify.register(helmetPlugin);
-  // await fastify.register(rateLimitPlugin);
-  // await fastify.register(correlationIdPlugin);
-  // await fastify.register(authJwtPlugin);
-  //
-  // const services = await buildServices(config);
-  // fastify.decorate('services', services);
-  //
-  // await fastify.register(yourRoutes, { prefix: '/api' });
-  //
-  // await fastify.listen({ port: config.API_PORT, host: config.API_HOST });
+  const config = loadConfig();
 
-  console.warn('[api] Entrypoint stub — implementasi setelah core/plugins siap.');
+  const app = Fastify({
+    logger: false,
+    trustProxy: true,
+  });
+
+  app.get('/healthz', async () => ({ status: 'ok' }));
+
+  const shutdown = async (signal: string): Promise<void> => {
+    try {
+      await app.close();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    } finally {
+      void signal;
+    }
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  await app.listen({ port: config.API_PORT, host: config.API_HOST });
 }
 
 main().catch((err) => {

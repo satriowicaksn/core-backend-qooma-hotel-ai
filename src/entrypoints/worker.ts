@@ -1,36 +1,28 @@
 /**
  * Entrypoint: Bull queue worker process.
  *
- * Tanggung jawab:
- * - Register Bull queues + processors dari semua modul
- * - Scheduler untuk job berulang (kalau ada)
- * - Graceful drain saat SIGTERM
+ * Minimal boot — validates env + stays alive so the k8s Deployment
+ * does not CrashLoop while queue processors land incrementally
+ * (see CLAUDE.md §4 + docs/spec/02-hotel-core.md).
  */
 
-export {}; // ESM module marker
-
-// TODO(boilerplate): implementasi setelah Bull queue factory siap.
+import { loadConfig } from '@core/config/env.js';
 
 async function main(): Promise<void> {
-  // const config = loadConfig();
-  // const logger = createLogger({ service: 'worker', level: config.LOG_LEVEL });
-  // const services = await buildServices(config);
-  //
-  // // Register processors
-  // fooQueue.process('process_something', config.WORKER_CONCURRENCY_DEFAULT, fooProcessor);
-  //
-  // // Schedule repeatable jobs
-  // await fooQueue.add('process_something', {}, { repeat: { cron: '0 * * * *' } });
-  //
-  // process.on('SIGTERM', async () => {
-  //   logger.info('SIGTERM received, draining queues...');
-  //   await fooQueue.close();
-  //   process.exit(0);
-  // });
-  //
-  // logger.info('[worker] Started');
+  loadConfig();
 
-  console.warn('[worker] Entrypoint stub — implementasi setelah core/queue siap.');
+  // Keep the process alive; replace with `queue.process(...)` registrations
+  // once modules with queue producers ship.
+  const keepAlive = setInterval(() => {
+    /* idle */
+  }, 1 << 30);
+
+  const shutdown = (): void => {
+    clearInterval(keepAlive);
+    process.exit(0);
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 main().catch((err) => {

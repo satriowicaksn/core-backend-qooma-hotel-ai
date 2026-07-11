@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-api
+  namespace: core-staging
+  labels:
+    app: core-api
+    component: api
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: core-api
+  template:
+    metadata:
+      labels:
+        app: core-api
+        component: api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: api
+          image: ghcr.io/satriowicaksn/core-backend-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: core-config
+            - secretRef:
+                name: core-secrets
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-worker
+  namespace: core-staging
+  labels:
+    app: core-worker
+    component: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: core-worker
+  template:
+    metadata:
+      labels:
+        app: core-worker
+        component: worker
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: worker
+          image: ghcr.io/satriowicaksn/core-backend-worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: core-config
+            - secretRef:
+                name: core-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi

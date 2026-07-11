@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-config
+  namespace: core-staging
+data:
+  NODE_ENV: 'staging'
+  LOG_LEVEL: 'info'
+  TZ: 'UTC'
+  API_HOST: '0.0.0.0'
+  API_PORT: '3000'
+  RATE_LIMIT_GLOBAL_PER_MIN: '100'
+  RATE_LIMIT_WEBHOOK_PER_MIN: '300'
+  WORKER_CONCURRENCY_DEFAULT: '5'
+  JWT_ACCESS_TTL: '8h'
+  JWT_REFRESH_TTL: '30d'
+  ENCRYPTION_KEY_VERSION: 'v1'
+  # Sentry — leave blank in staging to disable.
+  SENTRY_DSN: ''
+  SENTRY_TRACES_SAMPLE_RATE: '0.1'
+  SENTRY_ENV: 'staging'
+  # Redis DB indexes (queue vs cache).
+  REDIS_QUEUE_DB: '0'
+  REDIS_CACHE_DB: '1'
+  REDIS_TLS_ENABLED: 'false'
+  # Cross-DB check gate (T21 Q-C-02): Auth co-locates in same Postgres so
+  # cross-schema FKs work; flip to 'false' once tier-gate wiring lands.
+  SKIP_CROSS_DB_CHECKS: 'true'
