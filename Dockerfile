@@ -22,7 +22,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # --- Stage 2: prisma generate -----------------------------------------------
 FROM deps AS prisma
 COPY prisma ./prisma
-RUN pnpm prisma:generate
+# `@prisma/client` postinstall drops empty type stubs at
+# `node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/*.d.ts`
+# which shadow the real generated client during tsc resolution. Remove
+# them so Node's module resolution walks up to `/app/node_modules/.prisma/client`
+# where `prisma generate` wrote the real types.
+RUN pnpm prisma:generate \
+    && rm -rf /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma
 
 # --- Stage 3: build ---------------------------------------------------------
 FROM prisma AS build
@@ -40,7 +46,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
     pnpm install --frozen-lockfile --prod=true
 COPY prisma ./prisma
-RUN pnpm prisma:generate
+# `@prisma/client` postinstall drops empty type stubs at
+# `node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/*.d.ts`
+# which shadow the real generated client during tsc resolution. Remove
+# them so Node's module resolution walks up to `/app/node_modules/.prisma/client`
+# where `prisma generate` wrote the real types.
+RUN pnpm prisma:generate \
+    && rm -rf /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma
 
 # --- Stage 5a: api runtime --------------------------------------------------
 FROM node:${NODE_VERSION} AS api
