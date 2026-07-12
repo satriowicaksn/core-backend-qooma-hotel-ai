@@ -55,7 +55,15 @@ export function serializeOverview(agg: OverviewAggRow): OverviewKpiWire {
 }
 
 export function serializeTicketBucket(row: TicketsByDayRow): TicketVolumeBucket {
-  return { date: row.date, count: row.count };
+  // `count`/`total` are the same per-day volume; FE tickets view reads
+  // total/closed/high_alert, high-alert trend_7d reads date/count.
+  return {
+    date: row.date,
+    count: row.count,
+    total: row.count,
+    closed: row.closed,
+    high_alert: row.highAlert,
+  };
 }
 
 export function serializeDepartmentPerf(row: DepartmentPerformanceRow): DepartmentPerformancePoint {
@@ -122,6 +130,43 @@ export function buildAlertSummary(deptWires: readonly HighAlertDeptWire[]): High
     threshold_exceeded_count: exceededCount,
     recommendation_key: computeRecommendationKey(exceededCount, deptWires.length),
   };
+}
+
+// Escape a CSV cell per RFC 4180 — quote when it contains a comma, quote or
+// newline; double any embedded quotes.
+function csvCell(value: string | number | null): string {
+  const s = value === null ? '' : String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function csvRow(cells: readonly (string | number | null)[]): string {
+  return cells.map(csvCell).join(',');
+}
+
+// Build an export CSV from the overview KPIs + tickets time-series. Two labeled
+// sections in one file so the FE Blob download carries both.
+export function buildExportCsv(
+  overview: OverviewKpiWire,
+  buckets: readonly TicketVolumeBucket[],
+): string {
+  const lines: string[] = [
+    csvRow(['section', 'overview']),
+    csvRow(['total_tickets', 'resolution_rate', 'avg_satisfaction', 'avg_response_time_minutes']),
+    csvRow([
+      overview.total_tickets,
+      overview.resolution_rate,
+      overview.avg_satisfaction,
+      overview.avg_response_time_minutes,
+    ]),
+    '',
+    csvRow(['section', 'tickets']),
+    csvRow(['date', 'total', 'closed', 'high_alert']),
+    ...buckets.map((b) => csvRow([b.date, b.total, b.closed, b.high_alert])),
+  ];
+  return `${lines.join('\r\n')}\r\n`;
 }
 
 // Meta wrapper — three-state tier fields per PM ACK T30 tightening #4

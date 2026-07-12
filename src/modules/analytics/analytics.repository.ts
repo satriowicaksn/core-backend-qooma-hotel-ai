@@ -26,6 +26,8 @@ interface RawOverviewRow {
 interface RawTicketByDayRow {
   bucket: Date;
   count: bigint;
+  closed: bigint;
+  high_alert: bigint;
 }
 
 interface RawHighAlertRow {
@@ -103,7 +105,9 @@ export class AnalyticsRepository {
     const rows = await this.db.$queryRaw<RawTicketByDayRow[]>(Prisma.sql`
       SELECT
         date_trunc('day', created_at) AS bucket,
-        COUNT(*)::bigint AS count
+        COUNT(*)::bigint AS count,
+        COUNT(*) FILTER (WHERE status = 'closed')::bigint AS closed,
+        COUNT(*) FILTER (WHERE is_high_alert)::bigint AS high_alert
       FROM tickets
       WHERE hotel_id = ${hotelId}::uuid
         AND created_at >= ${from}
@@ -114,6 +118,8 @@ export class AnalyticsRepository {
     return rows.map((r) => ({
       date: r.bucket.toISOString().slice(0, 10),
       count: Number(r.count),
+      closed: Number(r.closed),
+      highAlert: Number(r.high_alert),
     }));
   }
 

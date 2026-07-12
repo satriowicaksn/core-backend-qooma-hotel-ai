@@ -40,9 +40,15 @@ export interface OverviewResponse {
 }
 
 // ---------- Tickets time-series ----------
+// FE TicketsVolumePoint expects { date, total, closed, high_alert }. `count`
+// is retained as an alias of `total` so high-alert `trend_7d` (a
+// TicketVolumeBucket[]) still carries a `{ date, count }` view for the FE.
 export interface TicketVolumeBucket {
   readonly date: string;
   readonly count: number;
+  readonly total: number;
+  readonly closed: number;
+  readonly high_alert: number;
 }
 
 export interface TicketsTimeSeriesResponse {
@@ -138,6 +144,23 @@ export interface SatisfactionResponse {
   readonly meta: AnalyticsMetaWire;
 }
 
+// ---------- Export ----------
+// FE requests xlsx|pdf but no such lib is bundled — BE returns CSV built from
+// the overview + tickets time-series data. FE consumes the response as a Blob.
+export type ExportFormat = 'xlsx' | 'pdf';
+
+export interface ExportQuery {
+  readonly from: Date;
+  readonly to: Date;
+  readonly period: PeriodBucket;
+  readonly format: ExportFormat;
+}
+
+export interface ExportResult {
+  readonly filename: string;
+  readonly csv: string;
+}
+
 // ---------- Repository row types ----------
 // Prisma aggregation-result shapes returned by the repository. Kept internal
 // so the routes/service layer doesn't leak Decimal.
@@ -152,6 +175,8 @@ export interface OverviewAggRow {
 export interface TicketsByDayRow {
   readonly date: string; // YYYY-MM-DD
   readonly count: number;
+  readonly closed: number;
+  readonly highAlert: number;
 }
 
 export interface HighAlertDeptRow {

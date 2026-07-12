@@ -9,6 +9,7 @@ import { analyticsRoutes } from '../analytics.routes.js';
 import type { AnalyticsService } from '../analytics.service.js';
 import type {
   DepartmentPerformanceResponse,
+  ExportResult,
   HighAlertResponse,
   OverviewResponse,
   PeakHoursResponse,
@@ -39,8 +40,13 @@ const OVERVIEW_RESULT: OverviewResponse = {
 };
 
 const TICKETS_RESULT: TicketsTimeSeriesResponse = {
-  data: [{ date: '2026-06-01', count: 5 }],
+  data: [{ date: '2026-06-01', count: 5, total: 5, closed: 3, high_alert: 1 }],
   meta: META,
+};
+
+const EXPORT_RESULT: ExportResult = {
+  filename: 'analytics-2026-06-01-2026-06-30.csv',
+  csv: 'section,overview\r\ntotal_tickets\r\n42\r\n',
 };
 
 const HIGH_ALERT_RESULT: HighAlertResponse = {
@@ -97,6 +103,7 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     peakHours: () => Promise.resolve(PEAK_HOURS_RESULT),
     topRequests: () => Promise.resolve(TOP_REQUESTS_RESULT),
     satisfaction: () => Promise.resolve(SATISFACTION_RESULT),
+    export: () => Promise.resolve(EXPORT_RESULT),
   } as unknown as AnalyticsService;
 
   const app = Fastify();
@@ -302,6 +309,55 @@ describe('analyticsRoutes', () => {
     it('should 403 for staff', async () => {
       app = buildApp(STAFF, recorder);
       const res = await app.inject({ method: 'GET', url: '/analytics/satisfaction' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/export', () => {
+    it('should return CSV with attachment headers', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/export?format=xlsx',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toBe(
+        'attachment; filename="analytics-2026-06-01-2026-06-30.csv"',
+      );
+      expect(res.body).toBe(EXPORT_RESULT.csv);
+    });
+
+    it('should accept format=pdf', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/export?format=pdf',
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should 400 without a format param', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export' });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should 400 on bogus format', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=csv' });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=xlsx' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=xlsx' });
       expect(res.statusCode).toBe(403);
     });
   });

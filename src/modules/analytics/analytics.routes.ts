@@ -9,7 +9,7 @@ import { AuthError } from '@core/errors/app-errors.js';
 import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
-import { parseRangeQuery } from './analytics.schema.js';
+import { parseExportQuery, parseRangeQuery } from './analytics.schema.js';
 import type { AnalyticsService } from './analytics.service.js';
 
 export interface AnalyticsRoutesOptions {
@@ -122,6 +122,21 @@ export const analyticsRoutes: FastifyPluginCallback<AnalyticsRoutesOptions> = (
     );
     const result = await service.satisfaction(ctx, query);
     return reply.send(result);
+  });
+
+  fastify.get('/analytics/export', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const query = parseExportQuery(req.query);
+    req.log.info(
+      { module: 'analytics', action: 'export', correlationId: correlationIdOf(req) },
+      'analytics export',
+    );
+    const { filename, csv } = await service.export(ctx, query);
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .send(csv);
   });
 
   done();

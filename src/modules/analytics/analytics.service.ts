@@ -9,6 +9,7 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 import type { AnalyticsRepository } from './analytics.repository.js';
 import {
   buildAlertSummary,
+  buildExportCsv,
   buildMeta,
   serializeDepartmentPerf,
   serializeHighAlertDept,
@@ -20,6 +21,8 @@ import {
 } from './analytics.serializer.js';
 import type {
   DepartmentPerformanceResponse,
+  ExportQuery,
+  ExportResult,
   HighAlertDeptWire,
   HighAlertResponse,
   OverviewResponse,
@@ -170,5 +173,23 @@ export class AnalyticsService {
       data: rows.map(serializeSatisfactionPoint),
       meta: buildMeta(query.from, query.to, query.period),
     };
+  }
+
+  /**
+   * FE requests format=xlsx|pdf but no xlsx/pdf lib is bundled — we return a
+   * CSV built from overview KPIs + tickets time-series (reusing the same repo
+   * aggregations as the live endpoints). FE consumes the response as a Blob so
+   * the CSV downloads fine regardless of the requested `format`.
+   */
+  async export(ctx: TenantContext, query: ExportQuery): Promise<ExportResult> {
+    this.assertTierGate(ctx);
+    const [agg, rows] = await Promise.all([
+      this.repo.overviewAgg(ctx.hotelId, query.from, query.to),
+      this.repo.ticketsByDay(ctx.hotelId, query.from, query.to),
+    ]);
+    const csv = buildExportCsv(serializeOverview(agg), rows.map(serializeTicketBucket));
+    const fromDay = query.from.toISOString().slice(0, 10);
+    const toDay = query.to.toISOString().slice(0, 10);
+    return { filename: `analytics-${fromDay}-${toDay}.csv`, csv };
   }
 }
