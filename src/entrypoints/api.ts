@@ -32,10 +32,22 @@ import { buildVisitsService, visitsRoutes } from '@modules/visits/index.js';
 import { buildVoiceService, voiceRoutes } from '@modules/voice/index.js';
 import { buildWaTemplatesService, waTemplatesRoutes } from '@modules/wa-templates/index.js';
 import { configureTenantGuardHooks } from '@plugins/tenant-guard.hooks.js';
+import type { SessionRole, SessionUser } from '@plugins/tenant-guard.js';
 
 // Side-effect: activates @fastify/jwt + Fastify type augmentations
 // (req.user → SessionUser, req.tenant → TenantContext).
 import '@plugins/tenant-guard.types.js';
+
+// Access-token claims minted by auth-backend (its `SignedPayload`): `sub` is the
+// userId; hotelId/deptId are null for super_admin. Distinct from SessionUser,
+// so the cookie hook must map claims → SessionUser (not assign the raw payload).
+interface AccessTokenClaims {
+  readonly sub: string;
+  readonly sid: string;
+  readonly role: SessionRole;
+  readonly hotelId: string | null;
+  readonly deptId: string | null;
+}
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -86,7 +98,17 @@ async function main(): Promise<void> {
       const cookieHeader = req.headers.cookie ?? '';
       const token = /(?:^|;\s*)token=([^;]+)/.exec(cookieHeader)?.[1];
       if (token) {
-        req.user = app.jwt.verify(token);
+        // auth signs `sub` (not `userId`) + nullable hotelId/deptId. Map onto
+        // SessionUser so ctx.userId is populated — notifications, ticket/visit
+        // audit and feature-flag updated_by all read ctx.userId.
+        const claims = app.jwt.verify<AccessTokenClaims>(token);
+        const user: SessionUser = {
+          userId: claims.sub,
+          hotelId: claims.hotelId ?? '',
+          role: claims.role,
+          ...(claims.deptId !== null ? { deptId: claims.deptId } : {}),
+        };
+        req.user = user;
       }
     } catch {
       // Unauthenticated — req.user stays undefined; routes throw AuthError.
