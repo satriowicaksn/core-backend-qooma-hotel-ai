@@ -83,6 +83,61 @@ export interface HighAlertResponse {
   readonly meta: AnalyticsMetaWire;
 }
 
+// ---------- Department performance ----------
+export interface DepartmentRefWire {
+  readonly id: string;
+  readonly name: string;
+  readonly code: string;
+}
+
+export interface DepartmentPerformancePoint {
+  readonly department: DepartmentRefWire;
+  readonly total: number;
+  readonly closed: number;
+  readonly avg_response_minutes: number;
+}
+
+export interface DepartmentPerformanceResponse {
+  readonly data: readonly DepartmentPerformancePoint[];
+  readonly meta: AnalyticsMetaWire;
+}
+
+// ---------- Peak hours ----------
+export interface PeakHoursBucket {
+  readonly weekday: number;
+  readonly hour: number;
+  readonly total: number;
+}
+
+export interface PeakHoursResponse {
+  readonly data: readonly PeakHoursBucket[];
+  readonly max: number;
+  readonly meta: AnalyticsMetaWire;
+}
+
+// ---------- Top requests ----------
+export interface TopRequest {
+  readonly code: string;
+  readonly total: number;
+}
+
+export interface TopRequestsResponse {
+  readonly data: readonly TopRequest[];
+  readonly meta: AnalyticsMetaWire;
+}
+
+// ---------- Satisfaction ----------
+export interface SatisfactionPoint {
+  readonly date: string;
+  readonly score: number;
+  readonly responses: number;
+}
+
+export interface SatisfactionResponse {
+  readonly data: readonly SatisfactionPoint[];
+  readonly meta: AnalyticsMetaWire;
+}
+
 // ---------- Repository row types ----------
 // Prisma aggregation-result shapes returned by the repository. Kept internal
 // so the routes/service layer doesn't leak Decimal.
@@ -105,4 +160,30 @@ export interface HighAlertDeptRow {
   readonly currentHighAlert: number;
   readonly prevCount: number;
   readonly prevHighAlert: number;
+}
+
+export interface DepartmentPerformanceRow {
+  readonly departmentId: string;
+  readonly departmentName: string;
+  readonly departmentCode: string;
+  readonly total: number;
+  readonly closed: number;
+  readonly avgResponseMinutes: number;
+}
+
+export interface PeakHoursRow {
+  readonly weekday: number;
+  readonly hour: number;
+  readonly total: number;
+}
+
+export interface TopRequestRow {
+  readonly code: string;
+  readonly total: number;
+}
+
+export interface SatisfactionRow {
+  readonly date: string; // YYYY-MM-DD
+  readonly score: number;
+  readonly responses: number;
 }

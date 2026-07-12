@@ -6,7 +6,15 @@
 
 import { Prisma, type PrismaClient } from '@prisma/client';
 
-import type { HighAlertDeptRow, OverviewAggRow, TicketsByDayRow } from './analytics.types.js';
+import type {
+  DepartmentPerformanceRow,
+  HighAlertDeptRow,
+  OverviewAggRow,
+  PeakHoursRow,
+  SatisfactionRow,
+  TicketsByDayRow,
+  TopRequestRow,
+} from './analytics.types.js';
 
 interface RawOverviewRow {
   total_tickets: bigint;
@@ -26,6 +34,32 @@ interface RawHighAlertRow {
   current_high_alert: bigint;
   prev_count: bigint;
   prev_high_alert: bigint;
+}
+
+interface RawDepartmentPerfRow {
+  department_id: string;
+  department_name: string;
+  department_code: string;
+  total: bigint;
+  closed: bigint;
+  avg_response_minutes: Prisma.Decimal | null;
+}
+
+interface RawPeakHoursRow {
+  weekday: number;
+  hour: number;
+  total: bigint;
+}
+
+interface RawTopRequestRow {
+  code: string;
+  total: bigint;
+}
+
+interface RawSatisfactionRow {
+  bucket: Date;
+  score: Prisma.Decimal | null;
+  responses: bigint;
 }
 
 export class AnalyticsRepository {
@@ -117,6 +151,103 @@ export class AnalyticsRepository {
       currentHighAlert: Number(r.current_high_alert),
       prevCount: Number(r.prev_count),
       prevHighAlert: Number(r.prev_high_alert),
+    }));
+  }
+
+  async departmentPerformance(
+    hotelId: string,
+    from: Date,
+    to: Date,
+  ): Promise<DepartmentPerformanceRow[]> {
+    const rows = await this.db.$queryRaw<RawDepartmentPerfRow[]>(Prisma.sql`
+      SELECT
+        d.id AS department_id,
+        d.name AS department_name,
+        d.code AS department_code,
+        COUNT(t.id)::bigint AS total,
+        COUNT(t.id) FILTER (WHERE t.status = 'closed')::bigint AS closed,
+        COALESCE(
+          AVG(EXTRACT(EPOCH FROM (t.closed_at - t.created_at)) / 60.0)
+            FILTER (WHERE t.status = 'closed'),
+          0
+        ) AS avg_response_minutes
+      FROM tickets t
+      JOIN departments d ON d.id = t.department_id
+      WHERE t.hotel_id = ${hotelId}::uuid
+        AND t.created_at >= ${from}
+        AND t.created_at <= ${to}
+      GROUP BY d.id, d.name, d.code
+      ORDER BY total DESC
+    `);
+    return rows.map((r) => ({
+      departmentId: r.department_id,
+      departmentName: r.department_name,
+      departmentCode: r.department_code,
+      total: Number(r.total),
+      closed: Number(r.closed),
+      avgResponseMinutes: r.avg_response_minutes ? Number(r.avg_response_minutes.toFixed(2)) : 0,
+    }));
+  }
+
+  async peakHours(hotelId: string, from: Date, to: Date): Promise<PeakHoursRow[]> {
+    const rows = await this.db.$queryRaw<RawPeakHoursRow[]>(Prisma.sql`
+      SELECT
+        EXTRACT(DOW FROM created_at)::int AS weekday,
+        EXTRACT(HOUR FROM created_at)::int AS hour,
+        COUNT(*)::bigint AS total
+      FROM tickets
+      WHERE hotel_id = ${hotelId}::uuid
+        AND created_at >= ${from}
+        AND created_at <= ${to}
+      GROUP BY weekday, hour
+      ORDER BY weekday ASC, hour ASC
+    `);
+    return rows.map((r) => ({
+      weekday: r.weekday,
+      hour: r.hour,
+      total: Number(r.total),
+    }));
+  }
+
+  async topRequests(hotelId: string, from: Date, to: Date): Promise<TopRequestRow[]> {
+    const rows = await this.db.$queryRaw<RawTopRequestRow[]>(Prisma.sql`
+      SELECT
+        complaint_type AS code,
+        COUNT(*)::bigint AS total
+      FROM tickets
+      WHERE hotel_id = ${hotelId}::uuid
+        AND created_at >= ${from}
+        AND created_at <= ${to}
+        AND complaint_type IS NOT NULL
+      GROUP BY complaint_type
+      ORDER BY total DESC
+      LIMIT 10
+    `);
+    return rows.map((r) => ({
+      code: r.code,
+      total: Number(r.total),
+    }));
+  }
+
+  async satisfactionByDay(hotelId: string, from: Date, to: Date): Promise<SatisfactionRow[]> {
+    const rows = await this.db.$queryRaw<RawSatisfactionRow[]>(Prisma.sql`
+      SELECT
+        DATE(closed_at) AS bucket,
+        AVG(resolved_satisfaction) AS score,
+        COUNT(*)::bigint AS responses
+      FROM tickets
+      WHERE hotel_id = ${hotelId}::uuid
+        AND created_at >= ${from}
+        AND created_at <= ${to}
+        AND resolved_satisfaction IS NOT NULL
+        AND closed_at IS NOT NULL
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `);
+    return rows.map((r) => ({
+      date: r.bucket.toISOString().slice(0, 10),
+      score: r.score ? Number(r.score.toFixed(2)) : 0,
+      responses: Number(r.responses),
     }));
   }
 }

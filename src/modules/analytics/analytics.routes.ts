@@ -76,5 +76,53 @@ export const analyticsRoutes: FastifyPluginCallback<AnalyticsRoutesOptions> = (
     return reply.send(result);
   });
 
+  fastify.get('/analytics/departments', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const query = parseRangeQuery(req.query);
+    req.log.info(
+      { module: 'analytics', action: 'departments', correlationId: correlationIdOf(req) },
+      'analytics departments',
+    );
+    const result = await service.departments(ctx, query);
+    return reply.send(result);
+  });
+
+  fastify.get('/analytics/peak-hours', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const query = parseRangeQuery(req.query);
+    req.log.info(
+      { module: 'analytics', action: 'peak-hours', correlationId: correlationIdOf(req) },
+      'analytics peak-hours',
+    );
+    const result = await service.peakHours(ctx, query);
+    return reply.send(result);
+  });
+
+  fastify.get('/analytics/top-requests', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const query = parseRangeQuery(req.query);
+    req.log.info(
+      { module: 'analytics', action: 'top-requests', correlationId: correlationIdOf(req) },
+      'analytics top-requests',
+    );
+    const result = await service.topRequests(ctx, query);
+    return reply.send(result);
+  });
+
+  fastify.get('/analytics/satisfaction', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const query = parseRangeQuery(req.query);
+    req.log.info(
+      { module: 'analytics', action: 'satisfaction', correlationId: correlationIdOf(req) },
+      'analytics satisfaction',
+    );
+    const result = await service.satisfaction(ctx, query);
+    return reply.send(result);
+  });
+
   done();
 };

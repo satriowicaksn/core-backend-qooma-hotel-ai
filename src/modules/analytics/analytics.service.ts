@@ -10,17 +10,25 @@ import type { AnalyticsRepository } from './analytics.repository.js';
 import {
   buildAlertSummary,
   buildMeta,
+  serializeDepartmentPerf,
   serializeHighAlertDept,
   serializeOverview,
+  serializePeakHoursBucket,
+  serializeSatisfactionPoint,
   serializeTicketBucket,
+  serializeTopRequest,
 } from './analytics.serializer.js';
 import type {
+  DepartmentPerformanceResponse,
   HighAlertDeptWire,
   HighAlertResponse,
   OverviewResponse,
+  PeakHoursResponse,
   RangeQuery,
+  SatisfactionResponse,
   TicketVolumeBucket,
   TicketsTimeSeriesResponse,
+  TopRequestsResponse,
 } from './analytics.types.js';
 
 export interface AnalyticsServiceOptions {
@@ -121,6 +129,45 @@ export class AnalyticsService {
     return {
       data: deptWires,
       alert_summary: buildAlertSummary(deptWires),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async departments(ctx: TenantContext, query: RangeQuery): Promise<DepartmentPerformanceResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.departmentPerformance(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeDepartmentPerf),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async peakHours(ctx: TenantContext, query: RangeQuery): Promise<PeakHoursResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.peakHours(ctx.hotelId, query.from, query.to);
+    const data = rows.map(serializePeakHoursBucket);
+    const max = data.reduce((acc, b) => (b.total > acc ? b.total : acc), 0);
+    return {
+      data,
+      max,
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async topRequests(ctx: TenantContext, query: RangeQuery): Promise<TopRequestsResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.topRequests(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeTopRequest),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async satisfaction(ctx: TenantContext, query: RangeQuery): Promise<SatisfactionResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.satisfactionByDay(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeSatisfactionPoint),
       meta: buildMeta(query.from, query.to, query.period),
     };
   }

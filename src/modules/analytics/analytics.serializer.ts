@@ -3,15 +3,23 @@
 
 import type {
   AnalyticsMetaWire,
+  DepartmentPerformancePoint,
+  DepartmentPerformanceRow,
   HighAlertDeptRow,
   HighAlertDeptWire,
   HighAlertSummary,
   OverviewAggRow,
   OverviewKpiWire,
+  PeakHoursBucket,
+  PeakHoursRow,
   PeriodBucket,
   RecommendationKey,
+  SatisfactionPoint,
+  SatisfactionRow,
   TicketVolumeBucket,
   TicketsByDayRow,
+  TopRequest,
+  TopRequestRow,
 } from './analytics.types.js';
 
 // PM ACK T30 tightening #1: spec §1.4:161 formula `current > prev * 1.10`.
@@ -48,6 +56,31 @@ export function serializeOverview(agg: OverviewAggRow): OverviewKpiWire {
 
 export function serializeTicketBucket(row: TicketsByDayRow): TicketVolumeBucket {
   return { date: row.date, count: row.count };
+}
+
+export function serializeDepartmentPerf(row: DepartmentPerformanceRow): DepartmentPerformancePoint {
+  return {
+    department: {
+      id: row.departmentId,
+      name: row.departmentName,
+      code: row.departmentCode,
+    },
+    total: row.total,
+    closed: row.closed,
+    avg_response_minutes: row.avgResponseMinutes,
+  };
+}
+
+export function serializePeakHoursBucket(row: PeakHoursRow): PeakHoursBucket {
+  return { weekday: row.weekday, hour: row.hour, total: row.total };
+}
+
+export function serializeTopRequest(row: TopRequestRow): TopRequest {
+  return { code: row.code, total: row.total };
+}
+
+export function serializeSatisfactionPoint(row: SatisfactionRow): SatisfactionPoint {
+  return { date: row.date, score: row.score, responses: row.responses };
 }
 
 // Compute a per-dept high-alert wire from the joined agg row + a per-dept
