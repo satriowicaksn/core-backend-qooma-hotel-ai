@@ -31,7 +31,6 @@ import { buildTicketsService, ticketsRoutes } from '@modules/tickets/index.js';
 import { buildVisitsService, visitsRoutes } from '@modules/visits/index.js';
 import { buildVoiceService, voiceRoutes } from '@modules/voice/index.js';
 import { buildWaTemplatesService, waTemplatesRoutes } from '@modules/wa-templates/index.js';
-
 import { configureTenantGuardHooks } from '@plugins/tenant-guard.hooks.js';
 
 // Side-effect: activates @fastify/jwt + Fastify type augmentations
