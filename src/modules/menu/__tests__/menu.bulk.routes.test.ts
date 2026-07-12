@@ -79,12 +79,12 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1, ID_A2], is_available: true },
+      payload: { ids: [ID_A1, ID_A2], is_available: true },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual(BULK_RESULT);
     expect(recorder.bulkBody).toEqual({
-      item_ids: [ID_A1, ID_A2],
+      ids: [ID_A1, ID_A2],
       is_available: true,
     });
   });
@@ -94,7 +94,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1], is_available: true },
+      payload: { ids: [ID_A1], is_available: true },
     });
     expect(res.statusCode).toBe(401);
   });
@@ -104,7 +104,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1], is_available: true },
+      payload: { ids: [ID_A1], is_available: true },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -114,7 +114,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1], is_available: true },
+      payload: { ids: [ID_A1], is_available: true },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -124,7 +124,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1], is_available: true },
+      payload: { ids: [ID_A1], is_available: true },
     });
     expect(res.statusCode).toBe(200);
   });
@@ -134,7 +134,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [], is_available: true },
+      payload: { ids: [], is_available: true },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -144,7 +144,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1] },
+      payload: { ids: [ID_A1] },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -155,7 +155,7 @@ describe('POST /settings/menu/bulk-availability', () => {
       method: 'POST',
       url: '/settings/menu/bulk-availability',
       payload: {
-        item_ids: [ID_A1],
+        ids: [ID_A1],
         is_available: true,
         hotel_id: 'attacker',
       },
@@ -168,7 +168,7 @@ describe('POST /settings/menu/bulk-availability', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/settings/menu/bulk-availability',
-      payload: { item_ids: [ID_A1], available_window_from: '06:00' },
+      payload: { ids: [ID_A1], available_window_from: '06:00' },
     });
     expect(res.statusCode).toBe(400);
   });

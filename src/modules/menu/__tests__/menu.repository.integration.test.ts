@@ -10,6 +10,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 import { ConflictError, NotFoundError } from '@core/errors/app-errors.js';
+import { InMemoryAdapter } from '@core/storage/in-memory-adapter.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -101,7 +102,7 @@ beforeAll(async () => {
     stdio: 'ignore',
   });
   db = new PrismaClient({ datasources: { db: { url } } });
-  service = buildMenuService(db);
+  service = buildMenuService(db, new InMemoryAdapter());
 }, 180_000);
 
 afterAll(async () => {
@@ -352,7 +353,7 @@ describe('MenuService.bulkAvailability (integration)', () => {
     const random2 = '99999999-9999-4999-8999-999999999992';
 
     const res = await service.bulkAvailability(gmA, {
-      item_ids: [idA1, idA2, bItem.id, random1, random2],
+      ids: [idA1, idA2, bItem.id, random1, random2],
       is_available: false,
     });
     expect(res.data.updated).toBe(2);
@@ -373,7 +374,7 @@ describe('MenuService.bulkAvailability (integration)', () => {
   it('should return updated=0 + all skipped when nothing matches (Q-T23-#6)', async () => {
     const random = '99999999-9999-4999-8999-999999999999';
     const res = await service.bulkAvailability(gmA, {
-      item_ids: [random],
+      ids: [random],
       is_available: true,
     });
     expect(res.data.updated).toBe(0);
@@ -385,7 +386,7 @@ describe('MenuService.bulkAvailability (integration)', () => {
     if (!aItem) throw new Error('seed missing');
     // Set the window.
     const setRes = await service.bulkAvailability(gmA, {
-      item_ids: [aItem.id],
+      ids: [aItem.id],
       available_window_from: '06:00',
       available_window_to: '10:30',
     });
@@ -395,7 +396,7 @@ describe('MenuService.bulkAvailability (integration)', () => {
     expect(withWindow?.availableWindowTo?.toISOString()).toBe('1970-01-01T10:30:00.000Z');
     // Clear via null-null.
     const clearRes = await service.bulkAvailability(gmA, {
-      item_ids: [aItem.id],
+      ids: [aItem.id],
       available_window_from: null,
       available_window_to: null,
     });

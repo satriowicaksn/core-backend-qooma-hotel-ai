@@ -1,3 +1,4 @@
+import multipart from '@fastify/multipart';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import Fastify, { type FastifyInstance } from 'fastify';
 
@@ -7,7 +8,56 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import { menuRoutes } from '../menu.routes.js';
 import type { MenuService } from '../menu.service.js';
-import type { MenuCategoryResponse, MenuItemResponse, MenuListResponse } from '../menu.types.js';
+import type {
+  MenuCategoryResponse,
+  MenuCsvImportResult,
+  MenuItemResponse,
+  MenuListResponse,
+} from '../menu.types.js';
+
+const CSV_IMPORT_RESULT: MenuCsvImportResult = {
+  imported: 2,
+  skipped: 1,
+  errors: [{ row: 4, reason: 'price_idr: Expected number' }],
+};
+
+// Minimal multipart/form-data encoder for inject payloads. Each entry is
+// either a text field or a file (Buffer + filename + contentType).
+const BOUNDARY = 'testboundary1234';
+
+interface MultipartFilePart {
+  readonly filename: string;
+  readonly contentType: string;
+  readonly body: Buffer;
+}
+
+function encodeMultipart(
+  textFields: Record<string, string>,
+  fileParts: Record<string, MultipartFilePart> = {},
+): Buffer {
+  const chunks: Buffer[] = [];
+  for (const [name, value] of Object.entries(textFields)) {
+    chunks.push(
+      Buffer.from(
+        `--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+      ),
+    );
+  }
+  for (const [name, part] of Object.entries(fileParts)) {
+    chunks.push(
+      Buffer.from(
+        `--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name}"; filename="${part.filename}"\r\n` +
+          `Content-Type: ${part.contentType}\r\n\r\n`,
+      ),
+      part.body,
+      Buffer.from('\r\n'),
+    );
+  }
+  chunks.push(Buffer.from(`--${BOUNDARY}--\r\n`));
+  return Buffer.concat(chunks);
+}
+
+const MULTIPART_HEADERS = { 'content-type': `multipart/form-data; boundary=${BOUNDARY}` };
 
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const CATEGORY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -49,6 +99,9 @@ interface Recorder {
   createCategoryThrow?: Error;
   removeCategoryThrow?: Error;
   createItemThrow?: Error;
+  formFields?: Record<string, string | undefined>;
+  formImage?: unknown;
+  csvText?: string;
 }
 
 function buildApp(tenant: TenantContext | undefined, recorder: Recorder): FastifyInstance {
@@ -69,9 +122,33 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     },
     updateItem: (): Promise<MenuItemResponse> => Promise.resolve(ITEM_RESULT),
     removeItem: (): Promise<void> => Promise.resolve(),
+    createItemFromForm: (
+      _ctx: TenantContext,
+      fields: Record<string, string | undefined>,
+      image?: unknown,
+    ): Promise<MenuItemResponse> => {
+      recorder.formFields = fields;
+      recorder.formImage = image;
+      return Promise.resolve(ITEM_RESULT);
+    },
+    updateItemFromForm: (
+      _ctx: TenantContext,
+      _id: string,
+      fields: Record<string, string | undefined>,
+      image?: unknown,
+    ): Promise<MenuItemResponse> => {
+      recorder.formFields = fields;
+      recorder.formImage = image;
+      return Promise.resolve(ITEM_RESULT);
+    },
+    importCsv: (_ctx: TenantContext, csvText: string): Promise<MenuCsvImportResult> => {
+      recorder.csvText = csvText;
+      return Promise.resolve(CSV_IMPORT_RESULT);
+    },
   } as unknown as MenuService;
 
   const app = Fastify();
+  void app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof AppError) {
       return reply.code(err.statusCode).send(err.toJson());
@@ -312,6 +389,106 @@ describe('menuRoutes', () => {
       app = buildApp(GM, recorder);
       const res = await app.inject({ method: 'DELETE', url: `/settings/menu/${ITEM_ID}` });
       expect(res.statusCode).toBe(204);
+    });
+  });
+
+  describe('POST /settings/menu (multipart)', () => {
+    it('should route multipart to createItemFromForm with fields + image', async () => {
+      app = buildApp(GM, recorder);
+      const payload = encodeMultipart(
+        { category_id: CATEGORY_ID, name: 'Latte', price_idr: '30000', is_available: 'true' },
+        {
+          image: {
+            filename: 'latte.jpg',
+            contentType: 'image/jpeg',
+            body: Buffer.from('jpegbytes'),
+          },
+        },
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/menu',
+        headers: MULTIPART_HEADERS,
+        payload,
+      });
+      expect(res.statusCode).toBe(201);
+      expect(recorder.formFields).toMatchObject({ name: 'Latte', price_idr: '30000' });
+      expect(recorder.formImage).toBeDefined();
+    });
+
+    it('should still accept the JSON path (non-multipart)', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/menu',
+        payload: { category_id: CATEGORY_ID, name: 'Coffee', price_idr: 25000 },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(recorder.formFields).toBeUndefined();
+    });
+  });
+
+  describe('PATCH /settings/menu/:id (multipart)', () => {
+    it('should route multipart to updateItemFromForm', async () => {
+      app = buildApp(GM, recorder);
+      const payload = encodeMultipart({ name: 'Cold Brew', is_available: 'false' });
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/settings/menu/${ITEM_ID}`,
+        headers: MULTIPART_HEADERS,
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(recorder.formFields).toMatchObject({ name: 'Cold Brew', is_available: 'false' });
+    });
+  });
+
+  describe('POST /settings/menu/import-csv', () => {
+    it('should read the CSV file and return the import result', async () => {
+      app = buildApp(GM, recorder);
+      const csv = 'name,description,price_idr,category_id,prep_minutes,is_available\n';
+      const payload = encodeMultipart(
+        {},
+        {
+          file: { filename: 'menu.csv', contentType: 'text/csv', body: Buffer.from(csv) },
+        },
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/menu/import-csv',
+        headers: MULTIPART_HEADERS,
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual(CSV_IMPORT_RESULT);
+      expect(recorder.csvText).toBe(csv);
+    });
+
+    it('should 400 when no file part is present', async () => {
+      app = buildApp(GM, recorder);
+      const payload = encodeMultipart({ notfile: 'x' });
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/menu/import-csv',
+        headers: MULTIPART_HEADERS,
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should 403 for dept_head', async () => {
+      app = buildApp(DEPT_HEAD, recorder);
+      const payload = encodeMultipart(
+        {},
+        { file: { filename: 'm.csv', contentType: 'text/csv', body: Buffer.from('x') } },
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/menu/import-csv',
+        headers: MULTIPART_HEADERS,
+        payload,
+      });
+      expect(res.statusCode).toBe(403);
     });
   });
 });

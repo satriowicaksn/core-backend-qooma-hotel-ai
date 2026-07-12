@@ -4,6 +4,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { ValidationError } from '@core/errors/app-errors.js';
+import { InMemoryAdapter } from '@core/storage/in-memory-adapter.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -36,19 +37,23 @@ function fakeRepo(overrides: Partial<MenuRepository> = {}): MenuRepository {
   } as unknown as MenuRepository;
 }
 
+function makeService(repo: MenuRepository, storage = new InMemoryAdapter()): MenuService {
+  return new MenuService(repo, storage);
+}
+
 describe('parseBulkAvailabilityBody (zod)', () => {
   it('should accept a valid body with is_available only', () => {
     const body = parseBulkAvailabilityBody({
-      item_ids: [ID_A1],
+      ids: [ID_A1],
       is_available: false,
     });
-    expect(body.item_ids).toEqual([ID_A1]);
+    expect(body.ids).toEqual([ID_A1]);
     expect(body.is_available).toBe(false);
   });
 
   it('should accept a valid body with a full window', () => {
     const body = parseBulkAvailabilityBody({
-      item_ids: [ID_A1, ID_A2],
+      ids: [ID_A1, ID_A2],
       available_window_from: '06:00',
       available_window_to: '18:00',
     });
@@ -57,7 +62,7 @@ describe('parseBulkAvailabilityBody (zod)', () => {
   });
 
   it('should reject empty item_ids (min 1)', () => {
-    expect(() => parseBulkAvailabilityBody({ item_ids: [], is_available: true })).toThrow(
+    expect(() => parseBulkAvailabilityBody({ ids: [], is_available: true })).toThrow(
       ValidationError,
     );
   });
@@ -67,8 +72,8 @@ describe('parseBulkAvailabilityBody (zod)', () => {
       const idx = String(i).padStart(4, '0');
       return `30000${idx.slice(0, 3)}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
     });
-    const body = parseBulkAvailabilityBody({ item_ids: many, is_available: true });
-    expect(body.item_ids).toHaveLength(100);
+    const body = parseBulkAvailabilityBody({ ids: many, is_available: true });
+    expect(body.ids).toHaveLength(100);
   });
 
   it('should reject item_ids over N=100 (Q-T23-#3)', () => {
@@ -76,24 +81,24 @@ describe('parseBulkAvailabilityBody (zod)', () => {
       const idx = String(i).padStart(4, '0');
       return `30000${idx.slice(0, 3)}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
     });
-    expect(() => parseBulkAvailabilityBody({ item_ids: tooMany, is_available: true })).toThrow(
+    expect(() => parseBulkAvailabilityBody({ ids: tooMany, is_available: true })).toThrow(
       ValidationError,
     );
   });
 
   it('should reject non-uuid item_ids', () => {
-    expect(() =>
-      parseBulkAvailabilityBody({ item_ids: ['not-a-uuid'], is_available: true }),
-    ).toThrow(ValidationError);
+    expect(() => parseBulkAvailabilityBody({ ids: ['not-a-uuid'], is_available: true })).toThrow(
+      ValidationError,
+    );
   });
 
   it('should reject body with no delta field (Q-T23-#5)', () => {
-    expect(() => parseBulkAvailabilityBody({ item_ids: [ID_A1] })).toThrow(ValidationError);
+    expect(() => parseBulkAvailabilityBody({ ids: [ID_A1] })).toThrow(ValidationError);
   });
 
   it('should treat null as defined for refine-non-empty (PM ACK note)', () => {
     const body = parseBulkAvailabilityBody({
-      item_ids: [ID_A1],
+      ids: [ID_A1],
       available_window_from: null,
       available_window_to: null,
     });
@@ -104,7 +109,7 @@ describe('parseBulkAvailabilityBody (zod)', () => {
   it('should reject only-from (both-or-neither via refineAvailableWindow reuse)', () => {
     expect(() =>
       parseBulkAvailabilityBody({
-        item_ids: [ID_A1],
+        ids: [ID_A1],
         available_window_from: '06:00',
       }),
     ).toThrow(ValidationError);
@@ -113,7 +118,7 @@ describe('parseBulkAvailabilityBody (zod)', () => {
   it('should reject from >= to (strictly-less-than via refineAvailableWindow reuse)', () => {
     expect(() =>
       parseBulkAvailabilityBody({
-        item_ids: [ID_A1],
+        ids: [ID_A1],
         available_window_from: '18:00',
         available_window_to: '06:00',
       }),
@@ -121,7 +126,7 @@ describe('parseBulkAvailabilityBody (zod)', () => {
   });
 
   it('should allow no window at all (both undefined)', () => {
-    const body = parseBulkAvailabilityBody({ item_ids: [ID_A1], is_available: true });
+    const body = parseBulkAvailabilityBody({ ids: [ID_A1], is_available: true });
     expect(body.available_window_from).toBeUndefined();
     expect(body.available_window_to).toBeUndefined();
   });
@@ -129,7 +134,7 @@ describe('parseBulkAvailabilityBody (zod)', () => {
   it('should reject unknown field (strict — hotel_id belt-and-suspenders)', () => {
     expect(() =>
       parseBulkAvailabilityBody({
-        item_ids: [ID_A1],
+        ids: [ID_A1],
         is_available: true,
         hotel_id: 'attacker',
       }),
@@ -140,14 +145,14 @@ describe('parseBulkAvailabilityBody (zod)', () => {
 describe('MenuService.bulkAvailability', () => {
   it('should return updated=N + empty skipped when all items match', async () => {
     const bulk = jest.fn<MenuRepository['bulkUpdateAvailability']>().mockResolvedValue(3);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1, ID_A2, ID_A3]),
         bulkUpdateAvailability: bulk,
       }),
     );
     const res = await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1, ID_A2, ID_A3],
+      ids: [ID_A1, ID_A2, ID_A3],
       is_available: false,
     });
     expect(res.data.updated).toBe(3);
@@ -160,7 +165,7 @@ describe('MenuService.bulkAvailability', () => {
   });
 
   it('should collect cross-tenant + nonexistent items as NOT_FOUND skipped', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1, ID_A2]),
         bulkUpdateAvailability: () => Promise.resolve(2),
@@ -168,7 +173,7 @@ describe('MenuService.bulkAvailability', () => {
     );
     const RANDOM = '99999999-9999-4999-8999-999999999999';
     const res = await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1, ID_A2, ID_B1, RANDOM],
+      ids: [ID_A1, ID_A2, ID_B1, RANDOM],
       is_available: true,
     });
     expect(res.data.updated).toBe(2);
@@ -179,7 +184,7 @@ describe('MenuService.bulkAvailability', () => {
   });
 
   it('should preserve input order in skipped[] (Q-T23-#7)', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1]),
         bulkUpdateAvailability: () => Promise.resolve(1),
@@ -190,7 +195,7 @@ describe('MenuService.bulkAvailability', () => {
     // Input order: RANDOM_1, ID_A1 (matches), ID_B1, RANDOM_2.
     // Skipped preserves that order minus ID_A1.
     const res = await service.bulkAvailability(ctx(), {
-      item_ids: [RANDOM_1, ID_A1, ID_B1, RANDOM_2],
+      ids: [RANDOM_1, ID_A1, ID_B1, RANDOM_2],
       is_available: true,
     });
     expect(res.data.skipped.map((s) => s.item_id)).toEqual([RANDOM_1, ID_B1, RANDOM_2]);
@@ -198,14 +203,14 @@ describe('MenuService.bulkAvailability', () => {
 
   it('should return updated=0 + all skipped when nothing matches (Q-T23-#6 all-skipped edge)', async () => {
     const bulk = jest.fn<MenuRepository['bulkUpdateAvailability']>();
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([]),
         bulkUpdateAvailability: bulk,
       }),
     );
     const res = await service.bulkAvailability(ctx(), {
-      item_ids: [ID_B1],
+      ids: [ID_B1],
       is_available: true,
     });
     expect(res.data.updated).toBe(0);
@@ -216,14 +221,14 @@ describe('MenuService.bulkAvailability', () => {
 
   it('should convert HH:mm to Date in delta (T22 codec reuse)', async () => {
     const bulk = jest.fn<MenuRepository['bulkUpdateAvailability']>().mockResolvedValue(1);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1]),
         bulkUpdateAvailability: bulk,
       }),
     );
     await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1],
+      ids: [ID_A1],
       available_window_from: '06:00',
       available_window_to: '18:30',
     });
@@ -238,14 +243,14 @@ describe('MenuService.bulkAvailability', () => {
 
   it('should pass null through as null in delta (three-way null semantic)', async () => {
     const bulk = jest.fn<MenuRepository['bulkUpdateAvailability']>().mockResolvedValue(1);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1]),
         bulkUpdateAvailability: bulk,
       }),
     );
     await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1],
+      ids: [ID_A1],
       available_window_from: null,
       available_window_to: null,
     });
@@ -259,14 +264,14 @@ describe('MenuService.bulkAvailability', () => {
 
   it('should call findMatchingItemIds scoped to ctx.hotelId (leak-safe)', async () => {
     const find = jest.fn<MenuRepository['findMatchingItemIds']>().mockResolvedValue([ID_A1]);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: find,
         bulkUpdateAvailability: () => Promise.resolve(1),
       }),
     );
     await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1, ID_B1],
+      ids: [ID_A1, ID_B1],
       is_available: true,
     });
     expect(find).toHaveBeenCalledWith([ID_A1, ID_B1], HOTEL_A);
@@ -275,14 +280,14 @@ describe('MenuService.bulkAvailability', () => {
   it('should use Prisma-authoritative updated count (not matchingIds.length)', async () => {
     // Simulate race: findMatching returns 3 IDs but bulkUpdate finds only 2
     // (one item deleted between calls). Service returns Prisma count, not 3.
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findMatchingItemIds: () => Promise.resolve([ID_A1, ID_A2, ID_A3]),
         bulkUpdateAvailability: () => Promise.resolve(2),
       }),
     );
     const res = await service.bulkAvailability(ctx(), {
-      item_ids: [ID_A1, ID_A2, ID_A3],
+      ids: [ID_A1, ID_A2, ID_A3],
       is_available: true,
     });
     expect(res.data.updated).toBe(2);

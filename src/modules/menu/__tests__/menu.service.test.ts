@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { Prisma } from '@prisma/client';
 
 import { ConflictError, NotFoundError, ValidationError } from '@core/errors/app-errors.js';
+import { InMemoryAdapter } from '@core/storage/in-memory-adapter.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -85,6 +86,10 @@ function fakeRepo(overrides: Partial<MenuRepository> = {}): MenuRepository {
     deleteItem: () => Promise.resolve(),
     ...overrides,
   } as unknown as MenuRepository;
+}
+
+function makeService(repo: MenuRepository, storage = new InMemoryAdapter()): MenuService {
+  return new MenuService(repo, storage);
 }
 
 function prismaP2002(): Error {
@@ -310,9 +315,7 @@ describe('buildMenuCategoryWhere', () => {
 describe('MenuService.list', () => {
   it('should return nested categories-with-items', async () => {
     const rows: MenuCategoryWithItemsRow[] = [{ ...makeCategory(), items: [makeItem()] }];
-    const service = new MenuService(
-      fakeRepo({ listCategoriesWithItems: () => Promise.resolve(rows) }),
-    );
+    const service = makeService(fakeRepo({ listCategoriesWithItems: () => Promise.resolve(rows) }));
     const res = await service.list(ctx(), {});
     expect(res.data.categories).toHaveLength(1);
     expect(res.data.categories[0]?.items).toHaveLength(1);
@@ -322,15 +325,13 @@ describe('MenuService.list', () => {
 describe('MenuService.createCategory', () => {
   it('should sink hotel_id from tenant', async () => {
     const create = jest.fn<MenuRepository['createCategory']>().mockResolvedValue(makeCategory());
-    const service = new MenuService(fakeRepo({ createCategory: create }));
+    const service = makeService(fakeRepo({ createCategory: create }));
     await service.createCategory(ctx(), { name: 'Beverages' });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ hotelId: HOTEL_A }));
   });
 
   it('should translate P2002 to CATEGORY_NAME_TAKEN', async () => {
-    const service = new MenuService(
-      fakeRepo({ createCategory: () => Promise.reject(prismaP2002()) }),
-    );
+    const service = makeService(fakeRepo({ createCategory: () => Promise.reject(prismaP2002()) }));
     try {
       await service.createCategory(ctx(), { name: 'dup' });
       throw new Error('expected throw');
@@ -343,7 +344,7 @@ describe('MenuService.createCategory', () => {
 
 describe('MenuService.updateCategory', () => {
   it('should 404 on cross-tenant', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory({ hotelId: HOTEL_B })),
       }),
@@ -354,7 +355,7 @@ describe('MenuService.updateCategory', () => {
   });
 
   it('should translate P2002 to CATEGORY_NAME_TAKEN', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory()),
         updateCategory: () => Promise.reject(prismaP2002()),
@@ -368,7 +369,7 @@ describe('MenuService.updateCategory', () => {
 
 describe('MenuService.removeCategory', () => {
   it('should 409 CATEGORY_HAS_ITEMS via app-layer pre-check', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory()),
         countItemsInCategory: () => Promise.resolve(3),
@@ -386,7 +387,7 @@ describe('MenuService.removeCategory', () => {
 
   it('should allow delete when countItemsInCategory returns 0', async () => {
     const del = jest.fn<MenuRepository['deleteCategory']>().mockResolvedValue();
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory()),
         countItemsInCategory: () => Promise.resolve(0),
@@ -399,7 +400,7 @@ describe('MenuService.removeCategory', () => {
 
   it('should catch P2003 race + re-count + throw CATEGORY_HAS_ITEMS', async () => {
     let count = 0;
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory()),
         countItemsInCategory: () => {
@@ -421,7 +422,7 @@ describe('MenuService.removeCategory', () => {
   });
 
   it('should 404 on cross-tenant delete', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findCategoryById: () => Promise.resolve(makeCategory({ hotelId: HOTEL_B })),
       }),
@@ -432,7 +433,7 @@ describe('MenuService.removeCategory', () => {
 
 describe('MenuService.createItem', () => {
   it('should 404 MenuCategory when category_id does not belong to tenant', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({ ensureCategoryBelongsToHotel: () => Promise.resolve(false) }),
     );
     try {
@@ -450,7 +451,7 @@ describe('MenuService.createItem', () => {
 
   it('should sink hotel_id from tenant + convert HH:mm to Date', async () => {
     const create = jest.fn<MenuRepository['createItem']>().mockResolvedValue(makeItem());
-    const service = new MenuService(fakeRepo({ createItem: create }));
+    const service = makeService(fakeRepo({ createItem: create }));
     await service.createItem(ctx(), {
       category_id: CATEGORY_ID,
       name: 'x',
@@ -467,7 +468,7 @@ describe('MenuService.createItem', () => {
 
 describe('MenuService.updateItem', () => {
   it('should 404 on cross-tenant', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({ findItemById: () => Promise.resolve(makeItem({ hotelId: HOTEL_B })) }),
     );
     await expect(service.updateItem(ctx(), ITEM_ID, { name: 'x' })).rejects.toBeInstanceOf(
@@ -479,7 +480,7 @@ describe('MenuService.updateItem', () => {
     const ensure = jest
       .fn<MenuRepository['ensureCategoryBelongsToHotel']>()
       .mockResolvedValue(false);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findItemById: () => Promise.resolve(makeItem()),
         ensureCategoryBelongsToHotel: ensure,
@@ -496,7 +497,7 @@ describe('MenuService.updateItem', () => {
     const ensure = jest
       .fn<MenuRepository['ensureCategoryBelongsToHotel']>()
       .mockResolvedValue(true);
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findItemById: () => Promise.resolve(makeItem()),
         ensureCategoryBelongsToHotel: ensure,
@@ -508,7 +509,7 @@ describe('MenuService.updateItem', () => {
 
   it('should support image_url null passthrough (clear)', async () => {
     const update = jest.fn<MenuRepository['updateItem']>().mockResolvedValue(makeItem());
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({
         findItemById: () => Promise.resolve(makeItem({ imageUrl: 'x' })),
         updateItem: update,
@@ -523,7 +524,7 @@ describe('MenuService.updateItem', () => {
 describe('MenuService.removeItem', () => {
   it('should delete when tenant owns the item', async () => {
     const del = jest.fn<MenuRepository['deleteItem']>().mockResolvedValue();
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({ findItemById: () => Promise.resolve(makeItem()), deleteItem: del }),
     );
     await service.removeItem(ctx(), ITEM_ID);
@@ -531,9 +532,116 @@ describe('MenuService.removeItem', () => {
   });
 
   it('should 404 on cross-tenant', async () => {
-    const service = new MenuService(
+    const service = makeService(
       fakeRepo({ findItemById: () => Promise.resolve(makeItem({ hotelId: HOTEL_B })) }),
     );
     await expect(service.removeItem(ctx(), ITEM_ID)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('MenuService.createItemFromForm', () => {
+  it('should coerce string fields + upload image + thread image_url into createItem', async () => {
+    const create = jest.fn<MenuRepository['createItem']>().mockResolvedValue(makeItem());
+    const storage = new InMemoryAdapter();
+    const service = makeService(fakeRepo({ createItem: create }), storage);
+    await service.createItemFromForm(
+      ctx(),
+      {
+        category_id: CATEGORY_ID,
+        name: 'Latte',
+        description: 'Hot',
+        price_idr: '30000',
+        prep_minutes: '4',
+        is_available: 'true',
+        available_window_from: '',
+        available_window_to: '',
+      },
+      { buffer: Buffer.from('jpegbytes'), contentType: 'image/jpeg', filename: 'latte.jpg' },
+    );
+    const call = create.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(call.hotelId).toBe(HOTEL_A);
+    expect(call.priceIdr).toBe(30000);
+    expect(call.prepMinutes).toBe(4);
+    expect(call.isAvailable).toBe(true);
+    expect(typeof call.imageUrl).toBe('string');
+    expect((call.imageUrl as string).startsWith(`memory://menu/${HOTEL_A}/`)).toBe(true);
+  });
+
+  it('should not set image_url when no image part supplied', async () => {
+    const create = jest.fn<MenuRepository['createItem']>().mockResolvedValue(makeItem());
+    const service = makeService(fakeRepo({ createItem: create }));
+    await service.createItemFromForm(ctx(), {
+      category_id: CATEGORY_ID,
+      name: 'Espresso',
+      price_idr: '20000',
+      is_available: 'false',
+    });
+    const call = create.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(call.imageUrl).toBeUndefined();
+    expect(call.isAvailable).toBe(false);
+  });
+
+  it('should reject a form missing category_id', async () => {
+    const service = makeService(fakeRepo());
+    await expect(
+      service.createItemFromForm(ctx(), { name: 'x', price_idr: '1' }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe('MenuService.updateItemFromForm', () => {
+  it('should coerce partial fields and upload replacement image', async () => {
+    const update = jest.fn<MenuRepository['updateItem']>().mockResolvedValue(makeItem());
+    const service = makeService(
+      fakeRepo({ findItemById: () => Promise.resolve(makeItem()), updateItem: update }),
+    );
+    await service.updateItemFromForm(
+      ctx(),
+      ITEM_ID,
+      { name: 'Cold Brew', is_available: 'false' },
+      { buffer: Buffer.from('x'), contentType: 'image/png', filename: 'cb.png' },
+    );
+    const data = update.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(data.name).toBe('Cold Brew');
+    expect(data.isAvailable).toBe(false);
+    expect(typeof data.imageUrl).toBe('string');
+  });
+});
+
+describe('MenuService.importCsv', () => {
+  const CSV_HEADER = 'name,description,price_idr,category_id,prep_minutes,is_available';
+
+  it('should import valid rows and skip invalid ones', async () => {
+    const create = jest.fn<MenuRepository['createItem']>().mockResolvedValue(makeItem());
+    const service = makeService(fakeRepo({ createItem: create }));
+    const csv = [
+      CSV_HEADER,
+      `Coffee,Hot coffee,25000,${CATEGORY_ID},5,true`,
+      `Tea,,,${CATEGORY_ID},,false`, // price_idr empty → invalid
+      `Cake,Sweet,15000,${CATEGORY_ID},,true`,
+    ].join('\n');
+    const res = await service.importCsv(ctx(), csv);
+    expect(res.imported).toBe(2);
+    expect(res.skipped).toBe(1);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0]?.row).toBe(3);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('should record a create-time failure (cross-tenant category) as an error', async () => {
+    const service = makeService(
+      fakeRepo({ ensureCategoryBelongsToHotel: () => Promise.resolve(false) }),
+    );
+    const csv = [CSV_HEADER, `Coffee,Hot,25000,${CATEGORY_ID},5,true`].join('\n');
+    const res = await service.importCsv(ctx(), csv);
+    expect(res.imported).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(res.errors).toHaveLength(1);
+  });
+
+  it('should return zeros for a header-only CSV', async () => {
+    const service = makeService(fakeRepo());
+    const res = await service.importCsv(ctx(), CSV_HEADER);
+    expect(res).toEqual({ imported: 0, skipped: 0, errors: [] });
   });
 });

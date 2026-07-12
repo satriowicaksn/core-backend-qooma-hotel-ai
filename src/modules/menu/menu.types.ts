@@ -56,6 +56,25 @@ export interface MenuItemResponse {
   readonly data: MenuItemWire;
 }
 
+// Multipart image upload input (buffer + optional metadata from the file part).
+export interface MenuImageInput {
+  readonly buffer: Buffer;
+  readonly contentType?: string;
+  readonly filename?: string;
+}
+
+// CSV import result — matches FE MenuCsvImportResponse (src/types/api.ts).
+export interface MenuCsvImportRowError {
+  readonly row: number;
+  readonly reason: string;
+}
+
+export interface MenuCsvImportResult {
+  readonly imported: number;
+  readonly skipped: number;
+  readonly errors: readonly MenuCsvImportRowError[];
+}
+
 // T23-slice-1: bulk-availability endpoint types.
 export interface BulkAvailabilityDelta {
   readonly isAvailable?: boolean;
