@@ -7,6 +7,7 @@
  * (see CLAUDE.md §4).
  */
 
+import corsPlugin from '@fastify/cors';
 import Fastify from 'fastify';
 
 import { loadConfig } from '@core/config/env.js';
@@ -17,6 +18,16 @@ async function main(): Promise<void> {
   const app = Fastify({
     logger: false,
     trustProxy: true,
+  });
+
+  // CORS: FE hits core-staging directly cross-origin (withCredentials). Must
+  // never use '*' with credentials. CORS_ORIGIN is comma-separated to support
+  // multiple origins (localhost + Vercel preview URL).
+  await app.register(corsPlugin, {
+    origin: config.CORS_ORIGIN.split(',').map((s) => s.trim()),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Correlation-Id'],
   });
 
   app.get('/healthz', async () => ({ status: 'ok' }));
