@@ -1,5 +1,22 @@
 # PM-STATUS-PARENT — Qooma Backend (cross-dev roll-up)
 
+## 🔄 INTEGRATION HANDOVER — 2026-07-13 — full cross-repo board: FE `docs/INTEGRATION-STATUS.md`
+
+**Core ↔ FE: mostly COMPLETE (Dev A); full-fidelity backfill remains (Dev B).** Branch `feat/core-integration-fixes` (8 commits, locally green — **752 unit tests + build** — NOT pushed; PO pushes).
+
+**✅ Dev A — done:** entrypoint wires all 13 modules; `sub→userId` map in the cookie hook (was leaving `ctx.userId` undefined → breaking notifications/audit/billing/feature-flags); billing path/method (Q-CONTRACT-12); analytics 4 endpoints (departments/peak-hours/top-requests/satisfaction) + `GET /analytics/export` (CSV) + per-day total/closed/high_alert; **menu image upload (multipart → ObjectStorage/S3)** + menu/knowledge **CSV import** + `bulk-availability` `item_ids→ids`; knowledge accepts `{question,answer,keywords}`; voice request/response schema; `@fastify/multipart` + object-storage wired in `api.ts`.
+
+**🔧 Dev B (Nanak) — TASKS (serializer/data backfill; the app RUNS without these — the FE defaults each with a `// TODO(BE):` marker, fields just show empty):**
+
+- **BLOCKER — live-DB validation:** the new analytics `$queryRaw`, menu image upload (S3), and menu/knowledge CSV import are **unit-tested only**. Validate against real Postgres/S3 and run the updated `*.integration.test.ts` (testcontainers/Docker).
+- **tickets** serializer: nest `department {id,name,code}`; add guest `is_vip`/`privacy_mode`; message `type`; compute stats `by_department`, `closed_today`, `generated_at`, `prev_active_count`, `prev_closed_today`, `prev_high_alert_count`.
+- **guests** serializer: list card fields (`wa_phone_masked`, `last_visit_at`, `current_room`, `current_stay_nights`, `preference_tags`), `language`, `notes`, preference `source`/`confidence`/separated `key`, visit `occasion`, message `type`.
+- **analytics** `salah_kamar_count`; **billing** `active_agents`/`active_users_count`/`tier_started_at`; **feature-flags** `category`/`min_tier`/`is_tier_locked`/`depends_on_active_data`; **departments** `head_user_id`; **voice** test `latency_ms`; **agents** `system_prompt`; **knowledge** `usage_count`.
+
+**🔧 Dev C (Satrio):** staging env (`COOKIE_DOMAIN`, `CORS_ORIGIN` incl vercel origin, `S3_*`) + deploy; architecture decision cross-origin (`http.ts`, active) vs same-origin (Vercel rewrites).
+
+---
+
 > **Parent PM tracker.** Read-only buat Executor & PM A/B/C kecuali bagian roll-up yang explicit dipost oleh PM A/B/C. Parent PM authority untuk section §1, §3, §4, §5, §6, §7, §8. PM A/B/C append baris short ke §2 setelah tiap APPROVE (per `PM-AGENT.md §0.8`).
 >
 > Detail per-dev assignment (ASSIGNMENT → PLAN → SUBMIT → VERDICT) tinggal di **`PM-STATUS-A.md`** (Nathan), **`PM-STATUS-B.md`** (Nanak), **`PM-STATUS-C.md`** (Satrio).
