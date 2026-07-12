@@ -10,6 +10,7 @@
 
 import corsPlugin from '@fastify/cors';
 import jwtPlugin from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
@@ -17,6 +18,9 @@ import { loadConfig } from '@core/config/env.js';
 import { AppError } from '@core/errors/app-errors.js';
 import { createLogger } from '@core/logger/logger.js';
 import { db } from '@core/prisma/prisma-client.js';
+import { InMemoryAdapter } from '@core/storage/in-memory-adapter.js';
+import type { ObjectStoragePort } from '@core/storage/object-storage.port.js';
+import { S3Adapter } from '@core/storage/s3-adapter.js';
 
 import { agentsRoutes, buildAgentsService } from '@modules/agents/index.js';
 import { analyticsRoutes, buildAnalyticsService } from '@modules/analytics/index.js';
@@ -118,6 +122,25 @@ async function main(): Promise<void> {
   // Derive req.tenant from verified req.user.
   configureTenantGuardHooks(app);
 
+  // Multipart — menu item images + menu/knowledge CSV imports. 5 MB / 1 file cap.
+  await app.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 20 },
+  });
+
+  // Object storage for menu images. S3/R2 when configured (bucket present),
+  // else in-memory (dev). Fail-lazy: the S3 adapter validates creds on first use.
+  const storage: ObjectStoragePort = config.S3_BUCKET
+    ? new S3Adapter({
+        ...(config.S3_ENDPOINT !== undefined ? { endpoint: config.S3_ENDPOINT } : {}),
+        ...(config.S3_REGION !== undefined ? { region: config.S3_REGION } : {}),
+        bucket: config.S3_BUCKET,
+        ...(config.S3_ACCESS_KEY_ID !== undefined ? { accessKeyId: config.S3_ACCESS_KEY_ID } : {}),
+        ...(config.S3_SECRET_ACCESS_KEY !== undefined
+          ? { secretAccessKey: config.S3_SECRET_ACCESS_KEY }
+          : {}),
+      })
+    : new InMemoryAdapter();
+
   // Shared opts for services that do cross-DB validation (Q-C-02 / T21).
   const crossDbOpts = {
     logger,
@@ -132,7 +155,7 @@ async function main(): Promise<void> {
   const featureFlagsService = buildFeatureFlagsService(db, crossDbOpts);
   const guestsService = buildGuestsService(db);
   const knowledgeService = buildKnowledgeService(db);
-  const menuService = buildMenuService(db);
+  const menuService = buildMenuService(db, storage);
   const notificationsService = buildNotificationsService(db);
   const ticketsService = buildTicketsService(db);
   const visitsService = buildVisitsService(db);
