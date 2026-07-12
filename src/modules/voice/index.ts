@@ -8,8 +8,9 @@ import { VoiceService } from './voice.service.js';
 
 export { voiceRoutes, type VoiceRoutesOptions } from './voice.routes.js';
 export { VoiceService } from './voice.service.js';
-export type { UpsertVoiceBody } from './voice.schema.js';
+export type { UpsertVoiceBody, VoiceTestBody } from './voice.schema.js';
 export type {
+  SipCodec,
   VoiceConfigResponse,
   VoiceConfigWire,
   VoiceTestResponse,

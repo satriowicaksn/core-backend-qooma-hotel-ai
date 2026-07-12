@@ -8,7 +8,7 @@ import { AuthError } from '@core/errors/app-errors.js';
 import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
-import { parseUpsertVoiceBody } from './voice.schema.js';
+import { parseUpsertVoiceBody, parseVoiceTestBody } from './voice.schema.js';
 import type { VoiceService } from './voice.service.js';
 
 export interface VoiceRoutesOptions {
@@ -67,11 +67,12 @@ export const voiceRoutes: FastifyPluginCallback<VoiceRoutesOptions> = (fastify, 
   fastify.post('/settings/voice/test', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
+    const body = parseVoiceTestBody(req.body);
     req.log.info(
       { module: 'voice', action: 'test', correlationId: correlationIdOf(req) },
       'test voice connection',
     );
-    const result = await service.test(ctx);
+    const result = await service.test(ctx, body);
     return reply.send(result);
   });
 

@@ -12,10 +12,18 @@ import type { VoiceConfigResponse, VoiceTestResponse } from '../voice.types.js';
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 
+const STUB_NOTE = 'stub — PBX integration is wave 2a per ADD-23.7';
+
 const CONFIG_RESULT: VoiceConfigResponse = {
   data: {
     hotel_id: HOTEL_A,
     pbx_type: 'sip',
+    pbx_host: 'sip.example.com',
+    sip_username: 'user',
+    sip_password: 'pass',
+    sip_port: 5060,
+    sip_codec: 'opus',
+    did_number: '+15551234',
     config: {},
     is_active: true,
     updated_at: '2026-07-03T00:00:00.000Z',
@@ -23,13 +31,21 @@ const CONFIG_RESULT: VoiceConfigResponse = {
 };
 
 const TEST_RESULT: VoiceTestResponse = {
-  data: { success: true, note: 'stub — PBX integration is wave 2a per ADD-23.7' },
+  data: { success: true, message: STUB_NOTE, note: STUB_NOTE },
+};
+
+const VALID_TEST_BODY = {
+  pbx_host: 'sip.example.com',
+  sip_username: 'user',
+  sip_password: 'pass',
+  sip_port: 5060,
 };
 
 interface Recorder {
   getCtx?: TenantContext;
   upsertBody?: unknown;
   testCtx?: TenantContext;
+  testBody?: unknown;
   testThrow?: Error;
 }
 
@@ -43,8 +59,9 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
       recorder.upsertBody = body;
       return Promise.resolve(CONFIG_RESULT);
     },
-    test: (ctx: TenantContext): Promise<VoiceTestResponse> => {
+    test: (ctx: TenantContext, body: unknown): Promise<VoiceTestResponse> => {
       recorder.testCtx = ctx;
+      recorder.testBody = body;
       if (recorder.testThrow) {
         return Promise.reject(recorder.testThrow);
       }
@@ -173,11 +190,26 @@ describe('voiceRoutes', () => {
   });
 
   describe('POST /settings/voice/test', () => {
-    it('should return 200 stub success on happy path', async () => {
+    it('should parse the body and return 200 stub success on happy path', async () => {
       app = buildApp(GM, recorder);
-      const res = await app.inject({ method: 'POST', url: '/settings/voice/test' });
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/voice/test',
+        payload: VALID_TEST_BODY,
+      });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual(TEST_RESULT);
+      expect(recorder.testBody).toEqual(VALID_TEST_BODY);
+    });
+
+    it('should 400 on a body missing required fields', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/voice/test',
+        payload: { pbx_host: 'sip.example.com' },
+      });
+      expect(res.statusCode).toBe(400);
     });
 
     it('should 422 VOICE_NOT_CONFIGURED when service throws', async () => {
@@ -187,7 +219,11 @@ describe('voiceRoutes', () => {
         }),
       };
       app = buildApp(GM, recorder);
-      const res = await app.inject({ method: 'POST', url: '/settings/voice/test' });
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/voice/test',
+        payload: VALID_TEST_BODY,
+      });
       expect(res.statusCode).toBe(422);
       const body: { code: string; details: { rule: string } } = res.json();
       expect(body.code).toBe('BUSINESS_RULE');
@@ -196,7 +232,11 @@ describe('voiceRoutes', () => {
 
     it('should 403 for dept_head', async () => {
       app = buildApp(DEPT_HEAD, recorder);
-      const res = await app.inject({ method: 'POST', url: '/settings/voice/test' });
+      const res = await app.inject({
+        method: 'POST',
+        url: '/settings/voice/test',
+        payload: VALID_TEST_BODY,
+      });
       expect(res.statusCode).toBe(403);
     });
   });
