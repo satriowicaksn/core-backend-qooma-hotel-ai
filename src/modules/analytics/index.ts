@@ -12,15 +12,27 @@ export { analyticsRoutes, type AnalyticsRoutesOptions } from './analytics.routes
 export { AnalyticsService } from './analytics.service.js';
 export type {
   AnalyticsMetaWire,
+  DepartmentPerformancePoint,
+  DepartmentPerformanceResponse,
+  DepartmentRefWire,
+  ExportFormat,
+  ExportQuery,
+  ExportResult,
   HighAlertDeptWire,
   HighAlertResponse,
   HighAlertSummary,
   OverviewKpiWire,
   OverviewResponse,
+  PeakHoursBucket,
+  PeakHoursResponse,
   PeriodBucket,
   RecommendationKey,
+  SatisfactionPoint,
+  SatisfactionResponse,
   TicketVolumeBucket,
   TicketsTimeSeriesResponse,
+  TopRequest,
+  TopRequestsResponse,
 } from './analytics.types.js';
 
 export interface BuildAnalyticsServiceOptions {

@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { ValidationError } from '@core/errors/app-errors.js';
 
-import type { PeriodBucket, RangeQuery } from './analytics.types.js';
+import type { ExportFormat, ExportQuery, PeriodBucket, RangeQuery } from './analytics.types.js';
 
 const DEFAULT_WINDOW_DAYS = 30;
 
@@ -53,4 +53,32 @@ export function parseRangeQuery(raw: unknown): RangeQuery {
 
 function startOfDayUTC(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+const formatEnum = z.enum(['xlsx', 'pdf']);
+
+const ExportQuerySchema = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    period: periodEnum.optional(),
+    format: formatEnum,
+  })
+  .strict()
+  .refine((v) => v.period !== 'custom' || (v.from !== undefined && v.to !== undefined), {
+    message: "period='custom' requires both from and to",
+  })
+  .refine((v) => v.from === undefined || v.to === undefined || v.from <= v.to, {
+    message: 'from must be <= to',
+  });
+
+export function parseExportQuery(raw: unknown): ExportQuery {
+  const result = ExportQuerySchema.safeParse(raw ?? {});
+  if (!result.success) throw toValidationError(result.error);
+  const q = result.data;
+  const to = q.to ?? startOfDayUTC(new Date());
+  const from = q.from ?? new Date(to.getTime() - DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const period: PeriodBucket = q.period ?? 'day';
+  const format: ExportFormat = q.format;
+  return { from, to, period, format };
 }

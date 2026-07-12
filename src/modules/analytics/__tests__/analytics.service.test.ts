@@ -6,7 +6,7 @@ import type { Logger } from '@core/logger/logger.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import type { AnalyticsRepository } from '../analytics.repository.js';
-import { parseRangeQuery } from '../analytics.schema.js';
+import { parseExportQuery, parseRangeQuery } from '../analytics.schema.js';
 import {
   buildAlertSummary,
   buildMeta,
@@ -16,6 +16,7 @@ import {
 } from '../analytics.serializer.js';
 import { AnalyticsService } from '../analytics.service.js';
 import type {
+  ExportQuery,
   HighAlertDeptRow,
   OverviewAggRow,
   RangeQuery,
@@ -263,14 +264,14 @@ describe('AnalyticsService.overview', () => {
 describe('AnalyticsService.tickets', () => {
   it('should serialize buckets in order', async () => {
     const rows: TicketsByDayRow[] = [
-      { date: '2026-06-01', count: 5 },
-      { date: '2026-06-02', count: 8 },
+      { date: '2026-06-01', count: 5, closed: 3, highAlert: 1 },
+      { date: '2026-06-02', count: 8, closed: 6, highAlert: 2 },
     ];
     const service = svc(fakeRepo({ ticketsByDay: () => Promise.resolve(rows) }));
     const res = await service.tickets(ctx(), query());
     expect(res.data).toEqual([
-      { date: '2026-06-01', count: 5 },
-      { date: '2026-06-02', count: 8 },
+      { date: '2026-06-01', count: 5, total: 5, closed: 3, high_alert: 1 },
+      { date: '2026-06-02', count: 8, total: 8, closed: 6, high_alert: 2 },
     ]);
     expect(res.meta.from).toBe('2026-06-01');
   });
@@ -337,6 +338,64 @@ describe('AnalyticsService.highAlert', () => {
     const res = await service.highAlert(ctx(), query());
     expect(res.alert_summary.threshold_exceeded_count).toBe(1);
     expect(res.alert_summary.recommendation_key).toBe('single_dept_spike');
+  });
+});
+
+function exportQuery(overrides: Partial<ExportQuery> = {}): ExportQuery {
+  return {
+    from: new Date('2026-06-01T00:00:00.000Z'),
+    to: new Date('2026-06-30T00:00:00.000Z'),
+    period: 'day',
+    format: 'xlsx',
+    ...overrides,
+  };
+}
+
+describe('parseExportQuery (zod)', () => {
+  it('should require a format param', () => {
+    expect(() => parseExportQuery({})).toThrow(ValidationError);
+  });
+
+  it('should reject a bogus format', () => {
+    expect(() => parseExportQuery({ format: 'csv' })).toThrow(ValidationError);
+  });
+
+  it('should default the range window when only format is given', () => {
+    const q = parseExportQuery({ format: 'pdf' });
+    expect(q.format).toBe('pdf');
+    const spanDays = Math.round((q.to.getTime() - q.from.getTime()) / (24 * 60 * 60 * 1000));
+    expect(spanDays).toBe(30);
+  });
+});
+
+describe('AnalyticsService.export', () => {
+  it('should build a CSV filename + overview/tickets sections', async () => {
+    const service = svc(
+      fakeRepo({
+        overviewAgg: () =>
+          Promise.resolve<OverviewAggRow>({
+            totalTickets: 42,
+            closedTickets: 21,
+            avgSatisfaction: '4.30',
+            avgResponseTimeMinutes: 25.5,
+          }),
+        ticketsByDay: () =>
+          Promise.resolve<TicketsByDayRow[]>([
+            { date: '2026-06-01', count: 5, closed: 3, highAlert: 1 },
+          ]),
+      }),
+    );
+    const res = await service.export(ctx(), exportQuery());
+    expect(res.filename).toBe('analytics-2026-06-01-2026-06-30.csv');
+    expect(res.csv).toContain('section,overview');
+    expect(res.csv).toContain('42');
+    expect(res.csv).toContain('section,tickets');
+    expect(res.csv).toContain('2026-06-01,5,3,1');
+  });
+
+  it('should throw TIER_GATE when the gate is enforced', async () => {
+    const service = svc(fakeRepo(), { skipCrossDbChecks: false });
+    await expect(service.export(ctx(), exportQuery())).rejects.toBeInstanceOf(BusinessRuleError);
   });
 });
 

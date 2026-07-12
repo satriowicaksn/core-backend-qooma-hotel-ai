@@ -56,31 +56,35 @@ function fakeRepo(overrides: Partial<KnowledgeRepository> = {}): KnowledgeReposi
 }
 
 describe('zod parsers', () => {
-  it('should accept a minimal create body', () => {
-    const body = parseCreateEntryBody({ title: 'x', content: 'y' });
-    expect(body.title).toBe('x');
+  it('should accept a minimal create body (FE field names)', () => {
+    const body = parseCreateEntryBody({ question: 'x', answer: 'y' });
+    expect(body.question).toBe('x');
   });
 
-  it('should reject a create body missing content', () => {
-    expect(() => parseCreateEntryBody({ title: 'x' })).toThrow(ValidationError);
+  it('should reject a create body missing answer', () => {
+    expect(() => parseCreateEntryBody({ question: 'x' })).toThrow(ValidationError);
   });
 
-  it('should reject title over 255 chars', () => {
-    expect(() => parseCreateEntryBody({ title: 'x'.repeat(256), content: 'y' })).toThrow(
+  it('should reject the legacy title field (FE field names only)', () => {
+    expect(() => parseCreateEntryBody({ title: 'x', content: 'y' })).toThrow(ValidationError);
+  });
+
+  it('should reject question over 255 chars', () => {
+    expect(() => parseCreateEntryBody({ question: 'x'.repeat(256), answer: 'y' })).toThrow(
       ValidationError,
     );
   });
 
-  it('should reject content over 10000 chars', () => {
-    expect(() => parseCreateEntryBody({ title: 'x', content: 'y'.repeat(10001) })).toThrow(
+  it('should reject answer over 10000 chars', () => {
+    expect(() => parseCreateEntryBody({ question: 'x', answer: 'y'.repeat(10001) })).toThrow(
       ValidationError,
     );
   });
 
   it('should reject an unknown field on create (strict — hotel_id)', () => {
-    expect(() => parseCreateEntryBody({ title: 'x', content: 'y', hotel_id: 'attacker' })).toThrow(
-      ValidationError,
-    );
+    expect(() =>
+      parseCreateEntryBody({ question: 'x', answer: 'y', hotel_id: 'attacker' }),
+    ).toThrow(ValidationError);
   });
 
   it('should reject an empty update body', () => {
@@ -91,21 +95,21 @@ describe('zod parsers', () => {
     expect(parseUpdateEntryBody({ category: null })).toEqual({ category: null });
   });
 
-  it('should reject tags over 20 items (Q-T24-#3)', () => {
+  it('should reject keywords over 20 items (Q-T24-#3)', () => {
     const many = Array.from({ length: 21 }, (_, i) => `t${i}`);
-    expect(() => parseCreateEntryBody({ title: 'x', content: 'y', tags: many })).toThrow(
+    expect(() => parseCreateEntryBody({ question: 'x', answer: 'y', keywords: many })).toThrow(
       ValidationError,
     );
   });
 
-  it('should reject a tag over 40 chars', () => {
+  it('should reject a keyword over 40 chars', () => {
     expect(() =>
-      parseCreateEntryBody({ title: 'x', content: 'y', tags: ['x'.repeat(41)] }),
+      parseCreateEntryBody({ question: 'x', answer: 'y', keywords: ['x'.repeat(41)] }),
     ).toThrow(ValidationError);
   });
 
-  it('should reject an empty-string tag', () => {
-    expect(() => parseCreateEntryBody({ title: 'x', content: 'y', tags: [''] })).toThrow(
+  it('should reject an empty-string keyword', () => {
+    expect(() => parseCreateEntryBody({ question: 'x', answer: 'y', keywords: [''] })).toThrow(
       ValidationError,
     );
   });
@@ -124,23 +128,28 @@ describe('zod parsers', () => {
 });
 
 describe('serializer', () => {
-  it('should snake_case and pass-through tags array', () => {
+  it('should expose both DB + FE-canonical field names', () => {
     const wire = serializeKnowledgeEntry(makeRow());
     expect(wire).toEqual({
       id: ENTRY_ID,
       hotel_id: HOTEL_A,
       title: 'Check-in FAQ',
       content: 'How to check in early',
+      question: 'Check-in FAQ',
+      answer: 'How to check in early',
       category: 'faq',
       tags: ['welcome', 'checkin'],
+      keywords: ['welcome', 'checkin'],
+      usage_count: 0,
       is_active: true,
       created_at: '2026-07-03T00:00:00.000Z',
       updated_at: '2026-07-03T00:00:00.000Z',
     });
   });
 
-  it('should keep tags=[] shape when unset (PM ACK reminder #3)', () => {
+  it('should keep keywords=[] shape when unset (PM ACK reminder #3)', () => {
     const wire = serializeKnowledgeEntry(makeRow({ tags: [] }));
+    expect(wire.keywords).toEqual([]);
     expect(wire.tags).toEqual([]);
   });
 });
@@ -201,27 +210,34 @@ describe('KnowledgeService.create', () => {
   it('should sink hotel_id from tenant', async () => {
     const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
     const service = new KnowledgeService(fakeRepo({ create }));
-    await service.create(ctx(), { title: 'x', content: 'y' });
+    await service.create(ctx(), { question: 'x', answer: 'y' });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ hotelId: HOTEL_A }));
+  });
+
+  it('should map FE question/answer onto DB title/content', async () => {
+    const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
+    const service = new KnowledgeService(fakeRepo({ create }));
+    await service.create(ctx(), { question: 'q', answer: 'a' });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: 'q', content: 'a' }));
   });
 
   it('should skip omitted optional fields (partial-create)', async () => {
     const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
     const service = new KnowledgeService(fakeRepo({ create }));
-    await service.create(ctx(), { title: 'x', content: 'y' });
+    await service.create(ctx(), { question: 'x', answer: 'y' });
     const data = create.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(data).not.toHaveProperty('category');
     expect(data).not.toHaveProperty('tags');
     expect(data).not.toHaveProperty('isActive');
   });
 
-  it('should pass tags array through', async () => {
+  it('should map keywords array onto DB tags', async () => {
     const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
     const service = new KnowledgeService(fakeRepo({ create }));
     await service.create(ctx(), {
-      title: 'x',
-      content: 'y',
-      tags: ['a', 'b', 'c'],
+      question: 'x',
+      answer: 'y',
+      keywords: ['a', 'b', 'c'],
     });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ tags: ['a', 'b', 'c'] }));
   });
@@ -230,7 +246,7 @@ describe('KnowledgeService.create', () => {
 describe('KnowledgeService.update', () => {
   it('should 404 when repo returns null', async () => {
     const service = new KnowledgeService(fakeRepo({ findById: () => Promise.resolve(null) }));
-    await expect(service.update(ctx(), ENTRY_ID, { title: 'x' })).rejects.toBeInstanceOf(
+    await expect(service.update(ctx(), ENTRY_ID, { question: 'x' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });
@@ -240,7 +256,7 @@ describe('KnowledgeService.update', () => {
       fakeRepo({ findById: () => Promise.resolve(makeRow({ hotelId: HOTEL_B })) }),
     );
     try {
-      await service.update(ctx(), ENTRY_ID, { title: 'x' });
+      await service.update(ctx(), ENTRY_ID, { question: 'x' });
       throw new Error('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(NotFoundError);
@@ -263,9 +279,9 @@ describe('KnowledgeService.update', () => {
     const service = new KnowledgeService(
       fakeRepo({ findById: () => Promise.resolve(makeRow()), update }),
     );
-    await service.update(ctx(), ENTRY_ID, { title: 'new' });
+    await service.update(ctx(), ENTRY_ID, { question: 'new' });
     const data = update.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(data).toHaveProperty('title');
+    expect(data.title).toBe('new');
     expect(data).not.toHaveProperty('content');
     expect(data).not.toHaveProperty('tags');
   });
@@ -275,7 +291,7 @@ describe('KnowledgeService.update', () => {
       fakeRepo({ findById: () => Promise.resolve(makeRow({ hotelId: HOTEL_B })) }),
     );
     const superCtx = ctx({ isSuperAdmin: true, role: 'super_admin' });
-    const res = await service.update(superCtx, ENTRY_ID, { title: 'x' });
+    const res = await service.update(superCtx, ENTRY_ID, { question: 'x' });
     expect(res.data).toBeDefined();
   });
 });
@@ -295,5 +311,62 @@ describe('KnowledgeService.remove', () => {
       fakeRepo({ findById: () => Promise.resolve(makeRow({ hotelId: HOTEL_B })) }),
     );
     await expect(service.remove(ctx(), ENTRY_ID)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('KnowledgeService.importCsv', () => {
+  const HEADER = 'question,answer,category,keywords';
+
+  it('should import each valid row + sink hotel_id + map keywords cell to tags', async () => {
+    const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
+    const service = new KnowledgeService(fakeRepo({ create }));
+    const csv = `${HEADER}\nHow to check in?,At the front desk,faq,"checkin, welcome"`;
+    const res = await service.importCsv(ctx(), csv);
+    expect(res).toEqual({ imported: 1, skipped: 0, errors: [] });
+    expect(create).toHaveBeenCalledWith({
+      hotelId: HOTEL_A,
+      title: 'How to check in?',
+      content: 'At the front desk',
+      category: 'faq',
+      tags: ['checkin', 'welcome'],
+    });
+  });
+
+  it('should treat empty category cell as null', async () => {
+    const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
+    const service = new KnowledgeService(fakeRepo({ create }));
+    const csv = `${HEADER}\nQ,A,,`;
+    await service.importCsv(ctx(), csv);
+    const data = create.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(data.category).toBeNull();
+    expect(data.tags).toEqual([]);
+  });
+
+  it('should collect invalid rows with 1-indexed row + reason, still import valid', async () => {
+    const create = jest.fn<KnowledgeRepository['create']>().mockResolvedValue(makeRow());
+    const service = new KnowledgeService(fakeRepo({ create }));
+    // row 1 missing answer (empty) → invalid; row 2 valid
+    const csv = `${HEADER}\nQ1,,faq,\nQ2,A2,faq,`;
+    const res = await service.importCsv(ctx(), csv);
+    expect(res.imported).toBe(1);
+    expect(res.skipped).toBe(1);
+    expect(res.errors[0]?.row).toBe(1);
+    expect(res.errors[0]?.reason).toContain('answer');
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('should report a column-count mismatch as a skipped row', async () => {
+    const service = new KnowledgeService(fakeRepo());
+    const csv = `${HEADER}\nonly,three,cols`;
+    const res = await service.importCsv(ctx(), csv);
+    expect(res.imported).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(res.errors[0]?.reason).toContain('column count mismatch');
+  });
+
+  it('should return zeros for a header-only file', async () => {
+    const service = new KnowledgeService(fakeRepo());
+    const res = await service.importCsv(ctx(), HEADER);
+    expect(res).toEqual({ imported: 0, skipped: 0, errors: [] });
   });
 });

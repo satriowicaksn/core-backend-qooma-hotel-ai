@@ -179,16 +179,19 @@ describe('KnowledgeService list + tenant isolation (integration)', () => {
 describe('KnowledgeService CRUD lifecycle (integration)', () => {
   it('should create → update → delete an entry', async () => {
     const created = await service.create(gmA, {
-      title: 'New Entry',
-      content: 'Body',
+      question: 'New Entry',
+      answer: 'Body',
       category: 'faq',
-      tags: ['new'],
+      keywords: ['new'],
     });
     expect(created.data.title).toBe('New Entry');
+    expect(created.data.question).toBe('New Entry');
     expect(created.data.tags).toEqual(['new']);
+    expect(created.data.keywords).toEqual(['new']);
 
-    const updated = await service.update(gmA, created.data.id, { title: 'Renamed' });
+    const updated = await service.update(gmA, created.data.id, { question: 'Renamed' });
     expect(updated.data.title).toBe('Renamed');
+    expect(updated.data.question).toBe('Renamed');
 
     await service.remove(gmA, created.data.id);
     const gone = await db.knowledgeEntry.findUnique({ where: { id: created.data.id } });
@@ -196,7 +199,7 @@ describe('KnowledgeService CRUD lifecycle (integration)', () => {
   });
 
   it('should default tags to [] when omitted', async () => {
-    const created = await service.create(gmA, { title: 'x', content: 'y' });
+    const created = await service.create(gmA, { question: 'x', answer: 'y' });
     expect(created.data.tags).toEqual([]);
   });
 
@@ -214,8 +217,31 @@ describe('KnowledgeService CRUD lifecycle (integration)', () => {
       where: { hotelId: HOTEL_A, title: 'Check-in FAQ' },
     });
     if (!existing) throw new Error('seed missing');
-    const updated = await service.update(gmA, existing.id, { tags: ['a', 'b'] });
+    const updated = await service.update(gmA, existing.id, { keywords: ['a', 'b'] });
     expect(updated.data.tags).toEqual(['a', 'b']);
+    expect(updated.data.keywords).toEqual(['a', 'b']);
+  });
+
+  it('should import valid CSV rows and skip invalid ones', async () => {
+    const csv = [
+      'question,answer,category,keywords',
+      'CSV Q1,CSV A1,faq,"one, two"',
+      'CSV Q2,,faq,', // invalid: empty answer
+      'CSV Q3,CSV A3,,three',
+    ].join('\n');
+    const res = await service.importCsv(gmA, csv);
+    expect(res.imported).toBe(2);
+    expect(res.skipped).toBe(1);
+    expect(res.errors[0]?.row).toBe(2);
+
+    const q1 = await db.knowledgeEntry.findFirst({
+      where: { hotelId: HOTEL_A, title: 'CSV Q1' },
+    });
+    expect(q1?.tags).toEqual(['one', 'two']);
+    const q3 = await db.knowledgeEntry.findFirst({
+      where: { hotelId: HOTEL_A, title: 'CSV Q3' },
+    });
+    expect(q3?.category).toBeNull();
   });
 });
 
@@ -223,7 +249,7 @@ describe('KnowledgeService cross-tenant (integration)', () => {
   it('should 404 on cross-tenant update (leak-safe)', async () => {
     const bEntry = await db.knowledgeEntry.findFirst({ where: { hotelId: HOTEL_B } });
     if (!bEntry) throw new Error('seed missing');
-    await expect(service.update(gmA, bEntry.id, { title: 'x' })).rejects.toBeInstanceOf(
+    await expect(service.update(gmA, bEntry.id, { question: 'x' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });

@@ -8,9 +8,14 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 import { analyticsRoutes } from '../analytics.routes.js';
 import type { AnalyticsService } from '../analytics.service.js';
 import type {
+  DepartmentPerformanceResponse,
+  ExportResult,
   HighAlertResponse,
   OverviewResponse,
+  PeakHoursResponse,
+  SatisfactionResponse,
   TicketsTimeSeriesResponse,
+  TopRequestsResponse,
 } from '../analytics.types.js';
 
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -35,8 +40,13 @@ const OVERVIEW_RESULT: OverviewResponse = {
 };
 
 const TICKETS_RESULT: TicketsTimeSeriesResponse = {
-  data: [{ date: '2026-06-01', count: 5 }],
+  data: [{ date: '2026-06-01', count: 5, total: 5, closed: 3, high_alert: 1 }],
   meta: META,
+};
+
+const EXPORT_RESULT: ExportResult = {
+  filename: 'analytics-2026-06-01-2026-06-30.csv',
+  csv: 'section,overview\r\ntotal_tickets\r\n42\r\n',
 };
 
 const HIGH_ALERT_RESULT: HighAlertResponse = {
@@ -46,6 +56,34 @@ const HIGH_ALERT_RESULT: HighAlertResponse = {
     threshold_exceeded_count: 0,
     recommendation_key: 'all_departments_healthy',
   },
+  meta: META,
+};
+
+const DEPARTMENTS_RESULT: DepartmentPerformanceResponse = {
+  data: [
+    {
+      department: { id: 'dep-1', name: 'Housekeeping', code: 'HK' },
+      total: 10,
+      closed: 7,
+      avg_response_minutes: 22.5,
+    },
+  ],
+  meta: META,
+};
+
+const PEAK_HOURS_RESULT: PeakHoursResponse = {
+  data: [{ weekday: 1, hour: 14, total: 3 }],
+  max: 3,
+  meta: META,
+};
+
+const TOP_REQUESTS_RESULT: TopRequestsResponse = {
+  data: [{ code: 'ac_broken', total: 8 }],
+  meta: META,
+};
+
+const SATISFACTION_RESULT: SatisfactionResponse = {
+  data: [{ date: '2026-06-01', score: 4.5, responses: 6 }],
   meta: META,
 };
 
@@ -61,6 +99,11 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
     },
     tickets: () => Promise.resolve(TICKETS_RESULT),
     highAlert: () => Promise.resolve(HIGH_ALERT_RESULT),
+    departments: () => Promise.resolve(DEPARTMENTS_RESULT),
+    peakHours: () => Promise.resolve(PEAK_HOURS_RESULT),
+    topRequests: () => Promise.resolve(TOP_REQUESTS_RESULT),
+    satisfaction: () => Promise.resolve(SATISFACTION_RESULT),
+    export: () => Promise.resolve(EXPORT_RESULT),
   } as unknown as AnalyticsService;
 
   const app = Fastify();
@@ -182,6 +225,139 @@ describe('analyticsRoutes', () => {
     it('should 403 for staff', async () => {
       app = buildApp(STAFF, recorder);
       const res = await app.inject({ method: 'GET', url: '/analytics/high-alert' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/departments', () => {
+    it('should return 200 with department performance + meta', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/departments' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual(DEPARTMENTS_RESULT);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/departments' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/departments' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/peak-hours', () => {
+    it('should return 200 with buckets + max + meta', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/peak-hours' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual(PEAK_HOURS_RESULT);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/peak-hours' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/peak-hours' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/top-requests', () => {
+    it('should return 200 with top requests + meta', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/top-requests' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual(TOP_REQUESTS_RESULT);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/top-requests' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/top-requests' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/satisfaction', () => {
+    it('should return 200 with satisfaction points + meta', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/satisfaction' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual(SATISFACTION_RESULT);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/satisfaction' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/satisfaction' });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /analytics/export', () => {
+    it('should return CSV with attachment headers', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/export?format=xlsx',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toBe(
+        'attachment; filename="analytics-2026-06-01-2026-06-30.csv"',
+      );
+      expect(res.body).toBe(EXPORT_RESULT.csv);
+    });
+
+    it('should accept format=pdf', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/export?format=pdf',
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('should 400 without a format param', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export' });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should 400 on bogus format', async () => {
+      app = buildApp(GM, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=csv' });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should 401 without tenant', async () => {
+      app = buildApp(undefined, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=xlsx' });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should 403 for staff', async () => {
+      app = buildApp(STAFF, recorder);
+      const res = await app.inject({ method: 'GET', url: '/analytics/export?format=xlsx' });
       expect(res.statusCode).toBe(403);
     });
   });

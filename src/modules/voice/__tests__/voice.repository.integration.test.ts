@@ -33,6 +33,13 @@ const gmB: TenantContext = {
   role: 'gm_admin',
 };
 
+const TEST_PAYLOAD = {
+  pbx_host: 'sip.example.com',
+  sip_username: 'user',
+  sip_password: 'pass',
+  sip_port: 5060,
+};
+
 let container: StartedPostgreSqlContainer;
 let db: PrismaClient;
 let service: VoiceService;
@@ -70,6 +77,12 @@ describe('VoiceService groundwork (integration)', () => {
       expect(res.data).toEqual({
         hotel_id: HOTEL_A,
         pbx_type: null,
+        pbx_host: '',
+        sip_username: '',
+        sip_password: '',
+        sip_port: 0,
+        sip_codec: 'g711a',
+        did_number: '',
         config: {},
         is_active: false,
         updated_at: null,
@@ -143,19 +156,41 @@ describe('VoiceService groundwork (integration)', () => {
 
   describe('POST /test precondition guard', () => {
     it('should 422 VOICE_NOT_CONFIGURED when no row exists', async () => {
-      await expect(service.test(gmA)).rejects.toBeInstanceOf(BusinessRuleError);
+      await expect(service.test(gmA, TEST_PAYLOAD)).rejects.toBeInstanceOf(BusinessRuleError);
     });
 
     it('should 422 VOICE_NOT_CONFIGURED when row exists but pbx_type is null', async () => {
       await service.upsert(gmA, { is_active: true }); // pbx_type stays null
-      await expect(service.test(gmA)).rejects.toBeInstanceOf(BusinessRuleError);
+      await expect(service.test(gmA, TEST_PAYLOAD)).rejects.toBeInstanceOf(BusinessRuleError);
     });
 
     it('should return stub success when pbx_type is set', async () => {
       await service.upsert(gmA, { pbx_type: 'sip' });
-      const res = await service.test(gmA);
+      const res = await service.test(gmA, TEST_PAYLOAD);
       expect(res.data.success).toBe(true);
+      expect(res.data.message).toContain('wave 2a');
       expect(res.data.note).toContain('wave 2a');
+    });
+  });
+
+  describe('flat SIP fields round-trip', () => {
+    it('should persist flat SIP fields into config and surface them flat on GET', async () => {
+      await service.upsert(gmA, {
+        pbx_type: 'cloud_pbx',
+        pbx_host: 'sip.example.com',
+        sip_username: 'user',
+        sip_password: 'pass',
+        sip_port: 5060,
+        sip_codec: 'opus',
+        did_number: '+15551234',
+      });
+      const res = await service.get(gmA);
+      expect(res.data.pbx_type).toBe('cloud_pbx');
+      expect(res.data.pbx_host).toBe('sip.example.com');
+      expect(res.data.sip_username).toBe('user');
+      expect(res.data.sip_port).toBe(5060);
+      expect(res.data.sip_codec).toBe('opus');
+      expect(res.data.did_number).toBe('+15551234');
     });
   });
 });

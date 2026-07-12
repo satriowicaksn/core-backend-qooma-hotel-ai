@@ -9,18 +9,29 @@ import type { TenantContext } from '@plugins/tenant-guard.js';
 import type { AnalyticsRepository } from './analytics.repository.js';
 import {
   buildAlertSummary,
+  buildExportCsv,
   buildMeta,
+  serializeDepartmentPerf,
   serializeHighAlertDept,
   serializeOverview,
+  serializePeakHoursBucket,
+  serializeSatisfactionPoint,
   serializeTicketBucket,
+  serializeTopRequest,
 } from './analytics.serializer.js';
 import type {
+  DepartmentPerformanceResponse,
+  ExportQuery,
+  ExportResult,
   HighAlertDeptWire,
   HighAlertResponse,
   OverviewResponse,
+  PeakHoursResponse,
   RangeQuery,
+  SatisfactionResponse,
   TicketVolumeBucket,
   TicketsTimeSeriesResponse,
+  TopRequestsResponse,
 } from './analytics.types.js';
 
 export interface AnalyticsServiceOptions {
@@ -123,5 +134,62 @@ export class AnalyticsService {
       alert_summary: buildAlertSummary(deptWires),
       meta: buildMeta(query.from, query.to, query.period),
     };
+  }
+
+  async departments(ctx: TenantContext, query: RangeQuery): Promise<DepartmentPerformanceResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.departmentPerformance(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeDepartmentPerf),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async peakHours(ctx: TenantContext, query: RangeQuery): Promise<PeakHoursResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.peakHours(ctx.hotelId, query.from, query.to);
+    const data = rows.map(serializePeakHoursBucket);
+    const max = data.reduce((acc, b) => (b.total > acc ? b.total : acc), 0);
+    return {
+      data,
+      max,
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async topRequests(ctx: TenantContext, query: RangeQuery): Promise<TopRequestsResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.topRequests(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeTopRequest),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  async satisfaction(ctx: TenantContext, query: RangeQuery): Promise<SatisfactionResponse> {
+    this.assertTierGate(ctx);
+    const rows = await this.repo.satisfactionByDay(ctx.hotelId, query.from, query.to);
+    return {
+      data: rows.map(serializeSatisfactionPoint),
+      meta: buildMeta(query.from, query.to, query.period),
+    };
+  }
+
+  /**
+   * FE requests format=xlsx|pdf but no xlsx/pdf lib is bundled — we return a
+   * CSV built from overview KPIs + tickets time-series (reusing the same repo
+   * aggregations as the live endpoints). FE consumes the response as a Blob so
+   * the CSV downloads fine regardless of the requested `format`.
+   */
+  async export(ctx: TenantContext, query: ExportQuery): Promise<ExportResult> {
+    this.assertTierGate(ctx);
+    const [agg, rows] = await Promise.all([
+      this.repo.overviewAgg(ctx.hotelId, query.from, query.to),
+      this.repo.ticketsByDay(ctx.hotelId, query.from, query.to),
+    ]);
+    const csv = buildExportCsv(serializeOverview(agg), rows.map(serializeTicketBucket));
+    const fromDay = query.from.toISOString().slice(0, 10);
+    const toDay = query.to.toISOString().slice(0, 10);
+    return { filename: `analytics-${fromDay}-${toDay}.csv`, csv };
   }
 }

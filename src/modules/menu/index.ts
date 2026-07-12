@@ -3,6 +3,8 @@
 
 import type { PrismaClient } from '@prisma/client';
 
+import type { ObjectStoragePort } from '@core/storage/object-storage.port.js';
+
 import { MenuRepository } from './menu.repository.js';
 import { MenuService } from './menu.service.js';
 
@@ -26,6 +28,6 @@ export type {
   MenuListResponse,
 } from './menu.types.js';
 
-export function buildMenuService(db: PrismaClient): MenuService {
-  return new MenuService(new MenuRepository(db));
+export function buildMenuService(db: PrismaClient, storage: ObjectStoragePort): MenuService {
+  return new MenuService(new MenuRepository(db), storage);
 }

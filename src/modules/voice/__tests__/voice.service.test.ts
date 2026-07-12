@@ -5,13 +5,20 @@ import { BusinessRuleError, ValidationError } from '@core/errors/app-errors.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import type { VoiceRepository } from '../voice.repository.js';
-import { parseUpsertVoiceBody } from '../voice.schema.js';
+import { parseUpsertVoiceBody, parseVoiceTestBody } from '../voice.schema.js';
 import { emptyVoiceConfig, serializeVoiceConfig } from '../voice.serializer.js';
 import { VoiceService } from '../voice.service.js';
 import type { VoiceConfigRow } from '../voice.types.js';
 
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const USER_ID = '11111111-1111-4111-8111-111111111111';
+
+const TEST_PAYLOAD = {
+  pbx_host: 'sip.example.com',
+  sip_username: 'user',
+  sip_password: 'pass',
+  sip_port: 5060,
+};
 
 function ctx(overrides: Partial<TenantContext> = {}): TenantContext {
   return {
@@ -75,18 +82,86 @@ describe('zod parser (UpsertVoiceBodySchema)', () => {
   it('should reject empty-string pbx_type', () => {
     expect(() => parseUpsertVoiceBody({ pbx_type: '' })).toThrow(ValidationError);
   });
+
+  it('should accept the flat FE VoiceSettings SIP fields', () => {
+    const body = {
+      pbx_type: 'cloud_pbx',
+      pbx_host: 'sip.example.com',
+      sip_username: 'user',
+      sip_password: 'pass',
+      sip_port: 5060,
+      sip_codec: 'opus' as const,
+      did_number: '+15551234',
+    };
+    expect(parseUpsertVoiceBody(body)).toEqual(body);
+  });
+
+  it('should reject an out-of-range sip_port', () => {
+    expect(() => parseUpsertVoiceBody({ sip_port: 70000 })).toThrow(ValidationError);
+  });
+
+  it('should reject an unknown sip_codec', () => {
+    expect(() => parseUpsertVoiceBody({ sip_codec: 'mp3' })).toThrow(ValidationError);
+  });
+});
+
+describe('zod parser (VoiceTestBodySchema)', () => {
+  it('should accept a full VoiceTestPayload', () => {
+    expect(parseVoiceTestBody(TEST_PAYLOAD)).toEqual(TEST_PAYLOAD);
+  });
+
+  it('should reject a body missing sip_port', () => {
+    const { sip_port: _omit, ...partial } = TEST_PAYLOAD;
+    expect(() => parseVoiceTestBody(partial)).toThrow(ValidationError);
+  });
+
+  it('should reject an unknown field (strict)', () => {
+    expect(() => parseVoiceTestBody({ ...TEST_PAYLOAD, extra: 1 })).toThrow(ValidationError);
+  });
 });
 
 describe('serializer', () => {
-  it('should snake_case a row', () => {
-    const wire = serializeVoiceConfig(makeRow());
+  it('should snake_case a row and surface flat SIP fields from config', () => {
+    const wire = serializeVoiceConfig(
+      makeRow({
+        config: {
+          pbx_host: 'sip.example.com',
+          sip_username: 'user',
+          sip_password: 'pass',
+          sip_port: 5060,
+          sip_codec: 'opus',
+          did_number: '+15551234',
+        },
+      }),
+    );
     expect(wire).toEqual({
       hotel_id: HOTEL_A,
       pbx_type: 'sip',
-      config: { host: 'sip.example.com' },
+      pbx_host: 'sip.example.com',
+      sip_username: 'user',
+      sip_password: 'pass',
+      sip_port: 5060,
+      sip_codec: 'opus',
+      did_number: '+15551234',
+      config: {
+        pbx_host: 'sip.example.com',
+        sip_username: 'user',
+        sip_password: 'pass',
+        sip_port: 5060,
+        sip_codec: 'opus',
+        did_number: '+15551234',
+      },
       is_active: true,
       updated_at: '2026-07-03T00:00:00.000Z',
     });
+  });
+
+  it('should default flat SIP fields when config lacks them', () => {
+    const wire = serializeVoiceConfig(makeRow({ config: { host: 'sip.example.com' } }));
+    expect(wire.pbx_host).toBe('');
+    expect(wire.sip_port).toBe(0);
+    expect(wire.sip_codec).toBe('g711a');
+    expect(wire.config).toEqual({ host: 'sip.example.com' });
   });
 
   it('should defensively narrow non-object config to {}', () => {
@@ -100,6 +175,12 @@ describe('serializer', () => {
     expect(emptyVoiceConfig(HOTEL_A)).toEqual({
       hotel_id: HOTEL_A,
       pbx_type: null,
+      pbx_host: '',
+      sip_username: '',
+      sip_password: '',
+      sip_port: 0,
+      sip_codec: 'g711a',
+      did_number: '',
       config: {},
       is_active: false,
       updated_at: null,
@@ -114,6 +195,12 @@ describe('VoiceService.get', () => {
     expect(res.data).toEqual({
       hotel_id: HOTEL_A,
       pbx_type: null,
+      pbx_host: '',
+      sip_username: '',
+      sip_password: '',
+      sip_port: 0,
+      sip_codec: 'g711a',
+      did_number: '',
       config: {},
       is_active: false,
       updated_at: null,
@@ -171,6 +258,49 @@ describe('VoiceService.upsert', () => {
     expect(res.data.is_active).toBe(true);
   });
 
+  it('should fold flat SIP fields into the config delta', async () => {
+    const upsert = jest.fn<VoiceRepository['upsert']>().mockResolvedValue(makeRow());
+    const service = new VoiceService(fakeRepo({ upsert }));
+    await service.upsert(ctx(), {
+      pbx_type: 'cloud_pbx',
+      pbx_host: 'sip.example.com',
+      sip_username: 'user',
+      sip_password: 'pass',
+      sip_port: 5060,
+      sip_codec: 'opus',
+      did_number: '+15551234',
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      HOTEL_A,
+      expect.objectContaining({
+        pbxType: 'cloud_pbx',
+        config: {
+          pbx_host: 'sip.example.com',
+          sip_username: 'user',
+          sip_password: 'pass',
+          sip_port: 5060,
+          sip_codec: 'opus',
+          did_number: '+15551234',
+        },
+      }),
+    );
+  });
+
+  it('should merge flat SIP fields over an explicit config blob (flat wins)', async () => {
+    const upsert = jest.fn<VoiceRepository['upsert']>().mockResolvedValue(makeRow());
+    const service = new VoiceService(fakeRepo({ upsert }));
+    await service.upsert(ctx(), {
+      config: { pbx_host: 'old.example.com', region: 'sg' },
+      pbx_host: 'new.example.com',
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      HOTEL_A,
+      expect.objectContaining({
+        config: { region: 'sg', pbx_host: 'new.example.com' },
+      }),
+    );
+  });
+
   it('should support clearing pbx_type to null via body', async () => {
     const upsert = jest
       .fn<VoiceRepository['upsert']>()
@@ -185,7 +315,7 @@ describe('VoiceService.test — Q-T29-#3 precondition guard', () => {
   it('should 422 VOICE_NOT_CONFIGURED when no row exists', async () => {
     const service = new VoiceService(fakeRepo({ findByHotel: () => Promise.resolve(null) }));
     try {
-      await service.test(ctx());
+      await service.test(ctx(), TEST_PAYLOAD);
       throw new Error('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(BusinessRuleError);
@@ -197,15 +327,16 @@ describe('VoiceService.test — Q-T29-#3 precondition guard', () => {
     const service = new VoiceService(
       fakeRepo({ findByHotel: () => Promise.resolve(makeRow({ pbxType: null })) }),
     );
-    await expect(service.test(ctx())).rejects.toBeInstanceOf(BusinessRuleError);
+    await expect(service.test(ctx(), TEST_PAYLOAD)).rejects.toBeInstanceOf(BusinessRuleError);
   });
 
-  it('should return the stub success wire when pbx_type is set', async () => {
+  it('should return the flat stub success wire when pbx_type is set', async () => {
     const service = new VoiceService(
       fakeRepo({ findByHotel: () => Promise.resolve(makeRow({ pbxType: 'sip' })) }),
     );
-    const res = await service.test(ctx());
+    const res = await service.test(ctx(), TEST_PAYLOAD);
     expect(res.data.success).toBe(true);
+    expect(res.data.message).toContain('wave 2a');
     expect(res.data.note).toContain('wave 2a');
   });
 });

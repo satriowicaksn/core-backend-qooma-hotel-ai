@@ -9,8 +9,13 @@ export function serializeKnowledgeEntry(row: KnowledgeEntryRow): KnowledgeEntryW
     hotel_id: row.hotelId,
     title: row.title,
     content: row.content,
+    question: row.title,
+    answer: row.content,
     category: row.category,
     tags: row.tags,
+    keywords: row.tags,
+    // No usage_count column yet — flat 0 until analytics wires it (FE reads it).
+    usage_count: 0,
     is_active: row.isActive,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),

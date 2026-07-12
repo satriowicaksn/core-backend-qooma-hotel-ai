@@ -105,13 +105,14 @@ export const UpdateItemBodySchema = refineAvailableWindow(
     }),
 );
 
-// T23-slice-1: bulk-availability body. Q-T23-#3 item_ids 1-100; reuses
+// T23-slice-1: bulk-availability body. Q-T23-#3 ids 1-100; reuses
 // refineAvailableWindow for the both-or-neither + strictly-less-than window
 // rule; Q-T23-#5 refines at least one delta field.
+// FE canonical: field is `ids` (src/types/api.ts BulkAvailabilityPayload).
 export const BulkAvailabilityBodySchema = refineAvailableWindow(
   z
     .object({
-      item_ids: z.array(z.string().uuid()).min(1).max(100),
+      ids: z.array(z.string().uuid()).min(1).max(100),
       is_available: z.boolean().optional(),
       available_window_from: hhmmField.nullable().optional(),
       available_window_to: hhmmField.nullable().optional(),
@@ -144,6 +145,145 @@ export const ListMenuQuerySchema = z
     is_active: boolFlag.optional(),
   })
   .strict();
+
+// --- Multipart (FormData) coercion ------------------------------------------
+// FE sends menu create/update as multipart/form-data with all values as
+// strings (price_idr/prep_minutes numeric-as-string, is_available 'true'/
+// 'false', window fields as HH:mm or '' when absent). image_url is NOT sent —
+// the service derives it from the uploaded file. We coerce the raw string
+// record into the same domain shape the JSON path produces, then reuse the
+// window refine.
+
+// Empty string from FormData means "field not provided" — drop it so optional
+// fields stay undefined and the both-or-neither window refine holds.
+function emptyToUndefined(v: unknown): unknown {
+  return v === '' ? undefined : v;
+}
+
+// The `.optional()` sits INSIDE each preprocess so that an empty-string cell
+// (mapped to undefined) is accepted rather than hitting the base validator with
+// `undefined` (which would report "Required").
+const multipartPrice = z.preprocess(emptyToUndefined, priceIdrField.optional());
+const multipartPrepMinutes = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int().nonnegative().optional(),
+);
+const multipartWindow = z.preprocess(emptyToUndefined, hhmmField.optional());
+
+// z.coerce.boolean() makes 'false' truthy — coerce 'true'/'false' explicitly.
+function coerceBoolString(v: unknown): unknown {
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return v;
+}
+const multipartBoolCell = z.preprocess(
+  (v) => coerceBoolString(emptyToUndefined(v)),
+  z.boolean().optional(),
+);
+
+const multipartItemShape = {
+  category_id: z.string().uuid(),
+  name: itemNameField,
+  description: descriptionField.optional(),
+  price_idr: z.coerce.number().nonnegative().max(9999999999.99),
+  prep_minutes: multipartPrepMinutes,
+  is_available: multipartBoolCell,
+  available_window_from: multipartWindow,
+  available_window_to: multipartWindow,
+};
+
+export const CreateItemMultipartSchema = refineAvailableWindow(
+  z.object(multipartItemShape).strict(),
+);
+
+export const UpdateItemMultipartSchema = refineAvailableWindow(
+  z
+    .object({
+      category_id: z.string().uuid().optional(),
+      name: itemNameField.optional(),
+      description: descriptionField.optional(),
+      price_idr: multipartPrice,
+      prep_minutes: multipartPrepMinutes,
+      is_available: multipartBoolCell,
+      available_window_from: multipartWindow,
+      available_window_to: multipartWindow,
+    })
+    .strict()
+    .refine((v) => Object.keys(v).length > 0, {
+      message: 'update body must include at least one field',
+    }),
+);
+
+// FormData parts arrive with only the keys the client sent — strip undefined
+// values so `.strict()` sees a clean object and optional fields stay absent.
+function compactFields(fields: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
+export function parseCreateItemMultipart(
+  fields: Record<string, string | undefined>,
+): CreateItemBody {
+  const result = CreateItemMultipartSchema.safeParse(compactFields(fields));
+  if (!result.success) throw toValidationError(result.error);
+  return result.data as CreateItemBody;
+}
+
+export function parseUpdateItemMultipart(
+  fields: Record<string, string | undefined>,
+): UpdateItemBody {
+  const result = UpdateItemMultipartSchema.safeParse(compactFields(fields));
+  if (!result.success) throw toValidationError(result.error);
+  return result.data as UpdateItemBody;
+}
+
+// --- CSV import row ----------------------------------------------------------
+// Columns: name, description, price_idr, category_id, prep_minutes,
+// is_available. Numeric + boolean cells coerced from their string form; empty
+// description => null; empty prep_minutes => null.
+export const MenuCsvRowSchema = z.object({
+  name: itemNameField,
+  description: z.preprocess((v) => (v === '' ? null : v), descriptionField),
+  // Empty price cell => undefined => "Required" (never silently 0).
+  price_idr: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().nonnegative().max(9999999999.99),
+  ),
+  category_id: z.string().uuid(),
+  // Empty prep cell => null (always-optional prep); otherwise coerce the string.
+  prep_minutes: z.preprocess(
+    (v) => (v === '' ? null : v),
+    z.coerce.number().int().nonnegative().nullable(),
+  ),
+  is_available: z.preprocess((v) => v === 'true', z.boolean()),
+});
+
+export type MenuCsvRow = z.infer<typeof MenuCsvRowSchema>;
+
+// parseCsvWithSchema expects ZodType<T> (input === output). Our row schema uses
+// z.coerce/z.preprocess, so its INPUT type is `unknown` (ZodEffects) — not
+// assignable to ZodType<MenuCsvRow>. The parser only ever feeds it a string
+// record, so exposing an output-typed handle is safe at runtime.
+export const MenuCsvRowValidator: z.ZodType<MenuCsvRow> =
+  MenuCsvRowSchema as unknown as z.ZodType<MenuCsvRow>;
+
+export const MENU_CSV_COLUMNS = [
+  'name',
+  'description',
+  'price_idr',
+  'category_id',
+  'prep_minutes',
+  'is_available',
+] as const;
+
+export function parseMenuCsvRow(raw: unknown): MenuCsvRow {
+  const result = MenuCsvRowSchema.safeParse(raw);
+  if (!result.success) throw toValidationError(result.error);
+  return result.data;
+}
 
 function toValidationError(error: z.ZodError): ValidationError {
   const first = error.issues[0];
