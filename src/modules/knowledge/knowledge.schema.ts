@@ -8,33 +8,63 @@ import { ValidationError } from '@core/errors/app-errors.js';
 
 import type { KnowledgeListFilters } from './knowledge.types.js';
 
-const titleField = z.string().min(1).max(255);
-const contentField = z.string().min(1).max(10000);
+// FE (settings.content.api.ts) is the canonical contract and sends
+// { category, question, answer, keywords }. We accept the FE field names at the
+// boundary; the service maps question→title, answer→content, keywords→tags onto
+// the DB columns.
+const questionField = z.string().min(1).max(255);
+const answerField = z.string().min(1).max(10000);
 const categoryField = z.string().min(1).max(80).nullable();
-const tagsField = z.array(z.string().min(1).max(40)).max(20);
+const keywordsField = z.array(z.string().min(1).max(40)).max(20);
 
 export const CreateEntryBodySchema = z
   .object({
-    title: titleField,
-    content: contentField,
+    question: questionField,
+    answer: answerField,
     category: categoryField.optional(),
-    tags: tagsField.optional(),
+    keywords: keywordsField.optional(),
     is_active: z.boolean().optional(),
   })
   .strict();
 
 export const UpdateEntryBodySchema = z
   .object({
-    title: titleField.optional(),
-    content: contentField.optional(),
+    question: questionField.optional(),
+    answer: answerField.optional(),
     category: categoryField.optional(),
-    tags: tagsField.optional(),
+    keywords: keywordsField.optional(),
     is_active: z.boolean().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, {
     message: 'update body must include at least one field',
   });
+
+// CSV import row. FE column order (settings.content.api.ts import): question,
+// answer, category, keywords. `keywords` is a comma-separated cell → split +
+// trim + drop empties; bounded like keywordsField above.
+export const ImportRowSchema = z.object({
+  question: questionField,
+  answer: answerField,
+  category: z
+    .string()
+    .trim()
+    .max(80)
+    .transform((v) => (v.length > 0 ? v : null)),
+  keywords: z
+    .string()
+    .transform((v) =>
+      v
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0),
+    )
+    .pipe(keywordsField),
+});
+
+export const IMPORT_COLUMNS = ['question', 'answer', 'category', 'keywords'] as const;
+
+export type ImportRow = z.infer<typeof ImportRowSchema>;
 
 export const EntryIdParamSchema = z.object({
   id: z.string().uuid('knowledge entry id must be a valid uuid'),

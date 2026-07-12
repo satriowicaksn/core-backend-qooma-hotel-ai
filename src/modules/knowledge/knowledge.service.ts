@@ -3,17 +3,26 @@
 // RBAC gate lives at the route layer (requireRole([gm_admin])).
 
 import type { Prisma } from '@prisma/client';
+import type { ZodType } from 'zod';
 
 import { NotFoundError } from '@core/errors/app-errors.js';
 
 import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.js';
+import { parseCsvWithSchema } from '@shared/utils/csv-parser.js';
 
 import type { KnowledgeRepository } from './knowledge.repository.js';
-import type { CreateEntryBody, UpdateEntryBody } from './knowledge.schema.js';
+import {
+  IMPORT_COLUMNS,
+  ImportRowSchema,
+  type CreateEntryBody,
+  type ImportRow,
+  type UpdateEntryBody,
+} from './knowledge.schema.js';
 import { serializeKnowledgeEntry } from './knowledge.serializer.js';
 import type {
   KnowledgeEntryResponse,
   KnowledgeEntryRow,
+  KnowledgeImportResponse,
   KnowledgeListFilters,
   KnowledgeListResponse,
 } from './knowledge.types.js';
@@ -51,12 +60,13 @@ export class KnowledgeService {
    * here reinforces the invariant.
    */
   async create(ctx: TenantContext, input: CreateEntryBody): Promise<KnowledgeEntryResponse> {
+    // FE field names → DB columns: question→title, answer→content, keywords→tags.
     const data: Prisma.KnowledgeEntryUncheckedCreateInput = {
       hotelId: ctx.hotelId,
-      title: input.title,
-      content: input.content,
+      title: input.question,
+      content: input.answer,
       ...(input.category !== undefined ? { category: input.category } : {}),
-      ...(input.tags !== undefined ? { tags: input.tags } : {}),
+      ...(input.keywords !== undefined ? { tags: input.keywords } : {}),
       ...(input.is_active !== undefined ? { isActive: input.is_active } : {}),
     };
     const row = await this.repo.create(data);
@@ -70,13 +80,51 @@ export class KnowledgeService {
   ): Promise<KnowledgeEntryResponse> {
     await this.loadOwned(ctx, id);
     const data: Prisma.KnowledgeEntryUncheckedUpdateInput = {};
-    if (input.title !== undefined) data.title = input.title;
-    if (input.content !== undefined) data.content = input.content;
+    if (input.question !== undefined) data.title = input.question;
+    if (input.answer !== undefined) data.content = input.answer;
     if (input.category !== undefined) data.category = input.category;
-    if (input.tags !== undefined) data.tags = input.tags;
+    if (input.keywords !== undefined) data.tags = input.keywords;
     if (input.is_active !== undefined) data.isActive = input.is_active;
     const row = await this.repo.update(id, data);
     return { data: serializeKnowledgeEntry(row) };
+  }
+
+  /**
+   * Bulk-create knowledge entries from a CSV upload. Partial success: valid
+   * rows are inserted, invalid rows collected into `errors` (1-indexed by data
+   * row, matching FE KnowledgeImportResponse). Inserts are sequential to keep
+   * the error surface stable and per-row (no all-or-nothing transaction — a
+   * single bad row must not roll back the good ones).
+   */
+  async importCsv(ctx: TenantContext, csvText: string): Promise<KnowledgeImportResponse> {
+    // ImportRowSchema transforms string cells (keywords split, category → null)
+    // so its zod *input* type differs from its output; parseCsvWithSchema's
+    // `ZodType<T>` collapses input=output. The runtime input is always the
+    // parser's Record<string,string> row, so this narrowing is sound.
+    const rowSchema = ImportRowSchema as unknown as ZodType<ImportRow>;
+    const { valid, errors } = parseCsvWithSchema<ImportRow>(csvText, rowSchema, {
+      columns: [...IMPORT_COLUMNS],
+      hasHeader: true,
+    });
+
+    let imported = 0;
+    for (const row of valid) {
+      await this.repo.create({
+        hotelId: ctx.hotelId,
+        title: row.question,
+        content: row.answer,
+        category: row.category,
+        tags: row.keywords,
+      });
+      imported++;
+    }
+
+    return {
+      imported,
+      skipped: errors.length,
+      // CsvRowError.rowIndex is 0-based over data rows → 1-index for the UI.
+      errors: errors.map((e) => ({ row: e.rowIndex + 1, reason: e.issues.join('; ') })),
+    };
   }
 
   async remove(ctx: TenantContext, id: string): Promise<void> {

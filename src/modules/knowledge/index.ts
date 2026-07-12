@@ -12,6 +12,7 @@ export type { CreateEntryBody, UpdateEntryBody } from './knowledge.schema.js';
 export type {
   KnowledgeEntryResponse,
   KnowledgeEntryWire,
+  KnowledgeImportResponse,
   KnowledgeListResponse,
 } from './knowledge.types.js';
 

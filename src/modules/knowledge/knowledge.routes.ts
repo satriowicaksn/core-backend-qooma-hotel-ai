@@ -2,7 +2,7 @@
 
 import type { FastifyPluginCallback, FastifyRequest } from 'fastify';
 
-import { AuthError } from '@core/errors/app-errors.js';
+import { AuthError, ValidationError } from '@core/errors/app-errors.js';
 
 import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
@@ -63,13 +63,34 @@ export const knowledgeRoutes: FastifyPluginCallback<KnowledgeRoutesOptions> = (
       {
         module: 'knowledge',
         action: 'create',
-        titleLen: body.title.length,
+        questionLen: body.question.length,
         correlationId: correlationIdOf(req),
       },
       'create knowledge entry',
     );
     const result = await service.create(ctx, body);
     return reply.code(201).send(result);
+  });
+
+  fastify.post('/settings/knowledge/import', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    requireRole(ctx, ALLOWED_ROLES);
+    const upload = await req.file();
+    if (!upload) {
+      throw new ValidationError('CSV file is required (multipart field "file")');
+    }
+    const csvText = (await upload.toBuffer()).toString('utf8');
+    req.log.info(
+      {
+        module: 'knowledge',
+        action: 'import',
+        filename: upload.filename,
+        correlationId: correlationIdOf(req),
+      },
+      'import knowledge csv',
+    );
+    const result = await service.importCsv(ctx, csvText);
+    return reply.send(result);
   });
 
   fastify.patch('/settings/knowledge/:id', async (req, reply) => {
