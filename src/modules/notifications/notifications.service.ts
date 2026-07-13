@@ -44,6 +44,10 @@ export class NotificationsService {
   constructor(private readonly repo: NotificationsRepository) {}
 
   async list(ctx: TenantContext, rawQuery: unknown): Promise<NotificationListResponse> {
+    // No hotel scope (e.g. super_admin, hotelId null) → empty valid page.
+    if (!ctx.hotelId) {
+      return { data: [], pageInfo: { nextCursor: null, hasMore: false } };
+    }
     const query = parseNotificationsQuery(rawQuery);
     const where = buildNotificationWhere(ctx, query.filters, query.cursor);
     const rows = await this.repo.findMany(where, query.limit + 1);
@@ -60,6 +64,10 @@ export class NotificationsService {
   }
 
   async unreadCount(ctx: TenantContext): Promise<UnreadCountResponse> {
+    // No hotel scope (e.g. super_admin, hotelId null) → zero count.
+    if (!ctx.hotelId) {
+      return { data: { count: 0 } };
+    }
     const count = await this.repo.countWhere({
       userId: ctx.userId,
       hotelId: ctx.hotelId,
