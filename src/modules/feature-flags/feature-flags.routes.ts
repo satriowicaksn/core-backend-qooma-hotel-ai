@@ -5,7 +5,7 @@
 
 import type { FastifyPluginCallback, FastifyRequest } from 'fastify';
 
-import { AuthError } from '@core/errors/app-errors.js';
+import { AuthError, ValidationError } from '@core/errors/app-errors.js';
 
 import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
@@ -45,6 +45,12 @@ export const featureFlagsRoutes: FastifyPluginCallback<FeatureFlagsRoutesOptions
   fastify.get('/feature-flags', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
+    // super_admin bypasses requireRole but has no hotel scope (hotelId is empty
+    // in their JWT). Feature flags are hotel-scoped; reject without a valid
+    // hotel to avoid a silent empty response or FK violation downstream.
+    if (!ctx.hotelId) {
+      throw new ValidationError('Feature flags require a hotel context. Use a hotel-scoped session.');
+    }
     req.log.info(
       { module: 'feature-flags', action: 'list', correlationId: correlationIdOf(req) },
       'list feature flags',
@@ -56,6 +62,9 @@ export const featureFlagsRoutes: FastifyPluginCallback<FeatureFlagsRoutesOptions
   fastify.patch('/feature-flags/:flag', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
+    if (!ctx.hotelId) {
+      throw new ValidationError('Feature flags require a hotel context. Use a hotel-scoped session.');
+    }
     const flag = parseFlagParam(req.params) as KnownFlag;
     const body = parseUpdateFlagBody(req.body);
     const query = parsePatchQuery(req.query);
