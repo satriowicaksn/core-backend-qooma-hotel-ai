@@ -83,6 +83,18 @@ export class AnalyticsService {
 
   async overview(ctx: TenantContext, query: RangeQuery): Promise<OverviewResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → zeroed KPIs.
+    if (!ctx.hotelId) {
+      return {
+        data: serializeOverview({
+          totalTickets: 0,
+          closedTickets: 0,
+          avgSatisfaction: null,
+          avgResponseTimeMinutes: null,
+        }),
+        meta: buildMeta(query.from, query.to, query.period),
+      };
+    }
     const agg = await this.repo.overviewAgg(ctx.hotelId, query.from, query.to);
     return {
       data: serializeOverview(agg),
@@ -92,6 +104,10 @@ export class AnalyticsService {
 
   async tickets(ctx: TenantContext, query: RangeQuery): Promise<TicketsTimeSeriesResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty series.
+    if (!ctx.hotelId) {
+      return { data: [], meta: buildMeta(query.from, query.to, query.period) };
+    }
     const rows = await this.repo.ticketsByDay(ctx.hotelId, query.from, query.to);
     return {
       data: rows.map(serializeTicketBucket),
@@ -108,6 +124,14 @@ export class AnalyticsService {
    */
   async highAlert(ctx: TenantContext, query: RangeQuery): Promise<HighAlertResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty depts + summary.
+    if (!ctx.hotelId) {
+      return {
+        data: [],
+        alert_summary: buildAlertSummary([]),
+        meta: buildMeta(query.from, query.to, query.period),
+      };
+    }
     const windowMs = query.to.getTime() - query.from.getTime();
     const prevFrom = new Date(query.from.getTime() - windowMs);
     const prevTo = new Date(query.from.getTime() - 1);
@@ -138,6 +162,10 @@ export class AnalyticsService {
 
   async departments(ctx: TenantContext, query: RangeQuery): Promise<DepartmentPerformanceResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty performance list.
+    if (!ctx.hotelId) {
+      return { data: [], meta: buildMeta(query.from, query.to, query.period) };
+    }
     const rows = await this.repo.departmentPerformance(ctx.hotelId, query.from, query.to);
     return {
       data: rows.map(serializeDepartmentPerf),
@@ -147,6 +175,10 @@ export class AnalyticsService {
 
   async peakHours(ctx: TenantContext, query: RangeQuery): Promise<PeakHoursResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty grid + zero max.
+    if (!ctx.hotelId) {
+      return { data: [], max: 0, meta: buildMeta(query.from, query.to, query.period) };
+    }
     const rows = await this.repo.peakHours(ctx.hotelId, query.from, query.to);
     const data = rows.map(serializePeakHoursBucket);
     const max = data.reduce((acc, b) => (b.total > acc ? b.total : acc), 0);
@@ -159,6 +191,10 @@ export class AnalyticsService {
 
   async topRequests(ctx: TenantContext, query: RangeQuery): Promise<TopRequestsResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty list.
+    if (!ctx.hotelId) {
+      return { data: [], meta: buildMeta(query.from, query.to, query.period) };
+    }
     const rows = await this.repo.topRequests(ctx.hotelId, query.from, query.to);
     return {
       data: rows.map(serializeTopRequest),
@@ -168,6 +204,10 @@ export class AnalyticsService {
 
   async satisfaction(ctx: TenantContext, query: RangeQuery): Promise<SatisfactionResponse> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → empty series.
+    if (!ctx.hotelId) {
+      return { data: [], meta: buildMeta(query.from, query.to, query.period) };
+    }
     const rows = await this.repo.satisfactionByDay(ctx.hotelId, query.from, query.to);
     return {
       data: rows.map(serializeSatisfactionPoint),
@@ -183,6 +223,24 @@ export class AnalyticsService {
    */
   async export(ctx: TenantContext, query: ExportQuery): Promise<ExportResult> {
     this.assertTierGate(ctx);
+    // No hotel scope (e.g. super_admin, hotelId null) → CSV with zeroed overview
+    // + empty tickets section.
+    if (!ctx.hotelId) {
+      return {
+        filename: `analytics-${query.from.toISOString().slice(0, 10)}-${query.to
+          .toISOString()
+          .slice(0, 10)}.csv`,
+        csv: buildExportCsv(
+          serializeOverview({
+            totalTickets: 0,
+            closedTickets: 0,
+            avgSatisfaction: null,
+            avgResponseTimeMinutes: null,
+          }),
+          [],
+        ),
+      };
+    }
     const [agg, rows] = await Promise.all([
       this.repo.overviewAgg(ctx.hotelId, query.from, query.to),
       this.repo.ticketsByDay(ctx.hotelId, query.from, query.to),

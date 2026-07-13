@@ -43,6 +43,11 @@ export class FeatureFlagsService {
   }
 
   async list(ctx: TenantContext): Promise<FeatureFlagListResponse> {
+    // No hotel scope (e.g. super_admin, hotelId null) → empty list. composeFlagList
+    // would otherwise stamp a null/empty hotel_id onto every synthesized flag wire.
+    if (!ctx.hotelId) {
+      return { data: [] };
+    }
     const rows = await this.repo.findManyByHotel(ctx.hotelId);
     return { data: composeFlagList(ctx.hotelId, rows) };
   }
