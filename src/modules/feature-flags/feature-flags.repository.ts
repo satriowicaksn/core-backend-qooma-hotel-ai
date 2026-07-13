@@ -37,6 +37,15 @@ export class FeatureFlagsRepository {
       ...(input.isEnabled !== undefined ? { isEnabled: input.isEnabled } : {}),
       ...(input.config !== undefined ? { config: input.config } : {}),
     };
+    // Opsi C: core DB and auth DB are separate databases (hotel_core_dev vs
+    // hotel_auth_dev). The `hotels` stub table in core DB is not populated by
+    // auth-BE, so the first INSERT into feature_flags fails with a FK violation
+    // (P2003). Upsert the hotel stub row first so the FK is satisfied.
+    await this.db.hotel.upsert({
+      where: { id: input.hotelId },
+      create: { id: input.hotelId },
+      update: {},
+    });
     return this.db.featureFlag.upsert({
       where: { hotelId_flag: { hotelId: input.hotelId, flag: input.flag } },
       create,
