@@ -49,7 +49,9 @@ export const featureFlagsRoutes: FastifyPluginCallback<FeatureFlagsRoutesOptions
     // in their JWT). Feature flags are hotel-scoped; reject without a valid
     // hotel to avoid a silent empty response or FK violation downstream.
     if (!ctx.hotelId) {
-      throw new ValidationError('Feature flags require a hotel context. Use a hotel-scoped session.');
+      throw new ValidationError(
+        'Feature flags require a hotel context. Use a hotel-scoped session.',
+      );
     }
     req.log.info(
       { module: 'feature-flags', action: 'list', correlationId: correlationIdOf(req) },
@@ -63,7 +65,9 @@ export const featureFlagsRoutes: FastifyPluginCallback<FeatureFlagsRoutesOptions
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
     if (!ctx.hotelId) {
-      throw new ValidationError('Feature flags require a hotel context. Use a hotel-scoped session.');
+      throw new ValidationError(
+        'Feature flags require a hotel context. Use a hotel-scoped session.',
+      );
     }
     const flag = parseFlagParam(req.params) as KnownFlag;
     const body = parseUpdateFlagBody(req.body);
