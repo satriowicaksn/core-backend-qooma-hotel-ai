@@ -55,6 +55,26 @@ export const UpdateGuestSchema = z
   })
   .strict();
 
+// POST /guests — name + wa_phone required; optional email.
+export const CreateGuestBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    wa_phone: z
+      .string()
+      .trim()
+      .regex(/^\+62\d{8,12}$/, 'wa_phone must start with +62 and be 10-15 digits'),
+    email: z.string().trim().email().max(255).nullable().optional(),
+  })
+  .strict();
+
+export type CreateGuestBody = z.infer<typeof CreateGuestBodySchema>;
+
+export function parseCreateGuestBody(raw: unknown): CreateGuestBody {
+  const result = CreateGuestBodySchema.safeParse(raw);
+  if (!result.success) throw toValidationError(result.error);
+  return result.data;
+}
+
 export const PreferenceBodySchema = z
   .object({
     preference_type: z.string().trim().min(1).max(40),

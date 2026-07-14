@@ -42,6 +42,16 @@ export class GuestsRepository {
     return this.db.guest.findUnique({ where: { id } });
   }
 
+  async createGuest(hotelId: string, data: Prisma.GuestUncheckedCreateInput): Promise<GuestRow> {
+    // Opsi C: upsert hotel stub so FK hotel_id → hotels.id is satisfied before insert.
+    await this.db.hotel.upsert({
+      where: { id: hotelId },
+      create: { id: hotelId },
+      update: {},
+    });
+    return this.db.guest.create({ data });
+  }
+
   async updateGuest(id: string, data: Prisma.GuestUpdateInput): Promise<GuestRow> {
     return this.db.guest.update({ where: { id }, data });
   }
