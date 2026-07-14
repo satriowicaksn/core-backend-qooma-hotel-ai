@@ -4,13 +4,14 @@
 
 import type { Prisma } from '@prisma/client';
 
-import { NotFoundError } from '@core/errors/app-errors.js';
+import { ConflictError, NotFoundError } from '@core/errors/app-errors.js';
 
 import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.js';
 
 import type { GuestsRepository } from './guests.repository.js';
 import {
   encodeMessageCursor,
+  parseCreateGuestBody,
   parseGuestListQuery,
   parseGuestUpdate,
   parseMessagesQuery,
@@ -86,6 +87,24 @@ function toGuestUpdateData(update: GuestUpdate): Prisma.GuestUpdateInput {
 
 export class GuestsService {
   constructor(private readonly repo: GuestsRepository) {}
+
+  async create(ctx: TenantContext, rawBody: unknown): Promise<GuestResponse> {
+    const body = parseCreateGuestBody(rawBody);
+    try {
+      const row = await this.repo.createGuest(ctx.hotelId, {
+        hotelId: ctx.hotelId,
+        name: body.name,
+        waPhone: body.wa_phone,
+        ...(body.email !== undefined ? { email: body.email } : {}),
+      });
+      return { data: serializeGuest(row, ctx) };
+    } catch (err) {
+      if ((err as { code?: string }).code === 'P2002') {
+        throw new ConflictError('Guest with this phone number already exists for this hotel');
+      }
+      throw err;
+    }
+  }
 
   async list(ctx: TenantContext, rawQuery: unknown): Promise<GuestListResponse> {
     const query = parseGuestListQuery(rawQuery);

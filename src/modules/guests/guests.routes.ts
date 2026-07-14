@@ -34,6 +34,16 @@ function correlationIdOf(req: FastifyRequest): string {
 export const guestsRoutes: FastifyPluginCallback<GuestsRoutesOptions> = (fastify, opts, done) => {
   const { service } = opts;
 
+  fastify.post('/guests', async (req, reply) => {
+    const ctx = requireTenant(req.tenant);
+    req.log.info(
+      { module: 'guests', action: 'create', correlationId: correlationIdOf(req) },
+      'create guest',
+    );
+    const result = await service.create(ctx, req.body);
+    return reply.code(201).send(result);
+  });
+
   fastify.get('/guests', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     req.log.info(
