@@ -23,6 +23,12 @@ import type {
 
 const MIN_ACTIVE_AGENTS = 3;
 
+const DEFAULT_AGENT_DEFINITIONS = [
+  { agentType: 'receptionist', name: 'Receptionist' },
+  { agentType: 'request_complaint', name: 'Request & Complaint' },
+  { agentType: 'engagement', name: 'Engagement' },
+] as const;
+
 // PM ACK tightening #3: Prisma throws PrismaClientKnownRequestError with
 // code='P2034' for transaction serialization conflicts (Postgres SQLSTATE
 // 40001). Belt-and-suspenders check on both.
@@ -66,8 +72,25 @@ export class AgentsService {
   ) {}
 
   async list(ctx: TenantContext, filters: AgentListFilters): Promise<AgentListResponse> {
-    const rows = await this.repo.findMany(buildAgentWhere(ctx, filters));
+    const where = buildAgentWhere(ctx, filters);
+    const rows = await this.repo.findMany(where);
+    if (rows.length === 0 && !ctx.isSuperAdmin && ctx.hotelId) {
+      const seeded = await this.provisionDefaults(ctx.hotelId);
+      const filtered =
+        filters.isActive !== undefined
+          ? seeded.filter((r) => r.isActive === filters.isActive)
+          : seeded;
+      return { data: filtered.map(serializeAgent) };
+    }
     return { data: rows.map(serializeAgent) };
+  }
+
+  private async provisionDefaults(hotelId: string): Promise<AgentRow[]> {
+    await this.db.aiAgentConfig.createMany({
+      data: DEFAULT_AGENT_DEFINITIONS.map((a) => ({ hotelId, ...a })),
+      skipDuplicates: true,
+    });
+    return this.repo.findMany({ hotelId });
   }
 
   /**

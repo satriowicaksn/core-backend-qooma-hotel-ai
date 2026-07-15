@@ -57,7 +57,7 @@ interface TxStub {
   updated: AgentRow;
 }
 
-function fakeDb(stub: TxStub): PrismaClient {
+function fakeDb(stub: TxStub, createManyResult = 3): PrismaClient {
   const tx = {
     aiAgentConfig: {
       count: () => Promise.resolve(stub.count),
@@ -66,6 +66,9 @@ function fakeDb(stub: TxStub): PrismaClient {
   };
   return {
     $transaction: (fn: (t: typeof tx) => Promise<unknown>) => fn(tx),
+    aiAgentConfig: {
+      createMany: () => Promise.resolve({ count: createManyResult }),
+    },
   } as unknown as PrismaClient;
 }
 
@@ -167,6 +170,61 @@ describe('AgentsService.list', () => {
     const res = await service.list(ctx(), {});
     expect(res.data).toHaveLength(2);
     expect(res.data[0]?.agent_type).toBe('a1');
+  });
+});
+
+describe('AgentsService.list — auto-provision defaults', () => {
+  const DEFAULTS = [
+    makeRow({ agentType: 'receptionist', name: 'Receptionist' }),
+    makeRow({ id: 'x2', agentType: 'request_complaint', name: 'Request & Complaint' }),
+    makeRow({ id: 'x3', agentType: 'engagement', name: 'Engagement' }),
+  ];
+
+  it('should seed 3 default agents when hotel has none', async () => {
+    let findCallCount = 0;
+    const service = new AgentsService(
+      fakeRepo({
+        findMany: () => {
+          findCallCount += 1;
+          return Promise.resolve(findCallCount === 1 ? [] : DEFAULTS);
+        },
+      }),
+      fakeDb({ count: 0, updated: makeRow() }),
+    );
+    const res = await service.list(ctx(), {});
+    expect(res.data).toHaveLength(3);
+    expect(res.data.map((r) => r.agent_type)).toEqual([
+      'receptionist',
+      'request_complaint',
+      'engagement',
+    ]);
+  });
+
+  it('should NOT seed when super_admin lists cross-hotel (empty result is valid)', async () => {
+    const createMany = jest.fn();
+    const db = {
+      $transaction: jest.fn(),
+      aiAgentConfig: { createMany },
+    } as unknown as PrismaClient;
+    const service = new AgentsService(fakeRepo({ findMany: () => Promise.resolve([]) }), db);
+    const res = await service.list(ctx({ isSuperAdmin: true, role: 'super_admin' }), {});
+    expect(res.data).toHaveLength(0);
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
+  it('should apply is_active filter to seeded rows', async () => {
+    let findCallCount = 0;
+    const service = new AgentsService(
+      fakeRepo({
+        findMany: () => {
+          findCallCount += 1;
+          return Promise.resolve(findCallCount === 1 ? [] : DEFAULTS);
+        },
+      }),
+      fakeDb({ count: 0, updated: makeRow() }),
+    );
+    const res = await service.list(ctx(), { isActive: true });
+    expect(res.data).toHaveLength(3);
   });
 });
 
