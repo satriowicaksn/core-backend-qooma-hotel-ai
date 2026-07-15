@@ -42,10 +42,7 @@ function sanitizeFilename(value: string): string {
 export const billingRoutes: FastifyPluginCallback<BillingRoutesOptions> = (fastify, opts, done) => {
   const { service } = opts;
 
-  // Q-CONTRACT-12 (ADD-13): billing overview lives top-level at /billing (FE
-  // hits /api/billing → /billing after the gateway-prefix strip). The stale
-  // /settings/billing path is retired here to match the ratified contract.
-  fastify.get('/billing', async (req, reply) => {
+  fastify.get('/settings/billing', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
     req.log.info(
