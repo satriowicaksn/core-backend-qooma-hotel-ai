@@ -206,10 +206,7 @@ describe('AgentsService.list — auto-provision defaults', () => {
       $transaction: jest.fn(),
       aiAgentConfig: { createMany },
     } as unknown as PrismaClient;
-    const service = new AgentsService(
-      fakeRepo({ findMany: () => Promise.resolve([]) }),
-      db,
-    );
+    const service = new AgentsService(fakeRepo({ findMany: () => Promise.resolve([]) }), db);
     const res = await service.list(ctx({ isSuperAdmin: true, role: 'super_admin' }), {});
     expect(res.data).toHaveLength(0);
     expect(createMany).not.toHaveBeenCalled();
