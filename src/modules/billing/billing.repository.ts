@@ -2,7 +2,12 @@
 
 import type { PrismaClient } from '@prisma/client';
 
-import type { BillingExtraRow, BillingInvoiceRow, BillingQuotaRow } from './billing.types.js';
+import type {
+  BillingExtraRow,
+  BillingInvoiceRow,
+  BillingQuotaRow,
+  TierName,
+} from './billing.types.js';
 
 const RECENT_INVOICES_LIMIT = 12;
 
@@ -41,5 +46,31 @@ export class BillingRepository {
       },
       orderBy: { purchasedAt: 'desc' },
     });
+  }
+
+  // Auth + Core co-locate in ONE Postgres (PARENT §4). Raw queries below read
+  // from Auth-owned tables (hotels, tiers, users) that share the same DB but
+  // are not in Core's Prisma schema. Only called when skipCrossDbChecks=false.
+
+  async findHotelTier(hotelId: string): Promise<TierName | null> {
+    const rows = await this.db.$queryRaw<Array<{ name: string }>>`
+      SELECT t.name
+      FROM hotels h
+      JOIN tiers t ON t.id = h.tier_id
+      WHERE h.id = ${hotelId}::uuid
+      LIMIT 1
+    `;
+    return (rows[0]?.name as TierName) ?? null;
+  }
+
+  async findActiveCrmUsersCount(hotelId: string): Promise<number> {
+    const rows = await this.db.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) AS count
+      FROM users
+      WHERE hotel_id = ${hotelId}::uuid
+        AND is_active = true
+        AND role <> 'super_admin'
+    `;
+    return Number(rows[0]?.count ?? 0);
   }
 }

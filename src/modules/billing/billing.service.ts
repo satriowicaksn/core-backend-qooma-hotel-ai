@@ -14,7 +14,12 @@ import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.
 
 import type { BillingRepository } from './billing.repository.js';
 import type { UpgradePackageBody } from './billing.schema.js';
-import { serializeExtra, serializeInvoice, serializeQuota } from './billing.serializer.js';
+import {
+  serializeExtra,
+  serializeInvoice,
+  serializeQuota,
+  serializeTier,
+} from './billing.serializer.js';
 import type {
   BillingInvoiceRow,
   BillingOverviewResponse,
@@ -60,12 +65,15 @@ export class BillingService {
 
   async overview(ctx: TenantContext): Promise<BillingOverviewResponse> {
     const now = new Date();
-    // Tier fetched via internal helper — returns null under Opsi C or on
-    // failure (fail-open per Q-T27-#6 lean C). Local-DB reads use Promise.all
-    // (fail-closed — genuine failure bubbles to route → error handler).
+    // Tier + CRM users fetched via internal helpers — return null/0 under Opsi
+    // C (fail-open). Local-DB reads use Promise.all (fail-closed).
     const tierPromise = this.fetchTierSnapshot(ctx.hotelId);
-    const [tier, quotaRow, invoiceRows, extraRows] = await Promise.all([
+    const crmUsersPromise = this.skipCrossDbChecks
+      ? Promise.resolve(0)
+      : this.repo.findActiveCrmUsersCount(ctx.hotelId);
+    const [tier, activeCrmUsers, quotaRow, invoiceRows, extraRows] = await Promise.all([
       tierPromise,
+      crmUsersPromise,
       this.repo.findLatestQuota(ctx.hotelId),
       this.repo.listRecentInvoices(ctx.hotelId),
       this.repo.listActiveExtras(ctx.hotelId, now),
@@ -73,6 +81,7 @@ export class BillingService {
 
     const data: BillingOverviewWire = {
       tier,
+      active_crm_users: activeCrmUsers,
       quota: quotaRow ? serializeQuota(quotaRow) : null,
       invoices: invoiceRows.map(serializeInvoice),
       extras: extraRows.map(serializeExtra),
@@ -135,19 +144,14 @@ export class BillingService {
     return row;
   }
 
-  private fetchTierSnapshot(_hotelId: string): Promise<TierSnapshotWire | null> {
+  private async fetchTierSnapshot(hotelId: string): Promise<TierSnapshotWire | null> {
     if (this.skipCrossDbChecks) {
-      // Opsi C dev-DB deviation (PARENT §4): Auth's `tiers` table is not in
-      // `hotel_core_dev`. Return null so overview stays functional; FE
-      // renders "tier tidak tersedia" empty state. Prod path emits a WARN
-      // once at construction (see constructor).
-      return Promise.resolve(null);
+      // Opsi C dev-DB deviation (PARENT §4): Auth's `tiers` table may not
+      // exist in the dev DB. Return null so overview stays functional; FE
+      // renders "tier tidak tersedia" empty state.
+      return null;
     }
-    // TODO(Opsi A): once shared-DB restored and Hotel model gains a `{ tier:
-    // Tier? }` relation, replace with
-    //   const hotel = await prisma.hotel.findUnique({ where: { id: hotelId }, include: { tier: true } });
-    //   return hotel?.tier ? serializeTier(hotel.tier.name) : null;
-    // Slice-1 dead branch keeps flag=false null-safe if the flag flips mid-migration.
-    return Promise.resolve(null);
+    const tierName = await this.repo.findHotelTier(hotelId);
+    return tierName ? serializeTier(tierName) : null;
   }
 }

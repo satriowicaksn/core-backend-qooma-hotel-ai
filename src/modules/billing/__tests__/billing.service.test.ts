@@ -84,6 +84,8 @@ function fakeRepo(overrides: Partial<BillingRepository> = {}): BillingRepository
     findInvoiceById: () => Promise.resolve(null),
     listRecentInvoices: () => Promise.resolve([]),
     listActiveExtras: () => Promise.resolve([]),
+    findHotelTier: () => Promise.resolve(null),
+    findActiveCrmUsersCount: () => Promise.resolve(0),
     ...overrides,
   } as unknown as BillingRepository;
 }
@@ -134,6 +136,13 @@ describe('zod parsers', () => {
     );
   });
 });
+
+function svcFlagOff(repo: BillingRepository): BillingService {
+  return new BillingService(repo, fakeUpgradeNotifier(), fakePdfStorage(), {
+    skipCrossDbChecks: false,
+    nodeEnv: 'production',
+  });
+}
 
 describe('BillingService.overview', () => {
   it('should return tier=null under Opsi C flag=true (Q-T27-#1)', async () => {
@@ -189,6 +198,43 @@ describe('BillingService.overview', () => {
     const service = svc(fakeRepo({ listActiveExtras }));
     await service.overview(ctx());
     expect(listActiveExtras).toHaveBeenCalledWith(HOTEL_A, expect.any(Date));
+  });
+
+  it('should return active_crm_users=0 under Opsi C flag=true', async () => {
+    const service = svc(fakeRepo());
+    const res = await service.overview(ctx());
+    expect(res.data.active_crm_users).toBe(0);
+  });
+});
+
+describe('BillingService.overview — Opsi A (flag=false)', () => {
+  it('should resolve tier via repo.findHotelTier when flag=false', async () => {
+    const service = svcFlagOff(fakeRepo({ findHotelTier: () => Promise.resolve('professional') }));
+    const res = await service.overview(ctx());
+    expect(res.data.tier?.name).toBe('professional');
+    expect(res.data.tier?.agents_max).toBe(3);
+    expect(res.data.tier?.outbound_monthly).toBe(4000);
+  });
+
+  it('should return tier=null when hotel not found in shared DB', async () => {
+    const service = svcFlagOff(fakeRepo({ findHotelTier: () => Promise.resolve(null) }));
+    const res = await service.overview(ctx());
+    expect(res.data.tier).toBeNull();
+  });
+
+  it('should return active_crm_users from repo when flag=false', async () => {
+    const service = svcFlagOff(fakeRepo({ findActiveCrmUsersCount: () => Promise.resolve(2) }));
+    const res = await service.overview(ctx());
+    expect(res.data.active_crm_users).toBe(2);
+  });
+
+  it('should call findActiveCrmUsersCount with hotelId', async () => {
+    const findActiveCrmUsersCount = jest
+      .fn<BillingRepository['findActiveCrmUsersCount']>()
+      .mockResolvedValue(0);
+    const service = svcFlagOff(fakeRepo({ findActiveCrmUsersCount }));
+    await service.overview(ctx());
+    expect(findActiveCrmUsersCount).toHaveBeenCalledWith(HOTEL_A);
   });
 });
 

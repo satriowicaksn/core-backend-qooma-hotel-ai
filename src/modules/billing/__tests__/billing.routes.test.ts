@@ -16,6 +16,7 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OVERVIEW_RESULT: BillingOverviewResponse = {
   data: {
     tier: null,
+    active_crm_users: 0,
     quota: null,
     invoices: [],
     extras: [],
