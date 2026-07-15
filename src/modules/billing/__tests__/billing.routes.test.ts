@@ -109,9 +109,9 @@ describe('billingRoutes', () => {
   });
 
   describe('overview', () => {
-    it('should GET /billing', async () => {
+    it('should GET /settings/billing', async () => {
       app = buildApp(GM, recorder);
-      const res = await app.inject({ method: 'GET', url: '/billing' });
+      const res = await app.inject({ method: 'GET', url: '/settings/billing' });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual(OVERVIEW_RESULT);
       expect(recorder.overviewCtx).toEqual(GM);
@@ -119,25 +119,25 @@ describe('billingRoutes', () => {
 
     it('should 401 without tenant', async () => {
       app = buildApp(undefined, recorder);
-      const res = await app.inject({ method: 'GET', url: '/billing' });
+      const res = await app.inject({ method: 'GET', url: '/settings/billing' });
       expect(res.statusCode).toBe(401);
     });
 
     it('should 403 for dept_head', async () => {
       app = buildApp(DEPT_HEAD, recorder);
-      const res = await app.inject({ method: 'GET', url: '/billing' });
+      const res = await app.inject({ method: 'GET', url: '/settings/billing' });
       expect(res.statusCode).toBe(403);
     });
 
     it('should 403 for staff', async () => {
       app = buildApp(STAFF, recorder);
-      const res = await app.inject({ method: 'GET', url: '/billing' });
+      const res = await app.inject({ method: 'GET', url: '/settings/billing' });
       expect(res.statusCode).toBe(403);
     });
 
     it('should allow super_admin', async () => {
       app = buildApp(SUPER, recorder);
-      const res = await app.inject({ method: 'GET', url: '/billing' });
+      const res = await app.inject({ method: 'GET', url: '/settings/billing' });
       expect(res.statusCode).toBe(200);
     });
   });
