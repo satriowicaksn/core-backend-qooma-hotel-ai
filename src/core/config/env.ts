@@ -30,7 +30,11 @@ const EnvSchema = z.object({
   REDIS_URL: z.string().min(1),
   REDIS_QUEUE_DB: z.coerce.number().int().nonnegative().default(0),
   REDIS_CACHE_DB: z.coerce.number().int().nonnegative().default(1),
-  REDIS_TLS_ENABLED: z.coerce.boolean().default(false),
+  // z.coerce.boolean() misparses string "false" as true (Boolean("false")===true).
+  // Use preprocess to handle the "false"/"true" string env var values correctly.
+  REDIS_TLS_ENABLED: z
+    .preprocess((v) => v === true || v === 'true' || v === '1', z.boolean())
+    .default(false),
 
   // Security
   JWT_ACCESS_SECRET: z.string().min(32),
@@ -73,7 +77,9 @@ const EnvSchema = z.object({
   // tables live in Auth DB not `hotel_core_dev`. Default true (safe-in-DEV).
   // Set false only after PARENT §4 Opsi A / multi-schema restoration lands.
   // Prod-with-flag-true = observability warning (see departments.service).
-  SKIP_CROSS_DB_CHECKS: z.coerce.boolean().default(true),
+  SKIP_CROSS_DB_CHECKS: z
+    .preprocess((v) => v === true || v === 'true' || v === '1', z.boolean())
+    .default(true),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
