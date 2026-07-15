@@ -43,6 +43,7 @@ export interface InvoicePdfResult {
 
 export class BillingService {
   private readonly skipCrossDbChecks: boolean;
+  private readonly logger?: Logger;
 
   constructor(
     private readonly repo: BillingRepository,
@@ -51,6 +52,7 @@ export class BillingService {
     opts: BillingServiceOptions,
   ) {
     this.skipCrossDbChecks = opts.skipCrossDbChecks;
+    this.logger = opts.logger;
     // Q-C-02 observability (mirror departments.service.ts:55-64). Fires once
     // at construction on prod+flag=true so silent tier-null does not ship.
     if (this.skipCrossDbChecks && opts.nodeEnv === 'production' && opts.logger) {
@@ -70,7 +72,15 @@ export class BillingService {
     const tierPromise = this.fetchTierSnapshot(ctx.hotelId);
     const crmUsersPromise = this.skipCrossDbChecks
       ? Promise.resolve(0)
-      : this.repo.findActiveCrmUsersCount(ctx.hotelId);
+      : this.repo.findActiveCrmUsersCount(ctx.hotelId).catch((err: unknown) => {
+          this.logger?.warn({
+            module: 'billing',
+            event: 'crm_users_count_error',
+            hotelId: ctx.hotelId,
+            err: err instanceof Error ? err.message : String(err),
+          });
+          return 0;
+        });
     const [tier, activeCrmUsers, quotaRow, invoiceRows, extraRows] = await Promise.all([
       tierPromise,
       crmUsersPromise,
@@ -146,12 +156,21 @@ export class BillingService {
 
   private async fetchTierSnapshot(hotelId: string): Promise<TierSnapshotWire | null> {
     if (this.skipCrossDbChecks) {
-      // Opsi C dev-DB deviation (PARENT §4): Auth's `tiers` table may not
-      // exist in the dev DB. Return null so overview stays functional; FE
-      // renders "tier tidak tersedia" empty state.
       return null;
     }
-    const tierName = await this.repo.findHotelTier(hotelId);
-    return tierName ? serializeTier(tierName) : null;
+    try {
+      const tierName = await this.repo.findHotelTier(hotelId);
+      return tierName ? serializeTier(tierName) : null;
+    } catch (err) {
+      // Fail-open per Q-T27-#6: log the actual SQL error so it can be diagnosed,
+      // but do not crash the billing endpoint.
+      this.logger?.warn({
+        module: 'billing',
+        event: 'tier_snapshot_error',
+        hotelId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
   }
 }
