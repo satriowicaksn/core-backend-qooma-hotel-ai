@@ -62,6 +62,7 @@ export interface ExtraWire {
 
 export interface BillingOverviewWire {
   readonly tier: TierSnapshotWire | null;
+  readonly active_crm_users: number;
   readonly quota: QuotaWire | null;
   readonly invoices: readonly InvoiceWire[];
   readonly extras: readonly ExtraWire[];
