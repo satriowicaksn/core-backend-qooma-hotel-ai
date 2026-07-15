@@ -43,7 +43,7 @@ export interface InvoicePdfResult {
 
 export class BillingService {
   private readonly skipCrossDbChecks: boolean;
-  private readonly logger?: Logger;
+  private readonly logger: Logger | undefined;
 
   constructor(
     private readonly repo: BillingRepository,
