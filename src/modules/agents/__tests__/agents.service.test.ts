@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import type { PrismaClient } from '@prisma/client';
 
-import { BusinessRuleError, NotFoundError, ValidationError } from '@core/errors/app-errors.js';
+import { NotFoundError, ValidationError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -70,12 +70,6 @@ function fakeDb(stub: TxStub, createManyResult = 3): PrismaClient {
       createMany: () => Promise.resolve({ count: createManyResult }),
     },
   } as unknown as PrismaClient;
-}
-
-function serializationFailure(): Error {
-  const err = new Error('serialization failure') as Error & { code: string };
-  err.code = 'P2034';
-  return err;
 }
 
 describe('zod parsers', () => {
@@ -250,32 +244,23 @@ describe('AgentsService.update — cross-tenant + not-found', () => {
   });
 });
 
-describe('AgentsService.update — Min-3 rule (toggle-off)', () => {
-  it('should 422 MIN_AGENTS_VIOLATION when toggle-off would drop below 3', async () => {
-    // 3 active → toggle-off → activeAfter = 2 → violation.
+describe('AgentsService.update — toggle-off (ADD-25: no minimum-agent floor)', () => {
+  it('should allow toggle-off below any active count via plain repo.update', async () => {
+    // ADD-25: the Min-3 gate is revoked — deactivation is always allowed, even
+    // if it drops the hotel below the old floor. No count/transaction involved.
+    const update = jest
+      .fn<AgentsRepository['update']>()
+      .mockResolvedValue(makeRow({ isActive: false }));
     const service = new AgentsService(
-      fakeRepo({ findById: () => Promise.resolve(makeRow({ isActive: true })) }),
-      fakeDb({ count: 3, updated: makeRow({ isActive: false }) }),
-    );
-    try {
-      await service.update(ctx(), AGENT_ID, { is_active: false });
-      throw new Error('expected throw');
-    } catch (err) {
-      expect(err).toBeInstanceOf(BusinessRuleError);
-      expect((err as BusinessRuleError).details.rule).toBe('MIN_AGENTS_VIOLATION');
-      expect((err as BusinessRuleError).details.activeAfter).toBe(2);
-      expect((err as BusinessRuleError).details.minRequired).toBe(3);
-    }
-  });
-
-  it('should allow toggle-off when 4 active remain (activeAfter=3)', async () => {
-    // 4 active → toggle-off → activeAfter = 3 → allowed.
-    const service = new AgentsService(
-      fakeRepo({ findById: () => Promise.resolve(makeRow({ isActive: true })) }),
-      fakeDb({ count: 4, updated: makeRow({ isActive: false }) }),
+      fakeRepo({
+        findById: () => Promise.resolve(makeRow({ isActive: true })),
+        update,
+      }),
+      fakeDb({ count: 0, updated: makeRow() }),
     );
     const res = await service.update(ctx(), AGENT_ID, { is_active: false });
     expect(res.data.is_active).toBe(false);
+    expect(update).toHaveBeenCalledWith(AGENT_ID, { isActive: false });
   });
 });
 
@@ -372,70 +357,5 @@ describe('AgentsService.update — capacity + config only (plain update)', () =>
     );
     const res = await service.update(ctx(), AGENT_ID, { config: { tone: 'casual' } });
     expect(res.data.config).toEqual({ tone: 'casual' });
-  });
-});
-
-describe('AgentsService.update — Serializable retry on P2034', () => {
-  it('should retry once on P2034 then succeed', async () => {
-    let calls = 0;
-    const flakyDb = {
-      $transaction: (fn: (tx: unknown) => Promise<unknown>) => {
-        calls += 1;
-        if (calls === 1) {
-          return Promise.reject(serializationFailure());
-        }
-        const tx = {
-          aiAgentConfig: {
-            count: () => Promise.resolve(4),
-            update: () => Promise.resolve(makeRow({ isActive: false })),
-          },
-        };
-        return fn(tx);
-      },
-    } as unknown as PrismaClient;
-    const service = new AgentsService(
-      fakeRepo({ findById: () => Promise.resolve(makeRow({ isActive: true })) }),
-      flakyDb,
-    );
-    const res = await service.update(ctx(), AGENT_ID, { is_active: false });
-    expect(res.data.is_active).toBe(false);
-    expect(calls).toBe(2);
-  });
-
-  it('should bubble the second P2034 (no infinite retry)', async () => {
-    let calls = 0;
-    const alwaysFlakyDb = {
-      $transaction: () => {
-        calls += 1;
-        return Promise.reject(serializationFailure());
-      },
-    } as unknown as PrismaClient;
-    const service = new AgentsService(
-      fakeRepo({ findById: () => Promise.resolve(makeRow({ isActive: true })) }),
-      alwaysFlakyDb,
-    );
-    await expect(service.update(ctx(), AGENT_ID, { is_active: false })).rejects.toHaveProperty(
-      'code',
-      'P2034',
-    );
-    expect(calls).toBe(2);
-  });
-
-  it('should NOT retry on a non-serialization error', async () => {
-    let calls = 0;
-    const errorDb = {
-      $transaction: () => {
-        calls += 1;
-        return Promise.reject(new Error('unexpected'));
-      },
-    } as unknown as PrismaClient;
-    const service = new AgentsService(
-      fakeRepo({ findById: () => Promise.resolve(makeRow({ isActive: true })) }),
-      errorDb,
-    );
-    await expect(service.update(ctx(), AGENT_ID, { is_active: false })).rejects.toThrow(
-      'unexpected',
-    );
-    expect(calls).toBe(1);
   });
 });

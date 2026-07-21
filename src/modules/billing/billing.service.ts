@@ -1,5 +1,5 @@
 // Service: Billing overview aggregation + upgrade request + invoice PDF stream
-// + daily-brief 404 stub. Consumes UpgradeNotifierPort + BillingPdfStoragePort.
+// + daily-brief 404 stub. Consumes TopupNotifierPort + BillingPdfStoragePort.
 // RBAC gate lives at the route layer (requireRole([gm_admin])).
 //
 // Cross-DB tier data (Auth's `tiers` table under H11 PO ruling) is gated by
@@ -13,7 +13,7 @@ import type { Logger } from '@core/logger/logger.js';
 import { assertHotelOwnership, type TenantContext } from '@plugins/tenant-guard.js';
 
 import type { BillingRepository } from './billing.repository.js';
-import type { UpgradePackageBody } from './billing.schema.js';
+import { TOPUP_MESSAGES, type OutboundTopupBody } from './billing.schema.js';
 import {
   serializeExtra,
   serializeInvoice,
@@ -28,7 +28,7 @@ import type {
   UpgradeRequestResponse,
 } from './billing.types.js';
 import type { BillingPdfStoragePort } from './ports/billing-pdf-storage.port.js';
-import type { UpgradeNotifierPort } from './ports/upgrade-notifier.port.js';
+import type { TopupNotifierPort } from './ports/topup-notifier.port.js';
 
 export interface BillingServiceOptions {
   readonly skipCrossDbChecks: boolean;
@@ -47,7 +47,7 @@ export class BillingService {
 
   constructor(
     private readonly repo: BillingRepository,
-    private readonly upgradeNotifier: UpgradeNotifierPort,
+    private readonly topupNotifier: TopupNotifierPort,
     private readonly pdfStorage: BillingPdfStoragePort,
     opts: BillingServiceOptions,
   ) {
@@ -84,7 +84,7 @@ export class BillingService {
     const [tier, activeCrmUsers, quotaRow, invoiceRows, extraRows] = await Promise.all([
       tierPromise,
       crmUsersPromise,
-      this.repo.findLatestQuota(ctx.hotelId),
+      this.repo.findQuota(ctx.hotelId),
       this.repo.listRecentInvoices(ctx.hotelId),
       this.repo.listActiveExtras(ctx.hotelId, now),
     ]);
@@ -101,17 +101,18 @@ export class BillingService {
     return { data };
   }
 
-  async requestUpgrade(
+  async requestOutboundTopup(
     ctx: TenantContext,
-    input: UpgradePackageBody,
+    input: OutboundTopupBody,
   ): Promise<UpgradeRequestResponse> {
     const requestId = randomUUID();
     const requestedAt = new Date();
-    await this.upgradeNotifier.notify({
+    await this.topupNotifier.notify({
       requestId,
       hotelId: ctx.hotelId,
       userId: ctx.userId,
-      targetTier: input.target_tier,
+      topupPackage: input.package,
+      messages: TOPUP_MESSAGES[input.package],
       requestedAt,
     });
     return {

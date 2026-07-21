@@ -34,7 +34,7 @@ const UPGRADE_RESULT: UpgradeRequestResponse = {
 
 interface Recorder {
   overviewCtx?: TenantContext;
-  upgradeTarget?: string;
+  topupPackage?: string;
   invoiceId?: string;
   dailyBriefHit?: boolean;
   invoiceResult?: InvoicePdfResult;
@@ -47,11 +47,11 @@ function buildApp(tenant: TenantContext | undefined, recorder: Recorder): Fastif
       recorder.overviewCtx = ctx;
       return Promise.resolve(OVERVIEW_RESULT);
     },
-    requestUpgrade: (
+    requestOutboundTopup: (
       _ctx: TenantContext,
-      body: { target_tier: string },
+      body: { package: string },
     ): Promise<UpgradeRequestResponse> => {
-      recorder.upgradeTarget = body.target_tier;
+      recorder.topupPackage = body.package;
       return Promise.resolve(UPGRADE_RESULT);
     },
     downloadInvoicePdf: (_ctx: TenantContext, id: string): Promise<InvoicePdfResult> => {
@@ -143,33 +143,33 @@ describe('billingRoutes', () => {
     });
   });
 
-  describe('upgrade', () => {
-    it('should POST /billing/upgrade-package and return 202', async () => {
+  describe('outbound top-up', () => {
+    it('should POST /billing/outbound-topup and return 202', async () => {
       app = buildApp(GM, recorder);
       const res = await app.inject({
         method: 'POST',
-        url: '/billing/upgrade-package',
-        payload: { target_tier: 'luxury' },
+        url: '/billing/outbound-topup',
+        payload: { package: 'M' },
       });
       expect(res.statusCode).toBe(202);
-      expect(recorder.upgradeTarget).toBe('luxury');
+      expect(recorder.topupPackage).toBe('M');
     });
 
-    it('should 400 on lite target (Q-T27-#2)', async () => {
+    it('should 400 on an unknown package size', async () => {
       app = buildApp(GM, recorder);
       const res = await app.inject({
         method: 'POST',
-        url: '/billing/upgrade-package',
-        payload: { target_tier: 'lite' },
+        url: '/billing/outbound-topup',
+        payload: { package: 'XL' },
       });
       expect(res.statusCode).toBe(400);
     });
 
-    it('should 400 on missing target_tier', async () => {
+    it('should 400 on missing package', async () => {
       app = buildApp(GM, recorder);
       const res = await app.inject({
         method: 'POST',
-        url: '/billing/upgrade-package',
+        url: '/billing/outbound-topup',
         payload: {},
       });
       expect(res.statusCode).toBe(400);
@@ -179,8 +179,8 @@ describe('billingRoutes', () => {
       app = buildApp(GM, recorder);
       const res = await app.inject({
         method: 'POST',
-        url: '/billing/upgrade-package',
-        payload: { target_tier: 'luxury', notes: 'urgent' },
+        url: '/billing/outbound-topup',
+        payload: { package: 'M', notes: 'urgent' },
       });
       expect(res.statusCode).toBe(400);
     });

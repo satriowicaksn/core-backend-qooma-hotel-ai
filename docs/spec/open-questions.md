@@ -83,12 +83,12 @@
 
 ## Q-CONTRACT-12 — Billing full shape (ADD-13)
 
-**FE assumed**: `GET /api/settings/billing` returns full `Billing` object with `tier`, `outbound_quota`, `active_agents`, `active_users_count`, `extra_addons`, `invoices`, `daily_brief_pdf_url_latest`. `POST /api/billing/upgrade-package` returns `pending_confirmation`.
+**FE assumed**: `GET /api/settings/billing` returns full `Billing` object with `tier`, `outbound_balance` (prepaid: `balance_total` / `balance_used` / `balance_remaining`), `active_agents`, `active_users_count`, `extra_addons`, `invoices`, `daily_brief_pdf_url_latest`. `POST /api/billing/outbound-topup { package: 'S'|'M'|'L' }` returns `pending_confirmation`.
 
 **Backend needs to confirm**:
 
-- Outbound quota thresholds `[80, 100]` percent.
-- Monthly reset day/time (UTC vs hotel timezone — FE doesn't care, but log it for monitoring).
+- Low-balance alert thresholds `[20, 5]` percent **remaining** (was 80/100 used).
+- Prepaid top-up package sizes S/M/L = 3,000 / 7,000 / 14,000 messages (tier-independent — a top-up does NOT change the subscription tier). No monthly reset; the balance carries until consumed.
 - Whether daily brief PDF URL is presigned (FE just hits it with `<a href download>`).
 
 **Cost of deviation**: medium — billing page is rich.
@@ -213,7 +213,7 @@
 
 ## Q-CONTRACT-23 — Tiers lookup table (Phase 2.8 — H11 service-split ruling)
 
-**FE assumed**: `tiers` lookup table in Auth's DB (PO ruling H11 — "Tier exists in DB"). Read endpoint `GET /api/admin/tiers` returns all 4 rows + per-tier config (`outbound_quota_monthly`, `agent_cap`, `agent_minimum`, `user_cap`, `department_cap`, `features` JSONB, `is_custom` for enterprise). Super_admin-only read in MVP. `hotels.tier_id` FK → `tiers.id`. Existing `AdminHotel.tier` + `/api/hotels/me { tier }` responses keep the flat `tier: 'luxury'` string (backend joins `tiers.name` on read) for FE compatibility. Full shape: `01-auth-identity.md` §1.4 + API-CONTRACT §2.1b.
+**FE assumed**: `tiers` lookup table in Auth's DB (PO ruling H11 — "Tier exists in DB"). Read endpoint `GET /api/admin/tiers` returns all 4 rows + per-tier config (`agent_cap` [TOTAL agents incl. Receptionist — 2/4/6, enterprise custom], `user_cap`, `department_cap`, `features` JSONB, `is_custom` for enterprise). No `outbound_quota_monthly` (outbound is a prepaid tier-independent top-up) and no `agent_minimum` (the cap is an upper bound only) — both fields dropped per ADD-25. Super_admin-only read in MVP. `hotels.tier_id` FK → `tiers.id`. Existing `AdminHotel.tier` + `/api/hotels/me { tier }` responses keep the flat `tier: 'luxury'` string (backend joins `tiers.name` on read) for FE compatibility. Full shape: `01-auth-identity.md` §1.4 + API-CONTRACT §2.1b.
 
 **Backend needs to confirm**:
 
@@ -281,7 +281,7 @@ Suggested defaults: 15-min access token, 7-day refresh, sliding.
 
 ### Q-OPS-03 — Outbound dispatch ownership — ✅ RESOLVED H12 2026-06-29 (PO ruling)
 
-**Decision**: outbound WA + Telegram dispatch lives in **Integration service** (not as a Hotel Core worker). HC RPCs Integration via `send_wa_message` / `send_telegram_message`. DND + quota gating happens in Integration BEFORE dispatch, using HC's quota meter via two-phase RPC (`check_and_reserve_outbound_quota` + `commit_outbound_quota_increment`).
+**Decision**: outbound WA + Telegram dispatch lives in **Integration service** (not as a Hotel Core worker). HC RPCs Integration via `send_wa_message` / `send_telegram_message`. DND + prepaid-balance gating happens in Integration BEFORE dispatch, using HC's prepaid outbound balance via two-phase RPC (`check_and_reserve_outbound_quota` + `commit_outbound_quota_increment`) — reserve refused when the balance is exhausted (0 remaining).
 
 This decision is part of the broader H12 "Integration owns the channels surface" ruling.
 

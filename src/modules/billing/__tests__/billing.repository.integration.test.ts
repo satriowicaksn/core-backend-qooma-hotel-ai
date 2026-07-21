@@ -1,8 +1,9 @@
 // Integration: real Postgres via testcontainers (TESTING.md §5 — no Prisma mock).
 // Self-contained: spins its own PG, applies migrations, seeds fixtures. Requires Docker.
-// Crux (T27): UNIQUE(hotel_id, period_start) + UNIQUE(invoice_number) + status
-// CHECK + tenant isolation + invoices ORDER BY issuedAt DESC + extras active
-// filter (expiresAt IS NULL OR > now). Overview aggregation E2E via service.
+// Crux (T27 / ADD-25): UNIQUE(hotel_id) one prepaid balance row per hotel +
+// UNIQUE(invoice_number) + status CHECK + tenant isolation + invoices ORDER BY
+// issuedAt DESC + extras active filter (expiresAt IS NULL OR > now). Overview
+// aggregation E2E via service.
 
 import { execFileSync } from 'node:child_process';
 
@@ -49,26 +50,14 @@ function silentLogger(): Logger {
 async function seed(): Promise<void> {
   await db.hotel.createMany({ data: [{ id: HOTEL_A }, { id: HOTEL_B }] });
 
-  // HOTEL_A: 2 months of quota history + 3 invoices in different statuses + 2 extras (1 active + 1 expired).
-  await db.billingQuota.createMany({
-    data: [
-      {
-        id: '10000000-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        hotelId: HOTEL_A,
-        periodStart: new Date('2026-06-01T00:00:00.000Z'),
-        outboundQuotaTotal: 4000,
-        outboundUsed: 3800,
-        resetAt: new Date('2026-07-01T00:00:00.000Z'),
-      },
-      {
-        id: '10000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        hotelId: HOTEL_A,
-        periodStart: new Date('2026-07-01T00:00:00.000Z'),
-        outboundQuotaTotal: 4000,
-        outboundUsed: 250,
-        resetAt: new Date('2026-08-01T00:00:00.000Z'),
-      },
-    ],
+  // HOTEL_A: one prepaid outbound-balance row + 3 invoices in different statuses + 2 extras (1 active + 1 expired).
+  await db.billingQuota.create({
+    data: {
+      id: '10000001-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      hotelId: HOTEL_A,
+      outboundBalanceTotal: 10000,
+      outboundBalanceUsed: 2500,
+    },
   });
 
   await db.billingInvoice.createMany({
@@ -138,10 +127,8 @@ async function seed(): Promise<void> {
     data: {
       id: '10000000-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       hotelId: HOTEL_B,
-      periodStart: new Date('2026-07-01T00:00:00.000Z'),
-      outboundQuotaTotal: 2000,
-      outboundUsed: 100,
-      resetAt: new Date('2026-08-01T00:00:00.000Z'),
+      outboundBalanceTotal: 2000,
+      outboundBalanceUsed: 100,
     },
   });
   await db.billingInvoice.create({
@@ -205,9 +192,10 @@ describe('BillingService overview + invoice download (integration)', () => {
     it('should assemble tier=null, latest quota, invoices, extras (active only)', async () => {
       const res = await service.overview(gmA);
       expect(res.data.tier).toBeNull();
-      // Latest quota = 2026-07 row.
-      expect(res.data.quota?.period_start).toBe('2026-07-01');
-      expect(res.data.quota?.outbound_used).toBe(250);
+      // Prepaid outbound balance (single row per hotel).
+      expect(res.data.quota?.outbound_balance_total).toBe(10000);
+      expect(res.data.quota?.outbound_balance_used).toBe(2500);
+      expect(res.data.quota?.outbound_balance_remaining).toBe(7500);
       // Invoices ordered by issuedAt DESC.
       expect(res.data.invoices.map((i) => i.invoice_number)).toEqual([
         'INV-2026-07-001',
@@ -228,7 +216,7 @@ describe('BillingService overview + invoice download (integration)', () => {
 
     it('should isolate HOTEL_B from HOTEL_A data', async () => {
       const res = await service.overview(gmB);
-      expect(res.data.quota?.outbound_total).toBe(2000);
+      expect(res.data.quota?.outbound_balance_total).toBe(2000);
       expect(res.data.invoices).toHaveLength(1);
       expect(res.data.invoices[0]?.invoice_number).toBe('INV-2026-07-B01');
       expect(res.data.extras).toHaveLength(0);
@@ -236,15 +224,15 @@ describe('BillingService overview + invoice download (integration)', () => {
   });
 
   describe('DB constraints', () => {
-    it('should reject a duplicate UNIQUE(hotel_id, period_start) at the DB layer', async () => {
+    it('should reject a second billing_quota row for the same hotel (UNIQUE hotel_id)', async () => {
+      // ADD-25: one prepaid outbound-balance row per hotel. HOTEL_A already has one.
       await expect(
         db.billingQuota.create({
           data: {
             id: '99999999-9999-4999-8999-999999999999',
             hotelId: HOTEL_A,
-            periodStart: new Date('2026-07-01T00:00:00.000Z'), // duplicate of seed
-            outboundQuotaTotal: 1,
-            outboundUsed: 0,
+            outboundBalanceTotal: 1,
+            outboundBalanceUsed: 0,
           },
         }),
       ).rejects.toBeDefined();
@@ -326,9 +314,9 @@ describe('BillingService overview + invoice download (integration)', () => {
     });
   });
 
-  describe('upgrade + daily brief', () => {
+  describe('outbound top-up + daily brief', () => {
     it('should return a fresh requestId + pending_manual_review + call the notifier', async () => {
-      const res = await service.requestUpgrade(gmA, { target_tier: 'luxury' });
+      const res = await service.requestOutboundTopup(gmA, { package: 'M' });
       expect(res.data.status).toBe('pending_manual_review');
       expect(res.data.request_id).toMatch(/^[0-9a-f-]{36}$/i);
     });

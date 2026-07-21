@@ -16,19 +16,20 @@ import type {
 
 // Spec §1.10 tier matrix. Snapshotted here for the tier-null fallback path
 // and for future flag=false wiring — matches the Auth `tiers` table values.
+// ADD-25: `agents_max` = TOTAL agents incl Receptionist (Lite 2 / Pro 4 /
+// Luxury 6). No per-tier outbound allotment — outbound is a prepaid top-up
+// balance metered per hotel.
 export const TIER_MATRIX: Readonly<Record<TierName, Omit<TierSnapshotWire, 'name'>>> = {
-  lite: { agents_max: 1, depts_max: 1, outbound_monthly: 2000, users_max_gm: 1, users_max_dh: 1 },
+  lite: { agents_max: 2, depts_max: 1, users_max_gm: 1, users_max_dh: 1 },
   professional: {
-    agents_max: 3,
+    agents_max: 4,
     depts_max: 3,
-    outbound_monthly: 4000,
     users_max_gm: 1,
     users_max_dh: 3,
   },
   luxury: {
-    agents_max: 5,
+    agents_max: 6,
     depts_max: 5,
-    outbound_monthly: 8000,
     users_max_gm: 1,
     users_max_dh: 5,
   },
@@ -37,7 +38,6 @@ export const TIER_MATRIX: Readonly<Record<TierName, Omit<TierSnapshotWire, 'name
     // When Opsi A restores Auth join, real values flow from `tiers` row.
     agents_max: 0,
     depts_max: 0,
-    outbound_monthly: 0,
     users_max_gm: 0,
     users_max_dh: 0,
   },
@@ -49,16 +49,13 @@ export function serializeTier(name: TierName): TierSnapshotWire {
 
 export function serializeQuota(row: BillingQuotaRow): QuotaWire {
   return {
-    period_start: row.periodStart.toISOString().slice(0, 10),
-    outbound_used: row.outboundUsed,
-    outbound_total: row.outboundQuotaTotal,
-    reset_at: row.resetAt ? row.resetAt.toISOString() : null,
-    threshold_80_emitted_at: row.threshold80EmittedAt
-      ? row.threshold80EmittedAt.toISOString()
+    outbound_balance_total: row.outboundBalanceTotal,
+    outbound_balance_used: row.outboundBalanceUsed,
+    outbound_balance_remaining: row.outboundBalanceTotal - row.outboundBalanceUsed,
+    threshold_20_emitted_at: row.threshold20EmittedAt
+      ? row.threshold20EmittedAt.toISOString()
       : null,
-    threshold_100_emitted_at: row.threshold100EmittedAt
-      ? row.threshold100EmittedAt.toISOString()
-      : null,
+    threshold_5_emitted_at: row.threshold5EmittedAt ? row.threshold5EmittedAt.toISOString() : null,
   };
 }
 

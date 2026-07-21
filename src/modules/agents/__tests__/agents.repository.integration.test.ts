@@ -1,6 +1,6 @@
 // Integration: real Postgres via testcontainers (TESTING.md §5 — no Prisma mock).
-// Crux (T28): UNIQUE(hotel_id, agent_type) + tenant isolation + Min-3 rule
-// under Serializable isolation (concurrent toggle-off race — exactly-one wins).
+// Crux (T28): UNIQUE(hotel_id, agent_type) + tenant isolation. ADD-25: the
+// minimum-agent floor is revoked — toggle-off is always allowed.
 
 import { execFileSync } from 'node:child_process';
 
@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/glo
 import { PrismaClient } from '@prisma/client';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-import { BusinessRuleError, NotFoundError } from '@core/errors/app-errors.js';
+import { NotFoundError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -37,8 +37,7 @@ let container: StartedPostgreSqlContainer;
 let db: PrismaClient;
 let service: AgentsService;
 
-// Canonical agent types for HOTEL_A seed (4 active + 1 inactive per PM ACK
-// fixture guidance — supports the toggle-off race scenario).
+// Canonical agent types for HOTEL_A seed (4 active + 1 inactive).
 const HOTEL_A_AGENTS = [
   { type: 'concierge', name: 'Concierge', isActive: true },
   { type: 'reception', name: 'Reception', isActive: true },
@@ -47,7 +46,7 @@ const HOTEL_A_AGENTS = [
   { type: 'wellness', name: 'Wellness', isActive: false },
 ] as const;
 
-// HOTEL_B seed: 3 active — at the Min-3 floor already.
+// HOTEL_B seed: 3 active.
 const HOTEL_B_AGENTS = [
   { type: 'concierge', name: 'Concierge B', isActive: true },
   { type: 'reception', name: 'Reception B', isActive: true },
@@ -140,23 +139,20 @@ describe('AgentsService list + tenant isolation (integration)', () => {
   });
 });
 
-describe('AgentsService update — Min-3 rule enforced in Serializable transaction', () => {
-  it('should block toggle-off when it would drop below 3 (HOTEL_B at floor)', async () => {
+describe('AgentsService update — toggle-off (ADD-25: no minimum-agent floor)', () => {
+  it('should allow toggle-off even below the old 3-agent floor (HOTEL_B 3 → 2 after)', async () => {
     const conciergeB = await db.aiAgentConfig.findFirst({
       where: { hotelId: HOTEL_B, agentType: 'concierge' },
     });
     if (!conciergeB) throw new Error('seed missing');
-    try {
-      await service.update(gmB, conciergeB.id, { is_active: false });
-      throw new Error('expected throw');
-    } catch (err) {
-      expect(err).toBeInstanceOf(BusinessRuleError);
-      expect((err as BusinessRuleError).details.rule).toBe('MIN_AGENTS_VIOLATION');
-      expect((err as BusinessRuleError).details.activeAfter).toBe(2);
-    }
-    // Row must survive the failed toggle.
+    const res = await service.update(gmB, conciergeB.id, { is_active: false });
+    expect(res.data.is_active).toBe(false);
     const still = await db.aiAgentConfig.findUnique({ where: { id: conciergeB.id } });
-    expect(still?.isActive).toBe(true);
+    expect(still?.isActive).toBe(false);
+    const activeCount = await db.aiAgentConfig.count({
+      where: { hotelId: HOTEL_B, isActive: true },
+    });
+    expect(activeCount).toBe(2);
   });
 
   it('should allow toggle-off when 4 active remain (HOTEL_A → 3 after)', async () => {
@@ -179,41 +175,6 @@ describe('AgentsService update — Min-3 rule enforced in Serializable transacti
     if (!wellness) throw new Error('seed missing');
     const res = await service.update(gmA, wellness.id, { is_active: true });
     expect(res.data.is_active).toBe(true);
-  });
-
-  it('should race-safe: two concurrent toggle-offs on HOTEL_A (4 active) result in exactly one violation', async () => {
-    // Start: 4 active (HOTEL_A concierge/reception/housekeeping/fnb).
-    // Two concurrent toggle-offs → allowed transitions would take us 4→3→2,
-    // but Min-3 must catch the second. Under Serializable isolation, one
-    // transaction sees the pre-commit count of the other → 40001 → retry →
-    // sees activeCount=3 → activeAfter=2 → throws MIN_AGENTS_VIOLATION.
-    // Expected outcome: 1 fulfilled + 1 BusinessRuleError. Final active count = 3.
-    const conciergeA = await db.aiAgentConfig.findFirst({
-      where: { hotelId: HOTEL_A, agentType: 'concierge' },
-    });
-    const receptionA = await db.aiAgentConfig.findFirst({
-      where: { hotelId: HOTEL_A, agentType: 'reception' },
-    });
-    if (!conciergeA || !receptionA) throw new Error('seed missing');
-
-    const results = await Promise.allSettled([
-      service.update(gmA, conciergeA.id, { is_active: false }),
-      service.update(gmA, receptionA.id, { is_active: false }),
-    ]);
-
-    const fulfilled = results.filter((r) => r.status === 'fulfilled');
-    const rejected = results.filter((r) => r.status === 'rejected');
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-    const rejection = rejected[0] as PromiseRejectedResult;
-    expect(rejection.reason).toBeInstanceOf(BusinessRuleError);
-    expect((rejection.reason as BusinessRuleError).details.rule).toBe('MIN_AGENTS_VIOLATION');
-
-    // Final state must respect Min-3 floor.
-    const activeCount = await db.aiAgentConfig.count({
-      where: { hotelId: HOTEL_A, isActive: true },
-    });
-    expect(activeCount).toBe(3);
   });
 });
 

@@ -11,18 +11,14 @@ import type {
 
 const RECENT_INVOICES_LIMIT = 12;
 
-// Returns the most recent quota row for the hotel, ordered by periodStart DESC.
-// Slice-1 treats "latest" as current-period when the seed exists; when no row
-// yet (first month or MVP §101 seed missing), returns null — service returns
-// `quota: null` upstream (honest empty-state).
+// ADD-25: one prepaid outbound-balance row per hotel (hotelId is unique).
+// Returns null when no balance row exists yet — service returns `quota: null`
+// upstream (honest empty-state).
 export class BillingRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async findLatestQuota(hotelId: string): Promise<BillingQuotaRow | null> {
-    return this.db.billingQuota.findFirst({
-      where: { hotelId },
-      orderBy: { periodStart: 'desc' },
-    });
+  async findQuota(hotelId: string): Promise<BillingQuotaRow | null> {
+    return this.db.billingQuota.findUnique({ where: { hotelId } });
   }
 
   async findInvoiceById(id: string): Promise<BillingInvoiceRow | null> {

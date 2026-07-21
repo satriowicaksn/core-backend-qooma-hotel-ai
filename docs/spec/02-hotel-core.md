@@ -2,7 +2,7 @@
 
 > **Bounded context**: the CRM itself. Everything a hotel general manager and department head touch every day — tickets, guests, settings, billing, notifications. This is the largest service by endpoint count.
 >
-> **Owns**: departments, tickets + ticket_updates + ticket_messages, guests + guest_preferences + visits, menu_categories + menu_items, knowledge_entries, wa_templates, feature_flags, billing_quotas + billing_invoices + billing_extras, notifications, ai_agent_configs (config-only; AI service consumes), per-hotel CRM workers (auto-close, escalation, daily brief, quota meter, monthly reset).
+> **Owns**: departments, tickets + ticket_updates + ticket_messages, guests + guest_preferences + visits, menu_categories + menu_items, knowledge_entries, wa_templates, feature_flags, billing_quotas + billing_invoices + billing_extras, notifications, ai_agent_configs (config-only; AI service consumes), per-hotel CRM workers (auto-close, escalation, daily brief, prepaid outbound balance meter).
 >
 > **Does NOT own** (per H11 PO ruling 2026-06-27 → Auth): `hotels` table, `tiers` table, hotel-tenant CRUD (`/api/admin/hotels`), per-hotel hotel-settings write (`/api/settings/hotel`), all user types. Hotel Core **reads** `hotels.tier_id` via cross-table join for tier-gating but never writes.
 >
@@ -25,7 +25,7 @@ Sections below mirror `docs/API-CONTRACT.md`. Section numbers cite the canonical
 **Tier-gating pattern for Hotel Core**: when an endpoint needs to know "is this hotel on Luxury?", join with Auth's `hotels` + `tiers` tables (same DB per `shared/data-model.md` §1):
 
 ```sql
-SELECT t.name AS tier_name, t.features, t.outbound_quota_monthly, t.agent_cap, t.department_cap
+SELECT t.name AS tier_name, t.features, t.agent_cap, t.department_cap
 FROM hotels h JOIN tiers t ON h.tier_id = t.id
 WHERE h.id = $1;
 ```
@@ -183,8 +183,7 @@ Reject any other transition with `422 BUSINESS_RULE` code `INVALID_TICKET_TRANSI
 
 **`PATCH /api/settings/agents/:id` constraints**:
 
-- **Min 3 active agents** — reject with `422 BUSINESS_RULE` code `MIN_AGENTS_VIOLATION` if toggle would drop below.
-- Tier-based agent caps — see Billing §1.10.
+- **Per-tier agent cap (upper bound only)** — total agents (incl. Receptionist) must not exceed the tier cap (Lite 2 / Pro 4 / Luxury 6; Enterprise custom) plus any purchased `+Agent` add-ons. Reject an activation/create beyond the cap with `422 BUSINESS_RULE`. There is **NO minimum-agent floor**. See Billing §1.10.
 
 **`/api/settings/hotel` MOVED to Auth** per H11 — see §1.1.
 
@@ -296,23 +295,27 @@ Global templates (`is_global: true`) are pre-approved by Qooma team — read-onl
 
 | Method | Path                                  | Purpose                                                            |
 | ------ | ------------------------------------- | ------------------------------------------------------------------ |
-| `GET`  | `/api/settings/billing`               | Full billing overview (tier, quota, agents, invoices, daily brief) |
-| `POST` | `/api/billing/upgrade-package`        | Backend confirms with Qooma team                                   |
+| `GET`  | `/api/settings/billing`               | Full billing overview (tier, prepaid outbound balance, agents, invoices, daily brief) |
+| `POST` | `/api/billing/outbound-topup`         | Request prepaid outbound top-up (`{ package: 'S'\|'M'\|'L' }`); backend confirms with Qooma team |
 | `GET`  | `/api/billing/invoices/:id/download`  | Stream invoice PDF                                                 |
 | `GET`  | `/api/billing/daily-brief/latest.pdf` | Daily brief PDF (T74 added)                                        |
 
-**Tier matrix** is now stored in Auth's `tiers` table (per H11). Hotel Core joins to read; the matrix values are:
+**Tier matrix** is now stored in Auth's `tiers` table (per H11). Hotel Core joins to read. `Agents` is the TOTAL agent cap incl. Receptionist. Outbound messaging is NOT bundled per tier — it is a prepaid top-up balance (see below), so there is no per-tier monthly allotment.
 
-| Tier         | Agents    | Depts  | Outbound/month | Users (GM + DH) |
-| ------------ | --------- | ------ | -------------- | --------------- |
-| Lite         | 1         | 1      | 2,000          | 1 + 1           |
-| Professional | 3 min     | 3      | 4,000          | 1 + 3           |
-| Luxury       | 5 include | 5      | 8,000          | 1 + 5           |
-| Enterprise   | custom    | custom | custom         | custom          |
+| Tier         | Agents (total, incl. Receptionist) | Depts  | Users (GM + DH) |
+| ------------ | ---------------------------------- | ------ | --------------- |
+| Lite         | 2                                  | 1      | 1 + 1           |
+| Professional | 4                                  | 3      | 1 + 3           |
+| Luxury       | 6                                  | 5      | 1 + 5           |
+| Enterprise   | custom                             | custom | custom          |
 
-**Min 3 agents at onboarding regardless of tier** (techspec §19.2). Server blocks any toggle that would violate this with `422 BUSINESS_RULE` code `MIN_AGENTS_VIOLATION`.
+**Agent cap is an upper bound only — there is NO minimum-agent floor and no `MIN_AGENTS_VIOLATION` rule.** Extra agents beyond the tier cap are sold as a `+Agent` add-on (each raises the effective cap).
 
-**Outbound quota meter**: every WA outbound from Integration service increments `billing_quotas.used`. At 80% → emit `billing:threshold_reached { percent: 80, type: 'outbound' }` (FE toast warning). At 100% → emit at 100, BLOCK further outbound (Integration service refuses to send), FE toast destructive. Reset on first day of each month UTC (or hotel timezone if you want — flag in open questions).
+**Prepaid outbound top-up** (tier-independent — buying a top-up does NOT change the subscription tier): outbound WhatsApp messages are bought as prepaid packages credited to the hotel's balance — **S = 3,000, M = 7,000, L = 14,000 messages**. No monthly reset; the balance carries until consumed.
+
+> **Mandatory clause** on every invoice / offer for outbound top-ups: _"Harga kuota pesan dapat berubah sewaktu-waktu mengikuti perubahan tarif dari Meta."_
+
+**Prepaid outbound balance meter**: every WA outbound from Integration service increments `billing_quotas.outbound_balance_used` against `outbound_balance_total` (the sum of prepaid top-ups). At **20% remaining** → emit `billing:low_balance { remaining_percent: 20, type: 'outbound' }` (FE toast warning). At **5% remaining** → emit `billing:low_balance { remaining_percent: 5, type: 'outbound' }` (FE toast destructive). At **0 remaining** → BLOCK further outbound (Integration service refuses to send) until a top-up (S/M/L) credits `outbound_balance_total`. There is NO monthly reset — the balance is prepaid and carries until consumed.
 
 **Daily brief PDF**: a worker generates one PDF per hotel per day summarizing the day's activity. Stored on object storage (S3 / R2 / equivalent); URL returned via `daily_brief_pdf_url_latest` field on the billing response. The download endpoint streams the file (server-side fetch from storage; no redirect to a presigned URL — keeps the cookie-auth path).
 
@@ -648,21 +651,21 @@ CREATE INDEX idx_feature_flags_hotel ON feature_flags(hotel_id);
 ### 2.10 `billing_quotas` + `billing_invoices` + `billing_extras`
 
 ```sql
+-- ADD-25: ONE prepaid outbound-balance row per hotel (hotel_id UNIQUE). No
+-- monthly period/reset. Outbound is metered DOWN from `outbound_balance_used`
+-- against `outbound_balance_total` (sum of prepaid top-ups). Low-balance alerts
+-- fire once each at 20% and 5% remaining.
 CREATE TABLE billing_quotas (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  hotel_id                 UUID NOT NULL REFERENCES hotels(id) ON DELETE RESTRICT,
-  period_start             DATE NOT NULL,                       -- first day of month
-  outbound_quota_total     INTEGER NOT NULL,                    -- snapshot of tier quota at period start
-  outbound_used            INTEGER NOT NULL DEFAULT 0,
-  threshold_80_emitted_at  TIMESTAMPTZ NULL,
-  threshold_100_emitted_at TIMESTAMPTZ NULL,
-  reset_at                 TIMESTAMPTZ NULL,
+  hotel_id                 UUID NOT NULL UNIQUE REFERENCES hotels(id) ON DELETE RESTRICT,
+  outbound_balance_total   INTEGER NOT NULL DEFAULT 0,           -- sum of prepaid top-ups (messages)
+  outbound_balance_used    INTEGER NOT NULL DEFAULT 0,
+  threshold_20_emitted_at  TIMESTAMPTZ NULL,                     -- low-balance alert at 20% remaining
+  threshold_5_emitted_at   TIMESTAMPTZ NULL,                     -- low-balance alert at 5% remaining
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT billing_quotas_hotel_period_unique UNIQUE (hotel_id, period_start)
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_billing_quotas_hotel ON billing_quotas(hotel_id);
-CREATE INDEX idx_billing_quotas_hotel_period ON billing_quotas(hotel_id, period_start DESC);
 
 CREATE TABLE billing_invoices (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -746,7 +749,7 @@ Full catalog in `shared/socket-events.md`. Hotel Core emits:
 | `verification:resolved`       | `verify-manual` or `reject` succeeds                                                              | `{ visit_id, status: 'checked_in'\|'rejected' }` |
 | `verification:failed_3x`      | Background job marks visit `failed_verification` after 3 attempts                                 | `{ visit_id, attempts: 3 }`                     |
 | `notification:new`            | Server persists a notification row                                                                | `{ notification: AppNotification }`             |
-| `billing:threshold_reached`   | Quota meter crosses 80% or 100%                                                                   | `{ percent: 80\|100, type: 'outbound' }`        |
+| `billing:low_balance`         | Prepaid outbound balance drops to 20% or 5% remaining                                             | `{ remaining_percent: 20\|5, type: 'outbound' }` |
 | `message:new` (cross-service) | AI service notifies Hotel Core of a new message; Hotel Core relays to socket                      | `{ ticket_id, message: TicketMessage }`         |
 
 ---
@@ -760,8 +763,7 @@ Full catalog in `shared/socket-events.md`. Hotel Core emits:
 | Pending verification reminder           | Daily evening run                       | Cron                          |
 | Failed 3x detection                     | After 3 failed AI verification attempts | Event-driven                  |
 | Daily brief PDF generation              | Once per hotel per day                  | Cron, hotel timezone          |
-| Quota meter check (outbound 80% / 100%) | On every outbound dispatch              | Event-driven (Integration RPC)|
-| Monthly quota reset                     | First of month                          | Cron                          |
+| Outbound balance meter check (20% / 5% remaining) | On every outbound dispatch    | Event-driven (Integration RPC)|
 | Notification persist + push             | On any socket-event-worthy state change | Event-driven                  |
 
 Place these alongside Hotel Core for simplicity. If your team prefers a separate worker process, fine — same code, separate runtime.
@@ -824,7 +826,6 @@ Canonical envelope: `README.md` §2.3. Hotel Core adds these `code` values insid
 | HTTP | code                                | When                                                                |
 | ---- | ----------------------------------- | ------------------------------------------------------------------- |
 | 422  | `INVALID_TICKET_TRANSITION`         | State machine rejects requested status                              |
-| 422  | `MIN_AGENTS_VIOLATION`              | Toggle would drop active agent count < 3                            |
 | 422  | `FEATURE_FLAG_DEPENDENCY_VIOLATION` | Disabling flag would break active data (e.g. running campaign)      |
 | 422  | `WA_TEMPLATE_LOCKED`                | Edit attempt on `approved` template                                 |
 | 422  | `TIER_GATE`                         | Tier-restricted resource access (e.g. analytics for non-Luxury)     |
@@ -864,7 +865,7 @@ Matches `core-backend-qooma-hotel-ai/KICKOFF.md §1` post-H12 update.
 | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | A (Nanak) | Nanak  | **Foundation** — Prisma schema + initial migration, tenant-guard middleware, RBAC middleware, seed scripts, ticket-state-machine helper, common error handlers, multipart upload utility, CSV import utility |
 | B (Nathan)  | Nathan   | **Core CRM** — tickets (+state machine + reroute + stats + overdue), ticket_updates, ticket_messages, guests + preferences, visits (pending + failed_3x + manual + checkin/checkout), notifications, socket emitters for `ticket:*` + `verification:*` + `notification:new` |
-| C (Satrio) | Satrio  | **Settings + Analytics** — departments, menu + categories (CSV + bulk + multipart), knowledge + import, WA templates (incl. resubmit relay), feature flags (tier-gated), billing (quota meter + invoices + upgrade + daily brief), settings/agents (config), settings/voice (groundwork), all 8 analytics endpoints (Luxury gate) |
+| C (Satrio) | Satrio  | **Settings + Analytics** — departments, menu + categories (CSV + bulk + multipart), knowledge + import, WA templates (incl. resubmit relay), feature flags (tier-gated), billing (prepaid balance meter + invoices + top-up + daily brief), settings/agents (config), settings/voice (groundwork), all 8 analytics endpoints (Luxury gate) |
 
 **Critical sequencing**: A ships first (foundation unblocks both B and C). B and C can run in parallel after A.
 

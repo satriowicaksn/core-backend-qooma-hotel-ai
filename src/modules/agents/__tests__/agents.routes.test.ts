@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { AppError, BusinessRuleError } from '@core/errors/app-errors.js';
+import { AppError } from '@core/errors/app-errors.js';
 
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
@@ -169,26 +169,6 @@ describe('agentsRoutes', () => {
         payload: { is_active: true, agent_type: 'butler' },
       });
       expect(res.statusCode).toBe(400);
-    });
-
-    it('should 422 on MIN_AGENTS_VIOLATION from service', async () => {
-      recorder = {
-        updateThrow: new BusinessRuleError('Minimum 3 active agents required', {
-          rule: 'MIN_AGENTS_VIOLATION',
-          activeAfter: 2,
-          minRequired: 3,
-        }),
-      };
-      app = buildApp(GM, recorder);
-      const res = await app.inject({
-        method: 'PATCH',
-        url: `/settings/agents/${AGENT_ID}`,
-        payload: { is_active: false },
-      });
-      expect(res.statusCode).toBe(422);
-      const body: { code: string; details: { rule: string } } = res.json();
-      expect(body.code).toBe('BUSINESS_RULE');
-      expect(body.details.rule).toBe('MIN_AGENTS_VIOLATION');
     });
 
     it('should 403 for dept_head', async () => {

@@ -14,7 +14,7 @@ export type SocketEvent =
   | 'verification:failed_3x'
   | 'notification:new'
   | 'message:new'
-  | 'billing:threshold_reached';
+  | 'billing:low_balance';
 
 export interface SocketEmitterPort {
   // Emit to the tenant room `hotel:${hotelId}` (README §2.5 — server-authoritative).
