@@ -7,15 +7,15 @@ import type { Logger } from '@core/logger/logger.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
 import type { BillingRepository } from '../billing.repository.js';
-import { parseUpgradePackageBody } from '../billing.schema.js';
+import { parseOutboundTopupBody, TOPUP_MESSAGES } from '../billing.schema.js';
 import { BillingService } from '../billing.service.js';
 import type { BillingExtraRow, BillingInvoiceRow, BillingQuotaRow } from '../billing.types.js';
 import type { BillingPdfStoragePort } from '../ports/billing-pdf-storage.port.js';
 import type {
-  UpgradeNotifierPort,
-  UpgradeNotifyInput,
-  UpgradeNotifyResult,
-} from '../ports/upgrade-notifier.port.js';
+  TopupNotifierPort,
+  TopupNotifyInput,
+  TopupNotifyResult,
+} from '../ports/topup-notifier.port.js';
 
 const HOTEL_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const HOTEL_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -36,12 +36,10 @@ function makeQuota(overrides: Partial<BillingQuotaRow> = {}): BillingQuotaRow {
   return {
     id: 'q-1',
     hotelId: HOTEL_A,
-    periodStart: new Date('2026-07-01T00:00:00.000Z'),
-    outboundQuotaTotal: 4000,
-    outboundUsed: 250,
-    threshold80EmittedAt: null,
-    threshold100EmittedAt: null,
-    resetAt: new Date('2026-08-01T00:00:00.000Z'),
+    outboundBalanceTotal: 10000,
+    outboundBalanceUsed: 2500,
+    threshold20EmittedAt: null,
+    threshold5EmittedAt: null,
     createdAt: new Date('2026-07-01T00:00:00.000Z'),
     updatedAt: new Date('2026-07-01T00:00:00.000Z'),
     ...overrides,
@@ -80,7 +78,7 @@ function makeExtra(overrides: Partial<BillingExtraRow> = {}): BillingExtraRow {
 
 function fakeRepo(overrides: Partial<BillingRepository> = {}): BillingRepository {
   return {
-    findLatestQuota: () => Promise.resolve(null),
+    findQuota: () => Promise.resolve(null),
     findInvoiceById: () => Promise.resolve(null),
     listRecentInvoices: () => Promise.resolve([]),
     listActiveExtras: () => Promise.resolve([]),
@@ -90,13 +88,13 @@ function fakeRepo(overrides: Partial<BillingRepository> = {}): BillingRepository
   } as unknown as BillingRepository;
 }
 
-function fakeUpgradeNotifier(
-  spy?: jest.Mock<(input: UpgradeNotifyInput) => Promise<UpgradeNotifyResult>>,
-): UpgradeNotifierPort {
+function fakeTopupNotifier(
+  spy?: jest.Mock<(input: TopupNotifyInput) => Promise<TopupNotifyResult>>,
+): TopupNotifierPort {
   return {
     notify:
       spy ??
-      ((input: UpgradeNotifyInput) =>
+      ((input: TopupNotifyInput) =>
         Promise.resolve({ requestId: input.requestId, notifiedAt: new Date() })),
   };
 }
@@ -110,11 +108,11 @@ function fakePdfStorage(overrides: Partial<BillingPdfStoragePort> = {}): Billing
 
 function svc(
   repo: BillingRepository,
-  notifier?: UpgradeNotifierPort,
+  notifier?: TopupNotifierPort,
   storage?: BillingPdfStoragePort,
   logger?: Logger,
 ): BillingService {
-  return new BillingService(repo, notifier ?? fakeUpgradeNotifier(), storage ?? fakePdfStorage(), {
+  return new BillingService(repo, notifier ?? fakeTopupNotifier(), storage ?? fakePdfStorage(), {
     skipCrossDbChecks: true,
     nodeEnv: 'development',
     ...(logger ? { logger } : {}),
@@ -122,23 +120,23 @@ function svc(
 }
 
 describe('zod parsers', () => {
-  it('should accept a valid upgrade body', () => {
-    expect(parseUpgradePackageBody({ target_tier: 'luxury' })).toEqual({ target_tier: 'luxury' });
+  it('should accept a valid outbound top-up body', () => {
+    expect(parseOutboundTopupBody({ package: 'M' })).toEqual({ package: 'M' });
   });
 
-  it('should reject the lite downgrade target (Q-T27-#2)', () => {
-    expect(() => parseUpgradePackageBody({ target_tier: 'lite' })).toThrow(ValidationError);
+  it('should reject an unknown package size', () => {
+    expect(() => parseOutboundTopupBody({ package: 'XL' })).toThrow(ValidationError);
   });
 
-  it('should reject an unknown field on upgrade body (strict)', () => {
-    expect(() => parseUpgradePackageBody({ target_tier: 'luxury', notes: 'urgent' })).toThrow(
+  it('should reject an unknown field on the top-up body (strict)', () => {
+    expect(() => parseOutboundTopupBody({ package: 'M', notes: 'urgent' })).toThrow(
       ValidationError,
     );
   });
 });
 
 function svcFlagOff(repo: BillingRepository): BillingService {
-  return new BillingService(repo, fakeUpgradeNotifier(), fakePdfStorage(), {
+  return new BillingService(repo, fakeTopupNotifier(), fakePdfStorage(), {
     skipCrossDbChecks: false,
     nodeEnv: 'production',
   });
@@ -152,17 +150,19 @@ describe('BillingService.overview', () => {
   });
 
   it('should return quota=null when no quota row exists (honest empty state)', async () => {
-    const service = svc(fakeRepo({ findLatestQuota: () => Promise.resolve(null) }));
+    const service = svc(fakeRepo({ findQuota: () => Promise.resolve(null) }));
     const res = await service.overview(ctx());
     expect(res.data.quota).toBeNull();
   });
 
   it('should serialize quota when present', async () => {
-    const service = svc(fakeRepo({ findLatestQuota: () => Promise.resolve(makeQuota()) }));
+    const service = svc(fakeRepo({ findQuota: () => Promise.resolve(makeQuota()) }));
     const res = await service.overview(ctx());
-    expect(res.data.quota?.outbound_total).toBe(4000);
-    expect(res.data.quota?.outbound_used).toBe(250);
-    expect(res.data.quota?.period_start).toBe('2026-07-01');
+    expect(res.data.quota?.outbound_balance_total).toBe(10000);
+    expect(res.data.quota?.outbound_balance_used).toBe(2500);
+    expect(res.data.quota?.outbound_balance_remaining).toBe(7500);
+    expect(res.data.quota?.threshold_20_emitted_at).toBeNull();
+    expect(res.data.quota?.threshold_5_emitted_at).toBeNull();
   });
 
   it('should serialize invoices ordered as-received from repo', async () => {
@@ -212,8 +212,7 @@ describe('BillingService.overview — Opsi A (flag=false)', () => {
     const service = svcFlagOff(fakeRepo({ findHotelTier: () => Promise.resolve('professional') }));
     const res = await service.overview(ctx());
     expect(res.data.tier?.name).toBe('professional');
-    expect(res.data.tier?.agents_max).toBe(3);
-    expect(res.data.tier?.outbound_monthly).toBe(4000);
+    expect(res.data.tier?.agents_max).toBe(4);
   });
 
   it('should return tier=null when hotel not found in shared DB', async () => {
@@ -238,27 +237,28 @@ describe('BillingService.overview — Opsi A (flag=false)', () => {
   });
 });
 
-describe('BillingService.requestUpgrade', () => {
+describe('BillingService.requestOutboundTopup', () => {
   it('should return 202-shaped envelope with a fresh requestId + status pending_manual_review', async () => {
     const service = svc(fakeRepo());
-    const res = await service.requestUpgrade(ctx(), { target_tier: 'luxury' });
+    const res = await service.requestOutboundTopup(ctx(), { package: 'M' });
     expect(res.data.status).toBe('pending_manual_review');
     expect(typeof res.data.request_id).toBe('string');
     expect(res.data.request_id.length).toBeGreaterThan(0);
     expect(typeof res.data.requested_at).toBe('string');
   });
 
-  it('should call the notifier with ctx.hotelId + ctx.userId + target_tier', async () => {
+  it('should call the notifier with ctx.hotelId + ctx.userId + topupPackage + messages', async () => {
     const notify = jest
-      .fn<(input: UpgradeNotifyInput) => Promise<UpgradeNotifyResult>>()
+      .fn<(input: TopupNotifyInput) => Promise<TopupNotifyResult>>()
       .mockResolvedValue({ requestId: 'x', notifiedAt: new Date() });
-    const service = svc(fakeRepo(), fakeUpgradeNotifier(notify));
-    await service.requestUpgrade(ctx(), { target_tier: 'enterprise' });
+    const service = svc(fakeRepo(), fakeTopupNotifier(notify));
+    await service.requestOutboundTopup(ctx(), { package: 'L' });
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({
         hotelId: HOTEL_A,
         userId: USER_ID,
-        targetTier: 'enterprise',
+        topupPackage: 'L',
+        messages: TOPUP_MESSAGES.L,
       }),
     );
   });
@@ -346,7 +346,7 @@ describe('Q-C-02 startup WARN', () => {
   it('should WARN once on prod + flag=true', () => {
     const warn = jest.fn();
     const logger: Logger = { debug: jest.fn(), info: jest.fn(), warn, error: jest.fn() };
-    new BillingService(fakeRepo(), fakeUpgradeNotifier(), fakePdfStorage(), {
+    new BillingService(fakeRepo(), fakeTopupNotifier(), fakePdfStorage(), {
       skipCrossDbChecks: true,
       nodeEnv: 'production',
       logger,
@@ -364,7 +364,7 @@ describe('Q-C-02 startup WARN', () => {
   it('should NOT WARN on development + flag=true', () => {
     const warn = jest.fn();
     const logger: Logger = { debug: jest.fn(), info: jest.fn(), warn, error: jest.fn() };
-    new BillingService(fakeRepo(), fakeUpgradeNotifier(), fakePdfStorage(), {
+    new BillingService(fakeRepo(), fakeTopupNotifier(), fakePdfStorage(), {
       skipCrossDbChecks: true,
       nodeEnv: 'development',
       logger,

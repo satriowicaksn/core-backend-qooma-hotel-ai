@@ -129,10 +129,10 @@ If a list response has no `pageInfo`, FE treats it as a single page. **Pick one 
 
 ### 2.8 Multi-tenant rate limits + quotas
 
-Tier-driven (`lite | professional | luxury | enterprise`). Hotel Core owns the tier source of truth via `GET /api/hotels/me`. Two enforcement points:
+Tier-driven caps (`lite | professional | luxury | enterprise`). Hotel Core owns the tier source of truth via `GET /api/hotels/me`. Enforcement points:
 
-- **Outbound WhatsApp message quota** (per month, per tier): enforced by Integration service before dispatch. 80% threshold and 100% block emit `billing:threshold_reached` socket events.
-- **Min-3-agents-active** rule: enforced by Hotel Core at the `PUT /api/settings/agents` boundary. Reject with `422 BUSINESS_RULE` if toggle would drop active count below 3.
+- **Prepaid outbound message balance** (tier-independent top-up, NOT a per-month tier allotment): enforced by Integration service before dispatch against the remaining balance. Low-balance alerts at **20%** and **5%** remaining emit `billing:low_balance` socket events; at 0 remaining outbound is blocked until a top-up credits the balance.
+- **Per-tier agent cap (upper bound only)**: enforced by Hotel Core at the `PATCH /api/settings/agents/:id` boundary. Reject with `422 BUSINESS_RULE` if creating/activating an agent would exceed the tier cap (Lite 2 / Pro 4 / Luxury 6; Enterprise custom) + purchased `+Agent` add-ons. There is NO minimum-agent floor.
 
 Full tier matrix in CLAUDE.md §1 and `02-hotel-core.md` §Billing.
 

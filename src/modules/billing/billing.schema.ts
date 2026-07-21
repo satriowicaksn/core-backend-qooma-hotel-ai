@@ -1,13 +1,17 @@
 // zod schemas — validate at the route boundary.
-// Q-T27-#2: upgrade target_tier enum enforces no 'lite' downgrade in MVP.
+// ADD-25: a top-up buys a prepaid outbound-message package (S/M/L),
+// tier-independent — buying it does NOT change the subscription tier.
 
 import { z } from 'zod';
 
 import { ValidationError } from '@core/errors/app-errors.js';
 
-export const UpgradePackageBodySchema = z
+// ADD-25 prepaid top-up package sizes (messages credited to the balance).
+export const TOPUP_MESSAGES = { S: 3000, M: 7000, L: 14000 } as const;
+
+export const OutboundTopupBodySchema = z
   .object({
-    target_tier: z.enum(['professional', 'luxury', 'enterprise']),
+    package: z.enum(['S', 'M', 'L']),
   })
   .strict();
 
@@ -24,10 +28,10 @@ function toValidationError(error: z.ZodError): ValidationError {
   });
 }
 
-export type UpgradePackageBody = z.infer<typeof UpgradePackageBodySchema>;
+export type OutboundTopupBody = z.infer<typeof OutboundTopupBodySchema>;
 
-export function parseUpgradePackageBody(raw: unknown): UpgradePackageBody {
-  const result = UpgradePackageBodySchema.safeParse(raw);
+export function parseOutboundTopupBody(raw: unknown): OutboundTopupBody {
+  const result = OutboundTopupBodySchema.safeParse(raw);
   if (!result.success) {
     throw toValidationError(result.error);
   }

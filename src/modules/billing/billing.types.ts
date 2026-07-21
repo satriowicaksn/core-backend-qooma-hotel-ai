@@ -15,28 +15,31 @@ export type BillingExtraRow = Prisma.BillingExtraGetPayload<Record<string, never
 // Spec §1.10 tier matrix: Lite / Professional / Luxury / Enterprise.
 export type TierName = 'lite' | 'professional' | 'luxury' | 'enterprise';
 
-// Upgrade endpoint target tier (Q-T27-#2: no 'lite' downgrade).
-export type UpgradeTargetTier = 'professional' | 'luxury' | 'enterprise';
+// ADD-25: prepaid outbound top-up package sizes (tier-independent — buying a
+// top-up does NOT change the subscription tier).
+export type TopupPackage = 'S' | 'M' | 'L';
 
 export type InvoiceStatus = 'issued' | 'paid' | 'overdue' | 'void';
 
 // Wire shapes — snake_case.
+// ADD-25: `agents_max` = TOTAL agents incl Receptionist (2/4/6). No per-tier
+// outbound allotment — outbound is a prepaid top-up balance.
 export interface TierSnapshotWire {
   readonly name: TierName;
   readonly agents_max: number;
   readonly depts_max: number;
-  readonly outbound_monthly: number;
   readonly users_max_gm: number;
   readonly users_max_dh: number;
 }
 
+// ADD-25: prepaid outbound balance wire — no monthly period/reset. Low-balance
+// alerts fire at 20% and 5% remaining.
 export interface QuotaWire {
-  readonly period_start: string;
-  readonly outbound_used: number;
-  readonly outbound_total: number;
-  readonly reset_at: string | null;
-  readonly threshold_80_emitted_at: string | null;
-  readonly threshold_100_emitted_at: string | null;
+  readonly outbound_balance_total: number;
+  readonly outbound_balance_used: number;
+  readonly outbound_balance_remaining: number;
+  readonly threshold_20_emitted_at: string | null;
+  readonly threshold_5_emitted_at: string | null;
 }
 
 export interface InvoiceWire {

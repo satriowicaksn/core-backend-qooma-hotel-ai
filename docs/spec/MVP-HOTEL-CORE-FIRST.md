@@ -50,7 +50,7 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 | C4  | Knowledge CRUD + import                 | `GET, POST /api/settings/knowledge` · `PATCH, DELETE /api/settings/knowledge/:id` · `POST .../import`| `gm_admin`, `dept_head` |
 | C5  | WA templates lifecycle                  | `GET, POST /api/wa-templates` · `PATCH, DELETE /api/wa-templates/:id` · `POST .../:id/resubmit`     | `gm_admin`              |
 | C6  | Feature flags                           | `GET /api/feature-flags` · `PATCH /api/feature-flags/:flag`                                          | `gm_admin`              |
-| C7  | Billing (overview + upgrade + invoice)  | `GET /api/settings/billing` · `POST /api/billing/upgrade-package` · `GET /api/billing/invoices/:id/download` · `GET /api/billing/daily-brief/latest.pdf` | `gm_admin` |
+| C7  | Billing (overview + top-up + invoice)   | `GET /api/settings/billing` · `POST /api/billing/outbound-topup` · `GET /api/billing/invoices/:id/download` · `GET /api/billing/daily-brief/latest.pdf` | `gm_admin` |
 | C8  | Settings/agents config                  | `GET /api/settings/agents` · `PATCH /api/settings/agents/:id`                                        | `gm_admin`              |
 | C9  | Settings/voice groundwork               | `GET, PUT /api/settings/voice` · `POST /api/settings/voice/test`                                     | `gm_admin`              |
 | C10 | Analytics (8 endpoints, Luxury-gated)   | `/api/analytics/{overview,tickets,departments,peak-hours,top-requests,satisfaction,high-alert,export}` | `gm_admin`, `dept_head` (own-dept slice) |
@@ -62,8 +62,7 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 | W1  | Auto-close `done_pending` → `closed`    | Per-ticket timer (15 min idle)                                         |
 | W2  | Escalation L1 → L2 → L3                 | Per-ticket timer; reads `departments.escalation_chain`                 |
 | W3  | Daily brief PDF generation              | Cron per hotel timezone                                                |
-| W4  | Quota meter check (80% / 100%)          | Event-driven via Integration RPC                                       |
-| W5  | Monthly quota reset                     | Cron, first of month                                                   |
+| W4  | Outbound balance meter check (20% / 5% remaining) | Event-driven via Integration RPC                             |
 
 **Workers may be deferred to a post-MVP wave** if the team prefers shipping the CRUD surface first. Tickets work without them (just no auto-close + no escalation timer); FE shows them via socket events when they fire.
 
@@ -80,7 +79,7 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 - **`GET /api/billing/daily-brief/latest.pdf`** — the PDF generator can land after the core billing endpoint. FE renders the "Daily brief belum tersedia" empty state if missing.
 - **`voice_configs`** persistence — keep the stub endpoint (always returns empty + `pbx_type: null`); real PBX config is wave 2a per ADD-23.7.
 - **AI service integration** for ticket creation from inbound WA — until AI ships, seed tickets manually via fixtures + admin endpoint. The shape stays the same.
-- **Integration service** for outbound WA + escalation Telegram pings — workers W2 / W4 / W5 stub the RPC and log instead of dispatching. Real wire-up when Integration ships.
+- **Integration service** for outbound WA + escalation Telegram pings — workers W2 / W4 stub the RPC and log instead of dispatching. Real wire-up when Integration ships.
 
 ---
 
@@ -98,8 +97,8 @@ Endpoints grouped by capability. Each row is a discrete deliverable a single exe
 8. **`knowledge_entries`**.
 9. **`wa_templates`**.
 10. **`feature_flags`** + seed default flags off for each existing hotel (Lite-tier-aware).
-11. **`billing_quotas`** + **`billing_invoices`** + **`billing_extras`** + seed current-month quota row per hotel.
-12. **`ai_agent_configs`** + seed 3 default agents per hotel (min-3 rule).
+11. **`billing_quotas`** + **`billing_invoices`** + **`billing_extras`** + seed one prepaid outbound-balance row per hotel (`outbound_balance_total` = 0 until first top-up).
+12. **`ai_agent_configs`** + seed default agents per hotel **up to the tier cap** (Lite 2 / Pro 4 / Luxury 6, incl. Receptionist). No min-3 rule — the cap is an upper bound only.
 13. **`voice_configs`** (stub).
 
 Each migration is forward-only. Indexes per DDL in `02-hotel-core.md` §2.
@@ -112,7 +111,7 @@ Each migration is forward-only. Indexes per DDL in `02-hotel-core.md` §2.
 
 **4.2 Ticket state machine** — only valid transitions per `02-hotel-core.md` §1.2 diagram. Reject everything else with `422 INVALID_TICKET_TRANSITION`. Centralize in `state-machine.ts`; don't sprinkle if/else in handlers.
 
-**4.3 Min-3 active agents** — `PATCH /api/settings/agents/:id` that would drop active count < 3 → `422 MIN_AGENTS_VIOLATION`. Compute in a transaction (`SELECT FOR UPDATE`) to avoid race.
+**4.3 Per-tier agent cap (upper bound)** — creating/activating an agent that would push total agents (incl. Receptionist) above the tier cap (Lite 2 / Pro 4 / Luxury 6; Enterprise custom) plus purchased `+Agent` add-ons → `422 BUSINESS_RULE`. Compute in a transaction (`SELECT FOR UPDATE`) to avoid race. There is NO minimum-agent floor.
 
 **4.4 Tier-gated analytics** — every `/api/analytics/*` checks `hotel.tier === 'luxury'` (via the join pattern). FE has a guard but backend MUST 403 independently.
 
@@ -145,7 +144,7 @@ A test pass per role:
 - [ ] **GM reroutes ticket** — `PATCH /api/tickets/:id/department { department_id: <other-dept> }` succeeds; `ticket_updates` shows `type: 'reroute'`. dept_head trying the same → `403 FORBIDDEN`.
 - [ ] **dept_head scope enforced** — log in as dept_head of dept A. `GET /api/tickets` returns ONLY dept-A tickets. Direct GET of a dept-B ticket → `404 NOT_FOUND` (not 403).
 - [ ] **PII masking** — log in as dept_head. Guest with `privacy_mode='vvip'` shows masked wa_phone + name + email. Log in as gm_admin (or super_admin), same guest shows unmasked values.
-- [ ] **Min-3 agent guard** — try toggling a 3rd active agent to `is_active: false` → `422 MIN_AGENTS_VIOLATION`. Add a 4th first, then toggling works.
+- [ ] **Per-tier agent cap** — on a Lite hotel (cap 2), creating/activating a 3rd agent → `422 BUSINESS_RULE`. Buying a `+Agent` add-on raises the cap, then it succeeds. (No minimum-agent floor — deactivating agents is always allowed.)
 - [ ] **Tier gate on analytics** — gm_admin of a `professional`-tier hotel calls `GET /api/analytics/overview` → `403 TIER_GATE`. Same call on a `luxury`-tier hotel → 200 with data.
 - [ ] **Menu CSV import** — upload a CSV with 10 items via `POST /api/settings/menu/import-csv` → response summary `{ imported: 10, skipped: 0, errors: [] }`. Items appear in `GET /api/settings/menu`.
 - [ ] **WA template lifecycle** — POST a template → `status: 'pending'`. (Mock) Meta webhook → status flips to `approved`. PATCH attempt → `422 WA_TEMPLATE_LOCKED`. DELETE archives it.
@@ -169,7 +168,7 @@ The FE has been running on MSW since H1. Once HC MVP ships, the FE can flip `VIT
 - `/settings/menu` (CRUD + categories + CSV)
 - `/settings/knowledge` (CRUD + import)
 - `/settings/wa-templates` (CRUD + Meta lifecycle)
-- `/settings/agents` (config toggles with min-3 enforcement)
+- `/settings/agents` (config toggles with per-tier cap enforcement)
 - `/settings/billing` (overview + quota + invoices + daily brief download)
 - `/settings/voice` (stub)
 - `/analytics` (Luxury hotels only, all 8 endpoints)
@@ -188,7 +187,7 @@ The FE MSW handlers (`src/mocks/handlers/*.ts`) are the authoritative shape refe
 
 - [ ] All endpoints in §1 implemented and respond per `02-hotel-core.md` shapes.
 - [ ] Prisma migrations applied (Auth + HC tables in the same DB).
-- [ ] Seed scripts create demo hotel + 5 depts + sample menu + 3 default agents.
+- [ ] Seed scripts create demo hotel + 5 depts + sample menu + default agents (within the tier cap).
 - [ ] Tenant-guard + RBAC middleware on every route.
 - [ ] PII masking middleware enforced (test via dept_head + vvip guest).
 - [ ] Ticket state machine validated (negative-test invalid transitions).

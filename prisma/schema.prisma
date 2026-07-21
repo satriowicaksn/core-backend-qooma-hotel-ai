@@ -379,23 +379,22 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
+// ADD-25: prepaid outbound top-up balance per hotel (ONE row per hotel).
+// Outbound is metered DOWN from `outboundBalanceUsed` against `outboundBalanceTotal`
+// (sum of top-ups). No monthly period/reset. Low-balance alerts fire at 20% and
+// 5% remaining. Inbound is free and never metered.
 model BillingQuota {
-  id                      String    @id @default(uuid()) @db.Uuid
-  hotelId                 String    @map("hotel_id") @db.Uuid
-  periodStart             DateTime  @map("period_start") @db.Date
-  outboundQuotaTotal      Int       @map("outbound_quota_total")
-  outboundUsed            Int       @default(0) @map("outbound_used")
-  threshold80EmittedAt    DateTime? @map("threshold_80_emitted_at") @db.Timestamptz
-  threshold100EmittedAt   DateTime? @map("threshold_100_emitted_at") @db.Timestamptz
-  resetAt                 DateTime? @map("reset_at") @db.Timestamptz
-  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                    String    @id @default(uuid()) @db.Uuid
+  hotelId               String    @unique @map("hotel_id") @db.Uuid
+  outboundBalanceTotal  Int       @default(0) @map("outbound_balance_total")
+  outboundBalanceUsed   Int       @default(0) @map("outbound_balance_used")
+  threshold20EmittedAt  DateTime? @map("threshold_20_emitted_at") @db.Timestamptz
+  threshold5EmittedAt   DateTime? @map("threshold_5_emitted_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
 
-  @@unique([hotelId, periodStart], map: "billing_quotas_hotel_period_unique")
-  @@index([hotelId])
-  @@index([hotelId, periodStart(sort: Desc)])
   @@map("billing_quotas")
 }
 

@@ -9,7 +9,7 @@ import { AuthError } from '@core/errors/app-errors.js';
 import { requireRole } from '@plugins/rbac.js';
 import type { TenantContext } from '@plugins/tenant-guard.js';
 
-import { parseInvoiceId, parseUpgradePackageBody } from './billing.schema.js';
+import { parseInvoiceId, parseOutboundTopupBody } from './billing.schema.js';
 import type { BillingService } from './billing.service.js';
 
 export interface BillingRoutesOptions {
@@ -53,20 +53,20 @@ export const billingRoutes: FastifyPluginCallback<BillingRoutesOptions> = (fasti
     return reply.send(result);
   });
 
-  fastify.post('/billing/upgrade-package', async (req, reply) => {
+  fastify.post('/billing/outbound-topup', async (req, reply) => {
     const ctx = requireTenant(req.tenant);
     requireRole(ctx, ALLOWED_ROLES);
-    const body = parseUpgradePackageBody(req.body);
+    const body = parseOutboundTopupBody(req.body);
     req.log.info(
       {
         module: 'billing',
-        action: 'upgrade',
-        targetTier: body.target_tier,
+        action: 'outbound_topup',
+        package: body.package,
         correlationId: correlationIdOf(req),
       },
-      'upgrade request',
+      'outbound top-up request',
     );
-    const result = await service.requestUpgrade(ctx, body);
+    const result = await service.requestOutboundTopup(ctx, body);
     return reply.code(202).send(result);
   });
 
