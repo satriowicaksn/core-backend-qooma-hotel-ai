@@ -71,6 +71,10 @@ const EnvSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
 
+  // Internal RPC shared secret (ADD-24 — integration-backend → this service).
+  // Optional so api boots without it; internal routes answer 401 until set.
+  INTERNAL_API_SECRET: z.string().min(32).optional(),
+
   // Cross-DB check gate (T21 Q-C-02 — Opsi C dev-DB deviation, PARENT §4).
   // When true, features skip queries that need cross-service tables (e.g.
   // `users.department_id` for departments delete-conflict), because those

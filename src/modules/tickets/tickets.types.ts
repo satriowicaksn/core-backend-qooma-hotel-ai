@@ -113,6 +113,23 @@ export interface TicketListItemWire {
   readonly resolved_satisfaction: number | null;
   readonly sla_due_at: string | null;
   readonly closed_at: string | null;
+  // ADD-24 OTP fields — otp_code is NEVER on the wire (anti-cheat).
+  readonly requires_otp: boolean;
+  readonly channel: string;
+  readonly otp_verified: boolean;
+  readonly otp_verified_at: string | null;
+  readonly otp_delivered_at: string | null;
+  readonly otp_generated_at: string | null;
+  readonly otp_attempts: number;
+  readonly otp_resend_count: number;
+  readonly otp_skipped: boolean;
+  readonly otp_skip_flagged: boolean;
+  readonly otp_skip_reason: string | null;
+  readonly review_status: string;
+  readonly review_outcome: string | null;
+  readonly reviewed_by: string | null;
+  readonly reviewed_at: string | null;
+  readonly confirmed_by_guest: boolean | null;
   readonly created_at: string;
   readonly updated_at: string;
 }

@@ -58,6 +58,7 @@ model Hotel {
   billingExtras    BillingExtra[]
   aiAgentConfigs   AiAgentConfig[]
   voiceConfig      VoiceConfig?
+  otpSettings      HotelOtpSettings?
 
   @@map("hotels")
 }
@@ -65,11 +66,11 @@ model Hotel {
 model User {
   id String @id @default(uuid()) @db.Uuid
 
-  assignedTickets  Ticket[]        @relation("ticket_assigned")
-  createdTickets   Ticket[]        @relation("ticket_created")
-  ticketUpdates    TicketUpdate[]
-  ticketMessages   TicketMessage[]
-  notifications    Notification[]
+  assignedTickets     Ticket[]        @relation("ticket_assigned")
+  createdTickets      Ticket[]        @relation("ticket_created")
+  ticketUpdates       TicketUpdate[]
+  ticketMessages      TicketMessage[]
+  notifications       Notification[]
   featureFlagsUpdated FeatureFlag[]
 
   @@map("users")
@@ -80,20 +81,20 @@ model User {
 // -----------------------------------------------------------------------------
 
 model Department {
-  id                     String   @id @default(uuid()) @db.Uuid
-  hotelId                String   @map("hotel_id") @db.Uuid
-  name                   String   @db.VarChar(80)
-  code                   String   @db.VarChar(8)
-  operatingHours         Json     @default("{}") @map("operating_hours")
-  escalationChain        Json     @default("{}") @map("escalation_chain")
-  telegramChatId         String?  @map("telegram_chat_id") @db.VarChar(64)
-  supervisorTelegramId   String?  @map("supervisor_telegram_id") @db.VarChar(64)
-  isActive               Boolean  @default(true) @map("is_active")
-  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                   String   @id @default(uuid()) @db.Uuid
+  hotelId              String   @map("hotel_id") @db.Uuid
+  name                 String   @db.VarChar(80)
+  code                 String   @db.VarChar(8)
+  operatingHours       Json     @default("{}") @map("operating_hours")
+  escalationChain      Json     @default("{}") @map("escalation_chain")
+  telegramChatId       String?  @map("telegram_chat_id") @db.VarChar(64)
+  supervisorTelegramId String?  @map("supervisor_telegram_id") @db.VarChar(64)
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  hotel    Hotel    @relation(fields: [hotelId], references: [id], onDelete: Restrict)
-  tickets  Ticket[]
+  hotel   Hotel    @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  tickets Ticket[]
 
   @@unique([hotelId, code], map: "departments_hotel_code_unique")
   @@index([hotelId])
@@ -102,17 +103,17 @@ model Department {
 }
 
 model Guest {
-  id           String   @id @default(uuid()) @db.Uuid
-  hotelId      String   @map("hotel_id") @db.Uuid
-  name         String   @db.VarChar(120)
-  waPhone      String   @map("wa_phone") @db.VarChar(20)
-  email        String?  @db.VarChar(255)
-  privacyMode  String   @default("standard") @map("privacy_mode") @db.VarChar(20)
-  isVip        Boolean  @default(false) @map("is_vip")
-  vipLevel     String?  @map("vip_level") @db.VarChar(20)
-  totalStays   Int      @default(0) @map("total_stays")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id          String   @id @default(uuid()) @db.Uuid
+  hotelId     String   @map("hotel_id") @db.Uuid
+  name        String   @db.VarChar(120)
+  waPhone     String   @map("wa_phone") @db.VarChar(20)
+  email       String?  @db.VarChar(255)
+  privacyMode String   @default("standard") @map("privacy_mode") @db.VarChar(20)
+  isVip       Boolean  @default(false) @map("is_vip")
+  vipLevel    String?  @map("vip_level") @db.VarChar(20)
+  totalStays  Int      @default(0) @map("total_stays")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   hotel       Hotel             @relation(fields: [hotelId], references: [id], onDelete: Restrict)
   preferences GuestPreference[]
@@ -146,20 +147,20 @@ model GuestPreference {
 }
 
 model Visit {
-  id                    String    @id @default(uuid()) @db.Uuid
-  hotelId               String    @map("hotel_id") @db.Uuid
-  guestId               String    @map("guest_id") @db.Uuid
-  checkIn               DateTime  @map("check_in") @db.Timestamptz
-  checkOut              DateTime? @map("check_out") @db.Timestamptz
-  nights                Int?
-  roomNumber            String?   @map("room_number") @db.VarChar(16)
-  status                String    @default("pending_verification") @db.VarChar(30)
-  bookingSource         String?   @map("booking_source") @db.VarChar(20)
-  verificationAttempts  Int       @default(0) @map("verification_attempts")
-  specialRequest        String?   @map("special_request") @db.Text
-  satisfactionScore     Int?      @map("satisfaction_score")
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  hotelId              String    @map("hotel_id") @db.Uuid
+  guestId              String    @map("guest_id") @db.Uuid
+  checkIn              DateTime  @map("check_in") @db.Timestamptz
+  checkOut             DateTime? @map("check_out") @db.Timestamptz
+  nights               Int?
+  roomNumber           String?   @map("room_number") @db.VarChar(16)
+  status               String    @default("pending_verification") @db.VarChar(30)
+  bookingSource        String?   @map("booking_source") @db.VarChar(20)
+  verificationAttempts Int       @default(0) @map("verification_attempts")
+  specialRequest       String?   @map("special_request") @db.Text
+  satisfactionScore    Int?      @map("satisfaction_score")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
   guest Guest @relation(fields: [guestId], references: [id], onDelete: Restrict)
@@ -172,26 +173,49 @@ model Visit {
 }
 
 model Ticket {
-  id                    String    @id @default(uuid()) @db.Uuid
-  hotelId               String    @map("hotel_id") @db.Uuid
-  ticketNumber          String    @map("ticket_number") @db.VarChar(32)
-  guestId               String    @map("guest_id") @db.Uuid
-  departmentId          String    @map("department_id") @db.Uuid
-  assignedUserId        String?   @map("assigned_user_id") @db.Uuid
-  createdBy             String?   @map("created_by") @db.Uuid
-  status                String    @default("open") @db.VarChar(30)
-  priority              String    @default("normal") @db.VarChar(10)
-  complaintType         String?   @map("complaint_type") @db.VarChar(30)
-  complaintDetail       String?   @map("complaint_detail") @db.Text
-  subject               String    @db.VarChar(255)
-  body                  String?   @db.Text
-  isHighAlert           Boolean   @default(false) @map("is_high_alert")
-  isOverdue             Boolean   @default(false) @map("is_overdue")
-  resolvedSatisfaction  Int?      @map("resolved_satisfaction")
-  slaDueAt              DateTime? @map("sla_due_at") @db.Timestamptz
-  closedAt              DateTime? @map("closed_at") @db.Timestamptz
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  hotelId              String    @map("hotel_id") @db.Uuid
+  ticketNumber         String    @map("ticket_number") @db.VarChar(32)
+  guestId              String    @map("guest_id") @db.Uuid
+  departmentId         String    @map("department_id") @db.Uuid
+  assignedUserId       String?   @map("assigned_user_id") @db.Uuid
+  createdBy            String?   @map("created_by") @db.Uuid
+  status               String    @default("open") @db.VarChar(30)
+  priority             String    @default("normal") @db.VarChar(10)
+  complaintType        String?   @map("complaint_type") @db.VarChar(30)
+  complaintDetail      String?   @map("complaint_detail") @db.Text
+  subject              String    @db.VarChar(255)
+  body                 String?   @db.Text
+  isHighAlert          Boolean   @default(false) @map("is_high_alert")
+  isOverdue            Boolean   @default(false) @map("is_overdue")
+  resolvedSatisfaction Int?      @map("resolved_satisfaction")
+  slaDueAt             DateTime? @map("sla_due_at") @db.Timestamptz
+  closedAt             DateTime? @map("closed_at") @db.Timestamptz
+  // ADD-24: OTP delivery verification. otp_code is NEVER exposed on any public
+  // /api response or in logs — internal RPC `otp/resend` is the only surface
+  // that returns it (server-side compare everywhere else). Nulled after
+  // verify / grace-close.
+  requiresOtp          Boolean   @default(false) @map("requires_otp")
+  otpCode              String?   @map("otp_code") @db.VarChar(2)
+  otpDeliveredAt       DateTime? @map("otp_delivered_at") @db.Timestamptz
+  telegramMessageId    BigInt?   @map("telegram_message_id")
+  otpGeneratedAt       DateTime? @map("otp_generated_at") @db.Timestamptz
+  otpVerified          Boolean   @default(false) @map("otp_verified")
+  otpVerifiedAt        DateTime? @map("otp_verified_at") @db.Timestamptz
+  otpAttempts          Int       @default(0) @map("otp_attempts")
+  otpResendCount       Int       @default(0) @map("otp_resend_count")
+  otpSkipped           Boolean   @default(false) @map("otp_skipped")
+  otpSkipFlagged       Boolean   @default(false) @map("otp_skip_flagged")
+  otpSkipReason        String?   @map("otp_skip_reason") @db.VarChar(20)
+  reviewStatus         String    @default("none") @map("review_status") @db.VarChar(20)
+  reviewOutcome        String?   @map("review_outcome") @db.VarChar(20)
+  reviewedBy           String?   @map("reviewed_by") @db.VarChar(255)
+  reviewedAt           DateTime? @map("reviewed_at") @db.Timestamptz
+  confirmedByGuest     Boolean?  @map("confirmed_by_guest")
+  confirmedAt          DateTime? @map("confirmed_at") @db.Timestamptz
+  channel              String    @default("wa") @db.VarChar(10)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   hotel        Hotel           @relation(fields: [hotelId], references: [id], onDelete: Restrict)
   guest        Guest           @relation(fields: [guestId], references: [id], onDelete: Restrict)
@@ -212,18 +236,18 @@ model Ticket {
 }
 
 model TicketUpdate {
-  id                 String   @id @default(uuid()) @db.Uuid
-  hotelId            String   @map("hotel_id") @db.Uuid
-  ticketId           String   @map("ticket_id") @db.Uuid
-  actorUserId        String?  @map("actor_user_id") @db.Uuid
-  type               String   @db.VarChar(40)
-  fromStatus         String?  @map("from_status") @db.VarChar(30)
-  toStatus           String?  @map("to_status") @db.VarChar(30)
-  fromDepartmentId   String?  @map("from_department_id") @db.Uuid
-  toDepartmentId     String?  @map("to_department_id") @db.Uuid
-  note               String?  @db.Text
-  metadata           Json     @default("{}")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id               String   @id @default(uuid()) @db.Uuid
+  hotelId          String   @map("hotel_id") @db.Uuid
+  ticketId         String   @map("ticket_id") @db.Uuid
+  actorUserId      String?  @map("actor_user_id") @db.Uuid
+  type             String   @db.VarChar(40)
+  fromStatus       String?  @map("from_status") @db.VarChar(30)
+  toStatus         String?  @map("to_status") @db.VarChar(30)
+  fromDepartmentId String?  @map("from_department_id") @db.Uuid
+  toDepartmentId   String?  @map("to_department_id") @db.Uuid
+  note             String?  @db.Text
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   hotel  Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -235,24 +259,24 @@ model TicketUpdate {
 }
 
 model TicketMessage {
-  id              String    @id @default(uuid()) @db.Uuid
-  hotelId         String    @map("hotel_id") @db.Uuid
-  ticketId        String    @map("ticket_id") @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  hotelId        String    @map("hotel_id") @db.Uuid
+  ticketId       String    @map("ticket_id") @db.Uuid
   // conversationId is an OPAQUE pointer to AI service's conversations.id.
   // No FK — AI runs in a separate DB. NULL until AI spawns a conversation.
-  conversationId  String?   @map("conversation_id") @db.Uuid
-  sender          String    @db.VarChar(20)
-  senderUserId    String?   @map("sender_user_id") @db.Uuid
-  body            String?   @db.Text
-  media           Json?
-  externalId      String?   @map("external_id") @db.VarChar(80)
-  sentAt          DateTime  @default(now()) @map("sent_at") @db.Timestamptz
-  deliveredAt     DateTime? @map("delivered_at") @db.Timestamptz
-  readAt          DateTime? @map("read_at") @db.Timestamptz
+  conversationId String?   @map("conversation_id") @db.Uuid
+  sender         String    @db.VarChar(20)
+  senderUserId   String?   @map("sender_user_id") @db.Uuid
+  body           String?   @db.Text
+  media          Json?
+  externalId     String?   @map("external_id") @db.VarChar(80)
+  sentAt         DateTime  @default(now()) @map("sent_at") @db.Timestamptz
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz
+  readAt         DateTime? @map("read_at") @db.Timestamptz
 
-  hotel  Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sender_user User? @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  hotel       Hotel  @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender_user User?  @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
 
   @@index([hotelId])
   @@index([ticketId, sentAt])
@@ -363,13 +387,13 @@ model WaTemplate {
 }
 
 model FeatureFlag {
-  id         String   @id @default(uuid()) @db.Uuid
-  hotelId    String   @map("hotel_id") @db.Uuid
-  flag       String   @db.VarChar(80)
-  isEnabled  Boolean  @default(false) @map("is_enabled")
-  config     Json     @default("{}")
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
-  updatedBy  String?  @map("updated_by") @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  hotelId   String   @map("hotel_id") @db.Uuid
+  flag      String   @db.VarChar(80)
+  isEnabled Boolean  @default(false) @map("is_enabled")
+  config    Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy String?  @map("updated_by") @db.Uuid
 
   hotel  Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   editor User? @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
@@ -384,14 +408,14 @@ model FeatureFlag {
 // (sum of top-ups). No monthly period/reset. Low-balance alerts fire at 20% and
 // 5% remaining. Inbound is free and never metered.
 model BillingQuota {
-  id                    String    @id @default(uuid()) @db.Uuid
-  hotelId               String    @unique @map("hotel_id") @db.Uuid
-  outboundBalanceTotal  Int       @default(0) @map("outbound_balance_total")
-  outboundBalanceUsed   Int       @default(0) @map("outbound_balance_used")
-  threshold20EmittedAt  DateTime? @map("threshold_20_emitted_at") @db.Timestamptz
-  threshold5EmittedAt   DateTime? @map("threshold_5_emitted_at") @db.Timestamptz
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  hotelId              String    @unique @map("hotel_id") @db.Uuid
+  outboundBalanceTotal Int       @default(0) @map("outbound_balance_total")
+  outboundBalanceUsed  Int       @default(0) @map("outbound_balance_used")
+  threshold20EmittedAt DateTime? @map("threshold_20_emitted_at") @db.Timestamptz
+  threshold5EmittedAt  DateTime? @map("threshold_5_emitted_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
 
@@ -419,13 +443,13 @@ model BillingInvoice {
 }
 
 model BillingExtra {
-  id           String    @id @default(uuid()) @db.Uuid
-  hotelId      String    @map("hotel_id") @db.Uuid
-  type         String    @db.VarChar(40)
-  qty          Int
-  amountIdr    Decimal   @map("amount_idr") @db.Decimal(14, 2)
-  purchasedAt  DateTime  @default(now()) @map("purchased_at") @db.Timestamptz
-  expiresAt    DateTime? @map("expires_at") @db.Timestamptz
+  id          String    @id @default(uuid()) @db.Uuid
+  hotelId     String    @map("hotel_id") @db.Uuid
+  type        String    @db.VarChar(40)
+  qty         Int
+  amountIdr   Decimal   @map("amount_idr") @db.Decimal(14, 2)
+  purchasedAt DateTime  @default(now()) @map("purchased_at") @db.Timestamptz
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz
 
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
 
@@ -462,6 +486,22 @@ model VoiceConfig {
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@map("voice_configs")
+}
+
+// ADD-24: per-hotel OTP delivery-verification knobs. Absent row = defaults
+// (grace 10 min, complaint window 180 min, enabled) — services read with
+// fallback, GET /settings/otp never 404s.
+model HotelOtpSettings {
+  hotelId            String   @id @map("hotel_id") @db.Uuid
+  otpGraceMinutes    Int      @default(10) @map("otp_grace_minutes")
+  otpComplaintWindow Int      @default(180) @map("otp_complaint_window")
+  otpEnabled         Boolean  @default(true) @map("otp_enabled")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@map("hotel_otp_settings")
 }
 
 // =============================================================================
@@ -506,6 +546,15 @@ model VoiceConfig {
 //   CHECK ((is_global = true AND hotel_id IS NULL) OR (is_global = false AND hotel_id IS NOT NULL));
 // ALTER TABLE billing_invoices ADD CONSTRAINT billing_invoices_status_check
 //   CHECK (status IN ('issued','paid','overdue','void'));
+// -- ADD-24 (20260722090000_add24_otp_delivery_verification):
+// ALTER TABLE tickets ADD CONSTRAINT tickets_otp_skip_reason_check
+//   CHECK (otp_skip_reason IS NULL OR otp_skip_reason IN ('grace_timeout','guest_declined','wrong_code_3x','other'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_review_status_check
+//   CHECK (review_status IN ('none','pending_supervisor','reviewed'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_review_outcome_check
+//   CHECK (review_outcome IS NULL OR review_outcome IN ('staff_fault','wrong_dept','guest_unreasonable','other'));
+// ALTER TABLE tickets ADD CONSTRAINT tickets_channel_check
+//   CHECK (channel IN ('wa','voice'));
 //
 // Plus partial indexes (Prisma's `where:` on @@index is limited; use raw SQL):
 //
@@ -522,5 +571,12 @@ model VoiceConfig {
 // CREATE INDEX idx_knowledge_search ON knowledge_entries
 //   USING GIN(to_tsvector('english', title || ' ' || content));
 // CREATE INDEX idx_wa_templates_global ON wa_templates(is_global) WHERE is_global = true;
+// -- ADD-24 (20260722090000_add24_otp_delivery_verification):
+// CREATE INDEX idx_tickets_pending_review ON tickets(hotel_id, review_status)
+//   WHERE review_status = 'pending_supervisor';
+// CREATE INDEX idx_tickets_otp_skipped ON tickets(hotel_id, otp_skipped, closed_at)
+//   WHERE otp_skipped = true;
+// CREATE INDEX idx_tickets_telegram_message ON tickets(hotel_id, telegram_message_id)
+//   WHERE telegram_message_id IS NOT NULL;
 //
 // =============================================================================

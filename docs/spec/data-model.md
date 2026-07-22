@@ -49,6 +49,7 @@ Alternative if you prefer microservices purity: every service owns its own DB. A
 | `wa_templates`                                           | Hotel Core  | —                                                                                                             |
 | `feature_flags`                                          | Hotel Core  | — (per-hotel state)                                                                                           |
 | `billing_quotas` / `billing_invoices` / `billing_extras` | Hotel Core  | —                                                                                                             |
+| `hotel_otp_settings` (ADD-24)                            | Hotel Core  | PK/FK `hotel_id → hotels.id`; absent row = defaults (grace 10 min, window 180 min, enabled)                   |
 | `conversations`                                          | AI          | opaque `guest_id`, `hotel_id`                                                                                 |
 | `messages` (AI's)                                        | AI          | FK `conversation_id`                                                                                          |
 | `ai_runs`                                                | AI          | FK `conversation_id`                                                                                          |

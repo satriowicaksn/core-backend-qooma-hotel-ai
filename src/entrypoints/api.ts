@@ -31,6 +31,13 @@ import { buildGuestsService, guestsRoutes } from '@modules/guests/index.js';
 import { buildKnowledgeService, knowledgeRoutes } from '@modules/knowledge/index.js';
 import { buildMenuService, menuRoutes } from '@modules/menu/index.js';
 import { buildNotificationsService, notificationsRoutes } from '@modules/notifications/index.js';
+import {
+  BullGraceSchedulerAdapter,
+  buildOtpServices,
+  createOtpGraceQueue,
+  otpInternalRoutes,
+  otpRoutes,
+} from '@modules/otp/index.js';
 import { buildTicketsService, ticketsRoutes } from '@modules/tickets/index.js';
 import { buildVisitsService, visitsRoutes } from '@modules/visits/index.js';
 import { buildVoiceService, voiceRoutes } from '@modules/voice/index.js';
@@ -158,6 +165,12 @@ async function main(): Promise<void> {
   const menuService = buildMenuService(db, storage);
   const notificationsService = buildNotificationsService(db);
   const ticketsService = buildTicketsService(db);
+  // ADD-24: grace-timer jobs are enqueued from the API process; the worker
+  // entrypoint owns the processor (see worker.ts).
+  const otpGraceQueue = createOtpGraceQueue();
+  const { otpService, otpCrmService } = buildOtpServices(db, {
+    scheduler: new BullGraceSchedulerAdapter(otpGraceQueue),
+  });
   const visitsService = buildVisitsService(db);
   const voiceService = buildVoiceService(db);
   const waTemplatesService = buildWaTemplatesService(db, { logger });
@@ -173,6 +186,12 @@ async function main(): Promise<void> {
   await app.register(knowledgeRoutes, { service: knowledgeService });
   await app.register(menuRoutes, { service: menuService });
   await app.register(notificationsRoutes, { service: notificationsService });
+  await app.register(otpRoutes, { service: otpCrmService });
+  await app.register(otpInternalRoutes, {
+    service: otpService,
+    internalSecret: config.INTERNAL_API_SECRET,
+    prefix: '/internal',
+  });
   await app.register(ticketsRoutes, { service: ticketsService });
   await app.register(visitsRoutes, { service: visitsService });
   await app.register(voiceRoutes, { service: voiceService });
