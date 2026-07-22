@@ -1,25 +1,34 @@
 /**
  * Entrypoint: Bull queue worker process.
  *
- * Minimal boot — validates env + stays alive so the k8s Deployment
- * does not CrashLoop while queue processors land incrementally
- * (see CLAUDE.md §4 + docs/spec/02-hotel-core.md).
+ * Registered processors:
+ *   - `otp.check_grace` (ADD-24): fires `otp_grace_minutes` after staff DONE;
+ *     grace-closes the ticket unless the guest's code was verified meanwhile
+ *     (guarded no-op otherwise — see OtpService.graceClose).
  */
 
 import { loadConfig } from '@core/config/env.js';
+import { db } from '@core/prisma/prisma-client.js';
+import { shutdownAllQueues } from '@core/queue/bull-factory.js';
+
+import {
+  BullGraceSchedulerAdapter,
+  buildOtpServices,
+  createOtpGraceQueue,
+  registerOtpGraceWorker,
+} from '@modules/otp/index.js';
 
 async function main(): Promise<void> {
   loadConfig();
 
-  // Keep the process alive; replace with `queue.process(...)` registrations
-  // once modules with queue producers ship.
-  const keepAlive = setInterval(() => {
-    /* idle */
-  }, 1 << 30);
+  const otpGraceQueue = createOtpGraceQueue();
+  const { otpService } = buildOtpServices(db, {
+    scheduler: new BullGraceSchedulerAdapter(otpGraceQueue),
+  });
+  registerOtpGraceWorker(otpGraceQueue, otpService);
 
   const shutdown = (): void => {
-    clearInterval(keepAlive);
-    process.exit(0);
+    void shutdownAllQueues().finally(() => process.exit(0));
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

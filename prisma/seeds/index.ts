@@ -247,8 +247,16 @@ async function main(): Promise<void> {
     });
   }
 
+  // ADD-24: explicit defaults row for the demo hotel (absent row = same
+  // defaults at runtime; seeded so /settings/otp edits have a base row).
+  await db.hotelOtpSettings.upsert({
+    where: { hotelId: HOTEL_ID },
+    create: { hotelId: HOTEL_ID },
+    update: {},
+  });
+
   console.warn(
-    `✓ Seed complete: hotel ${HOTEL_ID}, ${departments.length} depts, ${categories.length} categories, ${menuItems.length} items, ${knowledgeEntries.length} KB entries`,
+    `✓ Seed complete: hotel ${HOTEL_ID}, ${departments.length} depts, ${categories.length} categories, ${menuItems.length} items, ${knowledgeEntries.length} KB entries, otp settings`,
   );
 }
 

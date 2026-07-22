@@ -338,6 +338,30 @@ The `/api/admin/hotels` family + the entire `hotels` table moved to Auth. **See 
 
 Hotel Core implementations that previously joined directly on `hotels` should keep joining (same DB) but treat the table as read-only — writes are Auth's responsibility.
 
+### 1.13 OTP Delivery Verification (ADD-24)
+
+OTP = proof the task reached the guest, NOT staff attendance. 2-digit code (00–99), generated at ticket creation when `requires_otp = true` (category ∈ {room_request, menu_order, ordering} AND direct hand-over to a present guest AND visit `checked_in`). **Anti-cheat: `otp_code` NEVER appears on any public `/api/*` wire or log line** — server-side compare only; the internal `otp/resend` RPC is the sole surface returning the code. Non-OTP tickets keep the old §6.3 passive flow unchanged; complaints keep the HIGH ALERT path.
+
+Public CRM surface (tenant-guarded + RBAC, module `src/modules/otp/`):
+
+- Ticket list/detail serializers gain: `requires_otp`, `channel` ('wa'|'voice', ADD-24.9 groundwork), `otp_verified(_at)`, `otp_delivered_at`, `otp_generated_at`, `otp_attempts`, `otp_resend_count`, `otp_skipped`, `otp_skip_flagged`, `otp_skip_reason`, `review_status`, `review_outcome`, `reviewed_by`, `reviewed_at`, `confirmed_by_guest`. Never `otp_code`.
+- `GET /tickets/review-queue` (gm_admin all / dept_head own-dept forced / super_admin) — cursor-paginated `review_status='pending_supervisor'` items: `{ ticket, staff, otp_skip_reason, skip_note, complaint|null, timeline[] }`.
+- `PATCH /tickets/:id/review` `{ outcome: 'staff_fault'|'wrong_dept'|'guest_unreasonable'|'other', note? }` (note REQUIRED for 'other'). 409 `CONFLICT` `details.reason` = `REVIEW_ALREADY_DONE` | `NOT_PENDING_REVIEW`. Only `staff_fault` may later impact a score — recorded as a coaching-note audit entry ("catat untuk coaching"); scores are never auto-mutated.
+- `GET|PUT /settings/otp` (gm_admin; dept_head 403): `{ otp_enabled, otp_grace_minutes: 1–60 (default 10, founder-locked), otp_complaint_window: 30–1440 (default 180) }`. Absent row = defaults.
+- `GET /analytics/otp-metrics?month=YYYY-MM&department_id=` (gm_admin + dept_head own-dept) — per-staff `otp_verified_rate` / `otp_skip_rate` / `skip_then_complaint_rate` / `supervisor_confirmed_fault_rate` (0–1 fractions) + weighted `team_average`; base population = closed `requires_otp` tickets in the month.
+
+Internal RPC (integration-backend; `X-Internal-Secret` header + `timingSafeEqual`, env `INTERNAL_API_SECRET`, fail-closed when unset — `src/plugins/internal-auth.ts`):
+
+- `POST /internal/tickets/resolve-telegram` `{ hotel_id, telegram_message_id }` → `{ ticket_id }` | 404
+- `POST /internal/tickets/:id/telegram-message` `{ telegram_message_id }` → `{ ok: true }`
+- `POST /internal/tickets/:id/otp/ack-delivered` → stamps `otp_delivered_at` (code reached guest WA/TTS)
+- `POST /internal/tickets/:id/otp/mark-delivered` `{ actor_telegram_id? }` → staff DONE click: schedules Bull `otp.check_grace` (delay = grace×60s from the click; deterministic jobId → double-DONE safe) → `{ grace_deadline }`
+- `POST /internal/tickets/:id/otp/verify` `{ code, actor_telegram_id? }` → `{ result: 'verified'|'wrong_code'|'locked'|'already_closed'|'not_required', attempts_left? }`. Correct → CLOSED + `otp_verified=true` + `confirmed_by_guest=true` + code nulled. 3rd wrong → grace-close `wrong_code_3x` + note "3x kode salah".
+- `POST /internal/tickets/:id/otp/skip` `{ reason: 'guest_declined'|'other', note? }` → immediate grace-close, no penalty
+- `POST /internal/tickets/:id/otp/resend` → `{ otp_code }` (max 2 via `otp_resend_count`; 409 past limit / not applicable)
+
+GRACE-CLOSE (timer expiry / manual skip / 3× wrong): ticket CLOSED — never left hanging — `otp_skipped=true`, `otp_skip_flagged=true`, `confirmed_by_guest=NULL`, audit note "Selesai tanpa verifikasi OTP". NOT high alert, NOT an automatic score minus (§6.4 unchanged). ADD-24.4: a guest complaint arriving within `otp_complaint_window` for the same guest flips the skipped ticket to `review_status='pending_supervisor'` (`OtpService.linkComplaintToSkippedTickets`; to be invoked from whichever runtime complaint-ticket creation path lands — none exists in this repo yet). Every OTP state change re-emits `ticket:updated`.
+
 ---
 
 ## 2. Data model (this service owns) — DDL
@@ -461,6 +485,27 @@ CREATE TABLE tickets (
   resolved_satisfaction   INTEGER NULL,
   sla_due_at              TIMESTAMPTZ NULL,
   closed_at               TIMESTAMPTZ NULL,
+  -- ADD-24 (20260722090000_add24_otp_delivery_verification): OTP delivery
+  -- verification. otp_code NEVER on any public wire/log (internal RPC only).
+  requires_otp            BOOLEAN NOT NULL DEFAULT false,
+  otp_code                VARCHAR(2) NULL,               -- nulled after verify / grace-close
+  otp_delivered_at        TIMESTAMPTZ NULL,              -- when code reached guest WA/TTS
+  telegram_message_id     BIGINT NULL,                   -- dept-group message → ticket mapping
+  otp_generated_at        TIMESTAMPTZ NULL,
+  otp_verified            BOOLEAN NOT NULL DEFAULT false,
+  otp_verified_at         TIMESTAMPTZ NULL,
+  otp_attempts            INTEGER NOT NULL DEFAULT 0,    -- max 3, then wrong_code_3x skip
+  otp_resend_count        INTEGER NOT NULL DEFAULT 0,    -- max 2
+  otp_skipped             BOOLEAN NOT NULL DEFAULT false,
+  otp_skip_flagged        BOOLEAN NOT NULL DEFAULT false,
+  otp_skip_reason         VARCHAR(20) NULL,
+  review_status           VARCHAR(20) NOT NULL DEFAULT 'none',
+  review_outcome          VARCHAR(20) NULL,
+  reviewed_by             VARCHAR(255) NULL,             -- reviewer display name
+  reviewed_at             TIMESTAMPTZ NULL,
+  confirmed_by_guest      BOOLEAN NULL,                  -- NULL on grace-close (not a denial)
+  confirmed_at            TIMESTAMPTZ NULL,
+  channel                 VARCHAR(10) NOT NULL DEFAULT 'wa',  -- ADD-24.9 groundwork
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT tickets_status_check CHECK (status IN (
@@ -469,6 +514,10 @@ CREATE TABLE tickets (
   CONSTRAINT tickets_priority_check CHECK (priority IN ('low','normal','high','urgent')),
   CONSTRAINT tickets_complaint_type_check CHECK (complaint_type IS NULL OR complaint_type IN ('staff_attitude','facility','fnb','general','vvip')),
   CONSTRAINT tickets_satisfaction_check CHECK (resolved_satisfaction IS NULL OR (resolved_satisfaction BETWEEN 1 AND 5)),
+  CONSTRAINT tickets_otp_skip_reason_check CHECK (otp_skip_reason IS NULL OR otp_skip_reason IN ('grace_timeout','guest_declined','wrong_code_3x','other')),
+  CONSTRAINT tickets_review_status_check CHECK (review_status IN ('none','pending_supervisor','reviewed')),
+  CONSTRAINT tickets_review_outcome_check CHECK (review_outcome IS NULL OR review_outcome IN ('staff_fault','wrong_dept','guest_unreasonable','other')),
+  CONSTRAINT tickets_channel_check CHECK (channel IN ('wa','voice')),
   CONSTRAINT tickets_hotel_ticket_number_unique UNIQUE (hotel_id, ticket_number)
 );
 CREATE INDEX idx_tickets_hotel ON tickets(hotel_id);
@@ -480,6 +529,10 @@ CREATE INDEX idx_tickets_assigned ON tickets(assigned_user_id) WHERE assigned_us
 CREATE INDEX idx_tickets_overdue ON tickets(hotel_id, sla_due_at) WHERE is_overdue = true OR sla_due_at IS NOT NULL;
 CREATE INDEX idx_tickets_high_alert ON tickets(hotel_id, created_at DESC) WHERE is_high_alert = true;
 CREATE INDEX idx_tickets_open ON tickets(hotel_id, status) WHERE status NOT IN ('closed','cancelled');
+-- ADD-24 partial indexes
+CREATE INDEX idx_tickets_pending_review ON tickets(hotel_id, review_status) WHERE review_status = 'pending_supervisor';
+CREATE INDEX idx_tickets_otp_skipped ON tickets(hotel_id, otp_skipped, closed_at) WHERE otp_skipped = true;
+CREATE INDEX idx_tickets_telegram_message ON tickets(hotel_id, telegram_message_id) WHERE telegram_message_id IS NOT NULL;
 
 CREATE TABLE ticket_updates (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -733,6 +786,21 @@ CREATE TABLE voice_configs (
 - **To AI (separate DB, opaque)**: `ticket_messages.conversation_id` → AI's `conversations.id`. No DB FK; nullable. AI service writes the pointer when a conversation is spawned.
 - **To Integration (separate DB)**: no FK. Integration reads `departments.telegram_chat_id` + `departments.supervisor_telegram_id` cross-DB (or via internal RPC if you keep them in fully separated DBs — see `shared/data-model.md` §1 for the recommended shared-DB option).
 
+### 2.14 `hotel_otp_settings` (ADD-24)
+
+```sql
+CREATE TABLE hotel_otp_settings (
+  hotel_id              UUID PRIMARY KEY REFERENCES hotels(id) ON DELETE CASCADE,
+  otp_grace_minutes     INTEGER NOT NULL DEFAULT 10,    -- founder-locked default
+  otp_complaint_window  INTEGER NOT NULL DEFAULT 180,   -- minutes (ADD-24.4)
+  otp_enabled           BOOLEAN NOT NULL DEFAULT true,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+Absent row = defaults (services read with fallback; `GET /settings/otp` never 404s). Upserted by `PUT /settings/otp`.
+
 ---
 
 ## 3. Socket events emitted by Hotel Core
@@ -764,6 +832,7 @@ Full catalog in `shared/socket-events.md`. Hotel Core emits:
 | Failed 3x detection                     | After 3 failed AI verification attempts | Event-driven                  |
 | Daily brief PDF generation              | Once per hotel per day                  | Cron, hotel timezone          |
 | Outbound balance meter check (20% / 5% remaining) | On every outbound dispatch    | Event-driven (Integration RPC)|
+| OTP grace-close `otp.check_grace` (ADD-24) | Grace-close the ticket when no code arrived within `otp_grace_minutes` of DONE (no-op if verified/closed) | Bull delayed job scheduled at DONE click |
 | Notification persist + push             | On any socket-event-worthy state change | Event-driven                  |
 
 Place these alongside Hotel Core for simplicity. If your team prefers a separate worker process, fine — same code, separate runtime.
