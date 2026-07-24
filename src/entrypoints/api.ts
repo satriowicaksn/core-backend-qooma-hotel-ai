@@ -28,6 +28,7 @@ import { billingRoutes, buildBillingService } from '@modules/billing/index.js';
 import { buildDepartmentsService, departmentsRoutes } from '@modules/departments/index.js';
 import { buildFeatureFlagsService, featureFlagsRoutes } from '@modules/feature-flags/index.js';
 import { buildGuestsService, guestsRoutes } from '@modules/guests/index.js';
+import { hotelBootstrapRoutes } from '@modules/hotel-bootstrap/index.js';
 import { buildKnowledgeService, knowledgeRoutes } from '@modules/knowledge/index.js';
 import { buildMenuService, menuRoutes } from '@modules/menu/index.js';
 import { buildNotificationsService, notificationsRoutes } from '@modules/notifications/index.js';
@@ -189,6 +190,11 @@ async function main(): Promise<void> {
   await app.register(otpRoutes, { service: otpCrmService });
   await app.register(otpInternalRoutes, {
     service: otpService,
+    internalSecret: config.INTERNAL_API_SECRET,
+    prefix: '/internal',
+  });
+  await app.register(hotelBootstrapRoutes, {
+    db,
     internalSecret: config.INTERNAL_API_SECRET,
     prefix: '/internal',
   });
