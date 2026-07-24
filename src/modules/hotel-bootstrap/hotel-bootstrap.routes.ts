@@ -1,7 +1,6 @@
+import type { PrismaClient } from '@prisma/client';
 import type { FastifyPluginCallback } from 'fastify';
 import { z } from 'zod';
-
-import type { PrismaClient } from '@prisma/client';
 
 import { ValidationError } from '@core/errors/app-errors.js';
 
