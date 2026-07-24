@@ -6,6 +6,11 @@ import type { PrismaClient } from '@prisma/client';
 import { KnowledgeRepository } from './knowledge.repository.js';
 import { KnowledgeService } from './knowledge.service.js';
 
+export { KnowledgeRepository } from './knowledge.repository.js';
+export {
+  knowledgeInternalRoutes,
+  type KnowledgeInternalRoutesOptions,
+} from './knowledge.internal.routes.js';
 export { knowledgeRoutes, type KnowledgeRoutesOptions } from './knowledge.routes.js';
 export { KnowledgeService } from './knowledge.service.js';
 export type { CreateEntryBody, UpdateEntryBody } from './knowledge.schema.js';

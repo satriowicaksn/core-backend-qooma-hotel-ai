@@ -29,7 +29,12 @@ import { buildDepartmentsService, departmentsRoutes } from '@modules/departments
 import { buildFeatureFlagsService, featureFlagsRoutes } from '@modules/feature-flags/index.js';
 import { buildGuestsService, guestsRoutes } from '@modules/guests/index.js';
 import { hotelBootstrapRoutes } from '@modules/hotel-bootstrap/index.js';
-import { buildKnowledgeService, knowledgeRoutes } from '@modules/knowledge/index.js';
+import {
+  KnowledgeRepository,
+  buildKnowledgeService,
+  knowledgeInternalRoutes,
+  knowledgeRoutes,
+} from '@modules/knowledge/index.js';
 import { buildMenuService, menuRoutes } from '@modules/menu/index.js';
 import { buildNotificationsService, notificationsRoutes } from '@modules/notifications/index.js';
 import {
@@ -163,6 +168,7 @@ async function main(): Promise<void> {
   const featureFlagsService = buildFeatureFlagsService(db, crossDbOpts);
   const guestsService = buildGuestsService(db);
   const knowledgeService = buildKnowledgeService(db);
+  const knowledgeRepo = new KnowledgeRepository(db);
   const menuService = buildMenuService(db, storage);
   const notificationsService = buildNotificationsService(db);
   const ticketsService = buildTicketsService(db);
@@ -195,6 +201,11 @@ async function main(): Promise<void> {
   });
   await app.register(hotelBootstrapRoutes, {
     db,
+    internalSecret: config.INTERNAL_API_SECRET,
+    prefix: '/internal',
+  });
+  await app.register(knowledgeInternalRoutes, {
+    repo: knowledgeRepo,
     internalSecret: config.INTERNAL_API_SECRET,
     prefix: '/internal',
   });

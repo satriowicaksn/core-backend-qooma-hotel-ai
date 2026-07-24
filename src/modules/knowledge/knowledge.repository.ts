@@ -32,4 +32,22 @@ export class KnowledgeRepository {
   async delete(id: string): Promise<void> {
     await this.db.knowledgeEntry.delete({ where: { id } });
   }
+
+  async searchForRag(hotelId: string, query: string, limit: number): Promise<KnowledgeEntryRow[]> {
+    const q = query.trim();
+    if (q === '') return [];
+    return this.db.knowledgeEntry.findMany({
+      where: {
+        hotelId,
+        isActive: true,
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { content: { contains: q, mode: 'insensitive' } },
+          { tags: { has: q.toLowerCase() } },
+        ],
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: limit,
+    });
+  }
 }
